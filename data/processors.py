@@ -23,7 +23,7 @@ class StochasticProcessor(IProcessor):
         super().execute(x)
 
 
-class StochasticProcess(IProcessor):
+class StochasticProcess(IProcess):
     def __init__(self, ratio: float) -> None:
         super().__init__()
         self.ratio = ratio
