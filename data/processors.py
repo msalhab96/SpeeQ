@@ -27,7 +27,8 @@ class StochasticProcess(IProcessor):
     def __init__(self, ratio: float) -> None:
         super().__init__()
         self.ratio = ratio
-
+    
+    @property
     def _shall_do(self) -> bool:
         return random.random() <= self.ratio
 
