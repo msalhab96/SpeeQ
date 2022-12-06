@@ -52,3 +52,18 @@ class VolumeChanger(StochasticProcess):
 
     def func(self, x: Tensor) -> Tensor:
         return self._gain * x
+
+
+class ConsistentAttenuator(VolumeChanger):
+    """Attenuates the amplitude of the input signal by
+    a random gain less than 1, such that the gain is consistant
+    across all time steps.
+
+    Args:
+        ratio (float): The ratio/rate that the augmentation will be
+        applied to the data. Default 1.0
+        min_gain (float): The minimum gain that will be multiplied by
+        the signal. Default 0.1
+    """
+    def __init__(self, ratio=1.0, min_gain=0.1) -> None:
+        super().__init__(ratio, min_gain, max_gain=1)
