@@ -1,0 +1,37 @@
+import random
+from typing import List
+from interfaces import IProcessor, IProcess
+
+
+class OrderedProcessor(IProcessor):
+    def __init__(self, processes: List[IProcess]) -> None:
+        super().__init__()
+        self.processes = processes
+
+    def execute(self, x):
+        for process in self.processes:
+            x = process.run(x)
+        return x
+
+
+class StochasticProcessor(IProcessor):
+    def __init__(self, processes: List[IProcess]) -> None:
+        super().__init__(processes)
+
+    def execute(self, x):
+        random.shuffle(self.processes)
+        super().execute(x)
+
+
+class StochasticProcess(IProcessor):
+    def __init__(self, ratio: float) -> None:
+        super().__init__()
+        self.ratio = ratio
+
+    def _shall_do(self) -> bool:
+        return random.random() <= self.ratio
+
+    def run(self, x):
+        if self._shall_do:
+            return self.func(x)
+        return x
