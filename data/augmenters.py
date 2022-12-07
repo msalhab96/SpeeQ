@@ -67,3 +67,19 @@ class ConsistentAttenuator(VolumeChanger):
     """
     def __init__(self, ratio=1.0, min_gain=0.1) -> None:
         super().__init__(ratio, min_gain, max_gain=1)
+
+
+class VariableAttenuator(StochasticProcess):
+    """Attenuates the amplitude of the input signal by
+    a random gain less than 1, such that the gain is not consistant
+    across all time steps.
+
+    Args:
+        ratio (float): The ratio/rate that the augmentation will be
+        applied to the data. Default 1.0
+    """
+    def __init__(self, ratio=1.0) -> None:
+        super().__init__(ratio)
+
+    def func(self, x: Tensor):
+        return x * torch.randn_like(x).to(x.device)
