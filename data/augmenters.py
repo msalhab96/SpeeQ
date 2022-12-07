@@ -143,3 +143,25 @@ class Reverberation(StochasticProcess):
             torch.zeros(1, 1, ir_length//2 + is_odd).to(x.device),
         ])
         return torch.nn.functional.conv1d(x, ir).squeeze(dim=0)
+
+
+class BaseMasking(StochasticProcess):
+    def __init__(self, n: int, max_length: int, ratio=1.0) -> None:
+        super().__init__(ratio)
+        self.n = n
+        self.max_length = max_length
+
+    def _get_mask(self, x: Tensor, dim=-1):
+        mask = torch.ones_like(x, device=x.device)
+        length = x.shape[dim]
+        for _ in range(self.n):
+            start = random.randint(0, length)
+            end = random.randint(start, start + self.max_length)
+            end = min(length, end)
+            indices = torch.arange(start, end, device=x.device)
+            mask = mask.index_fill(
+                dim=dim,
+                index=indices,
+                value=0
+                )
+        return mask
