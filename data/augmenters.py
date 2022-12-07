@@ -83,3 +83,63 @@ class VariableAttenuator(StochasticProcess):
 
     def func(self, x: Tensor):
         return x * torch.randn_like(x).to(x.device)
+
+
+class Reverberation(StochasticProcess):
+    """Reverberates the input signal by generating an impulse response
+    and convolve it with the speech signal.
+
+    Args:
+        ratio (float): The ratio/rate that the augmentation will be
+        applied to the data. Default 1.0
+        min_len (int): The minimum impulse response to generate. Default 1000.
+        max_len (int): The maximum impulse response length. Default 4000.
+        start_val (int): The starting value of the impulse
+        response genration function. Default -10.
+        end_val (int): The end value of the impulse response
+        genration function. Default 10.
+        eps (float): smoothing value, to prevent devision by 0.
+        Default to 1e-3.
+    """
+    def __init__(
+            self,
+            ratio=1.0,
+            min_len=1000,
+            max_len=4000,
+            start_val=-10,
+            end_val=10,
+            eps=1e-3
+            ) -> None:
+        super().__init__(ratio)
+        self.min_len = min_len
+        self.max_len = max_len
+        self.start_val = start_val
+        self.end_val = end_val
+        self.eps = eps
+
+    def _get_impulse_response(self) -> Tensor:
+        length = random.randint(self.min_len, self.max_len)
+        x = torch.linspace(self.start_val, self.end_val, length)
+        alpha = self.eps + random.random()
+        x /= alpha
+        denominator = torch.exp(x) + torch.exp(-x)
+        numerator = torch.exp(x) - torch.exp(-x)
+        envelope = 1 - (numerator / denominator) ** 2
+        envelope = envelope.nan_to_num()
+        h = torch.randn_like(envelope) * envelope
+        return h.view(1, 1, length)
+
+    def func(self, x: Tensor):
+        if x.dim() == 2:
+            x = x.unsqueeze(dim=0)
+        ir = self._get_impulse_response()
+        ir = ir.to(x.device)
+        ir = ir.flip(dims=[-1])
+        ir_length = ir.shape[-1]
+        is_odd = int(ir_length % 2 != 0)
+        x = torch.cat([
+            torch.zeros(1, 1, ir_length//2).to(x.device),
+            x,
+            torch.zeros(1, 1, ir_length//2 + is_odd).to(x.device),
+        ])
+        return torch.nn.functional.conv1d(x, ir).squeeze(dim=0)
