@@ -165,3 +165,43 @@ class BaseMasking(StochasticProcess):
                 value=0
                 )
         return mask
+
+
+class FrequencyMasking(BaseMasking):
+    """Mask the inpus spectrogram, on the frequency axis.
+
+    Args:
+        n (int): The number of times to apply the masking operation.
+        max_length (int): The maximum masking length.
+        ratio (float): The ratio/rate that the augmentation will be
+        applied to the data. Default 1.0
+    """
+    def __init__(self, n: int, max_length: int, ratio=1.0) -> None:
+        super().__init__(ratio, n, max_length)
+
+    def func(self, x: Tensor) -> Tensor:
+        """
+        x (Tensor): the input spectrogram to be augmented of
+        shape [..., time, freq].
+        """
+        return x * self._get_mask(x, dim=-1)
+
+
+class TimeMasking(BaseMasking):
+    """Mask the inpus spectrogram, on the time axis.
+
+    Args:
+        n (int): The number of times to apply the masking operation.
+        max_length (int): The maximum masking length.
+        ratio (float): The ratio/rate that the augmentation will be
+        applied to the data. Default 1.0
+    """
+    def __init__(self, n: int, max_length: int, ratio=1.0) -> None:
+        super().__init__(ratio, n, max_length)
+
+    def func(self, x: Tensor) -> Tensor:
+        """
+        x (Tensor): the input spectrogram to be augmented of
+        shape [..., time, freq].
+        """
+        return x * self._get_mask(x, dim=-2)
