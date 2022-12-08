@@ -1,3 +1,4 @@
+import torch
 import json
 from typing import Union
 from csv import DictReader
@@ -40,3 +41,8 @@ def load_csv(
     with open(file_path, 'r', encoding=encoding) as f:
         data = [*DictReader(f)]
     return data
+
+
+def get_pad_mask(seq_len: int, pad_len: int):
+    mask = [i < seq_len for i in range(seq_len + pad_len)]
+    return torch.BoolTensor(mask)
