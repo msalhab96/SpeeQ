@@ -1,5 +1,6 @@
 import json
 from typing import Union
+from csv import DictReader
 
 
 def load_json(file_path, encoding='utf-8'):
@@ -30,3 +31,12 @@ def save_text(
         ) -> None:
     with open(file_path, 'w', encoding=encoding) as f:
         f.write(data)
+
+
+def load_csv(
+        file_path,
+        encoding='utf-8'
+        ):
+    with open(file_path, 'r', encoding=encoding) as f:
+        data = [*DictReader(f)]
+    return data
