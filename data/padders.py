@@ -42,3 +42,27 @@ class DynamicPadder(IPadder):
         else:
             x = torch.cat([x, pad], dim=self.dim)
         return x, pad_len
+
+
+class StaticPadder(DynamicPadder):
+    """Pads the input sequence across a dim for the maximum length
+
+    Args:
+        dim (int): The dimension to do the padding across.
+        pad_val (Union[int, Tensor, float]): The padding value that
+        will be used to fill the padding sequence.
+        max_len (int): The maximum sequence length.
+        left_pad (int): The side to pad the padding sequence to.
+    """
+    def __init__(
+            self,
+            dim: int,
+            pad_val: Union[int, Tensor, float],
+            max_len: int,
+            left_pad=False
+            ) -> None:
+        super().__init__(dim, pad_val, left_pad)
+        self.max_len = max_len
+
+    def pad(self, x: Tensor, *args, **kwargs):
+        return super().pad(x, self.max_len)
