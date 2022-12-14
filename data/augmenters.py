@@ -1,4 +1,4 @@
-from processors import StochasticProcess
+from .processors import StochasticProcess
 from torch import Tensor
 import random
 import torch
