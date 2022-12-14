@@ -1,6 +1,7 @@
+from abc import abstractmethod
 import random
 from typing import List
-from interfaces import IProcessor, IProcess
+from .interfaces import IProcessor, IProcess
 
 
 class OrderedProcessor(IProcessor):
@@ -27,10 +28,14 @@ class StochasticProcess(IProcess):
     def __init__(self, ratio: float) -> None:
         super().__init__()
         self.ratio = ratio
-    
+
     @property
     def _shall_do(self) -> bool:
         return random.random() <= self.ratio
+
+    @abstractmethod
+    def func():
+        pass
 
     def run(self, x):
         if self._shall_do:

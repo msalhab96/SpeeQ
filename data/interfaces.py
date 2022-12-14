@@ -13,10 +13,6 @@ class IProcessor(ABC):
 class IProcess(ABC):
 
     @abstractmethod
-    def func():
-        pass
-
-    @abstractmethod
     def run():
         pass
 
