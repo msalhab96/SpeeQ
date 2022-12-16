@@ -67,3 +67,23 @@ class PackedLSTM(PackedRNN):
             batch_first=batch_first,
             bidirectional=bidirectional
         )
+
+
+class PackedGRU(PackedRNN):
+    def __init__(
+            self,
+            input_size: int,
+            hidden_size: int,
+            batch_first=True,
+            enforce_sorted=False,
+            bidirectional=False
+            ) -> None:
+        super().__init__(
+            input_size, hidden_size, batch_first, enforce_sorted, bidirectional
+            )
+        self.rnn = nn.GRU(
+            input_size=input_size,
+            hidden_size=hidden_size,
+            batch_first=batch_first,
+            bidirectional=bidirectional
+        )
