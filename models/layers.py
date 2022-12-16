@@ -87,3 +87,21 @@ class PackedGRU(PackedRNN):
             batch_first=batch_first,
             bidirectional=bidirectional
         )
+
+
+class PredModule(nn.Module):
+    def __init__(
+            self,
+            in_features: int,
+            n_classes: int,
+            activation: nn.Module
+            ) -> None:
+        super().__init__()
+        self.fc = nn.Linear(
+            in_features=in_features,
+            out_features=n_classes
+        )
+        self.activation = activation
+
+    def forward(self, x: Tensor) -> Tensor:
+        return self.activation(self.fc(x))
