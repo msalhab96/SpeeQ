@@ -19,6 +19,7 @@ class DeepSpeechV1(nn.Module):
         n_clases (int): The number of classes to predict.
         max_clip_value (int): The maximum relu value.
         rnn_type (str): rnn, gru or lstm.
+        p_dropout (float): The dropout rate.
     """
     def __init__(
             self,
@@ -28,7 +29,8 @@ class DeepSpeechV1(nn.Module):
             bidirectional: bool,
             n_clases: int,
             max_clip_value: int,
-            rnn_type: str
+            rnn_type: str,
+            p_dropout: float
             ) -> None:
         super().__init__()
         self.ff_layers = nn.ModuleList([
@@ -39,6 +41,9 @@ class DeepSpeechV1(nn.Module):
                     ),
                 CReLu(
                     max_val=max_clip_value
+                    ),
+                nn.Dropout(
+                    p=p_dropout
                     )
             )
             for i in range(n_linear_layers)
