@@ -90,6 +90,15 @@ class PackedGRU(PackedRNN):
 
 
 class PredModule(nn.Module):
+    """A prediction module that consist of a signle
+    feed forward layer followed by a pre-defined activation
+    function.
+
+    Args:
+        in_features (int): The input feature size.
+        n_classes (int): The number of classes to produce.
+        activation (Module): The activation function to be used.
+    """
     def __init__(
             self,
             in_features: int,
