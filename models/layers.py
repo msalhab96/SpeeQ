@@ -47,3 +47,23 @@ class PackedRNN(nn.Module):
         out, h = self.rnn(packed)
         out, lens = pad_packed_sequence(out, batch_first=self.batch_first)
         return out, h, lens
+
+
+class PackedLSTM(PackedRNN):
+    def __init__(
+            self,
+            input_size: int,
+            hidden_size: int,
+            batch_first=True,
+            enforce_sorted=False,
+            bidirectional=False
+            ) -> None:
+        super().__init__(
+            input_size, hidden_size, batch_first, enforce_sorted
+            )
+        self.rnn = nn.LSTM(
+            input_size=input_size,
+            hidden_size=hidden_size,
+            batch_first=batch_first,
+            bidirectional=bidirectional
+        )
