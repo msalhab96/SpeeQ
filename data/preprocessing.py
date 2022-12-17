@@ -39,16 +39,31 @@ class FeatExtractor(IProcess):
             self,
             feat_ext_name: str,
             feat_ext_args: dict,
-            feat_stack_factor=1,
             ) -> None:
         super().__init__()
-        assert feat_stack_factor >= 1
-        self.feat_stack_factor = feat_stack_factor
         self.feat_extractor = self.__feat_extractor[feat_ext_name](
             **feat_ext_args
             )
 
-    def feat_stack(self, x: Tensor):
+    def run(self, x: Tensor):
+        x = self.feat_extractor(x)
+        x = x.swapaxes(-1, -2)  # (..., T, F)
+        return x
+
+
+class FeatStacker(IProcess):
+    """Implements the feature stacking operation.
+
+    Args:
+        feat_stack_factor (int): The feature stacking
+        ratio.
+    """
+    def __init__(self, feat_stack_factor: int) -> None:
+        super().__init__()
+        assert feat_stack_factor > 1
+        self.feat_stack_factor = feat_stack_factor
+
+    def run(self, x: Tensor):
         # x of shape (..., T, F)
         if self.feat_stack_factor == 1:
             return x
@@ -56,16 +71,11 @@ class FeatExtractor(IProcess):
         if residual != 0:
             size = list(x.shape)
             size[1] = self.feat_stack_factor - residual
-            x = torch.cat([x, torch.zeros(*size)])
+            zeros = torch.zeros(*size).to(x.device)
+            x = torch.cat([x, zeros])
         x = x.view(
             *x.shape[:-2],
             x.shape[-2] // self.feat_stack_factor,
             -1
             )
-        return x
-
-    def run(self, x: Tensor):
-        x = self.feat_extractor(x)
-        x = x.swapaxes(-1, -2)  # (..., T, F)
-        x = self.feat_stack(x)
         return x
