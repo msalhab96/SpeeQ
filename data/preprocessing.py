@@ -1,6 +1,7 @@
 import torch
 import functools
 import torchaudio
+from torch import nn
 from torch import Tensor
 from typing import Union
 from pathlib import Path
@@ -78,4 +79,40 @@ class FeatStacker(IProcess):
             x.shape[-2] // self.feat_stack_factor,
             -1
             )
+        return x
+
+
+class FrameContextualizer(IProcess):
+    """Implements frame contextualizer through time
+    as described in https://arxiv.org/abs/1412.5567
+
+    Args:
+        contex_size (int): The context size, or the number
+        of left and right frames to take with the current frame.
+    """
+    def __init__(self, contex_size: int) -> None:
+        super().__init__()
+        self.contex_size = contex_size
+        self.win_size = self.contex_size * 2 + 1
+        self.conv = nn.Conv1d(
+            in_channels=1,
+            out_channels=self.win_size,
+            kernel_size=self.win_size,
+            bias=False
+        )
+        self.conv.weight.data = torch.eye(self.win_size).view(
+            self.win_size, 1, self.win_size
+            )
+        self.conv.weight.requires_grad = False
+
+    def run(self, x: Tensor) -> Tensor:
+        # x of shape [1, T, F]
+        x = x.permute(2, 0, 1)  # [F, 1, T]
+        zeros = torch.zeros(
+            x.shape[0], 1, self.contex_size
+            )
+        x = torch.cat([zeros, x, zeros], dim=-1)
+        x = self.conv(x)  # [F, W, T]
+        x = x.permute(2, 1, 0).contiguous()  # [T, W, F]
+        x = x.view(1, x.shape[0], -1)  # [1, T, W * F]
         return x
