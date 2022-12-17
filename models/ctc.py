@@ -53,11 +53,18 @@ class DeepSpeechV1(nn.Module):
             hidden_size=hidden_size,
             bidirectional=bidirectional
         )
+        self.fc = nn.Linear(
+            in_features=hidden_size,
+            out_features=hidden_size,
+        )
+        self.crelu = CReLu(max_val=max_clip_value)
         self.pred_net = PredModule(
-            in_features=2 * hidden_size if bidirectional else hidden_size,
+            in_features=hidden_size,
             n_classes=n_clases,
             activation=nn.LogSoftmax(dim=-1)
         )
+        self.bidirectional = bidirectional
+        self.hidden_size = hidden_size
 
     def forward(self, x: Tensor, mask: Tensor) -> Tuple[Tensor, Tensor]:
         # mask of shape [B, M] and True if there's no padding
@@ -66,6 +73,9 @@ class DeepSpeechV1(nn.Module):
         for layer in self.ff_layers:
             x = layer(x)
         out, _, lengths = self.rnn(x, lengths)
+        if self.bidirectional is True:
+            out = out[..., :self.hidden_size] + out[..., self.hidden_size:]
+        out = self.crelu(self.fc(out))
         preds = self.pred_net(out)
         preds = preds.permute(1, 0, 2)
         return preds, lengths
