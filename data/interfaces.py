@@ -17,20 +17,6 @@ class IProcess(ABC):
         pass
 
 
-class IFileLoader(ABC):
-
-    @abstractmethod
-    def load():
-        pass
-
-
-class IFormater(ABC):
-
-    @abstractmethod
-    def format():
-        pass
-
-
 class IPadder(ABC):
 
     @abstractmethod
@@ -92,4 +78,26 @@ class ITokenizer(ABC):
 
     @abstractmethod
     def get_tokens(self):
+        pass
+
+
+class Dataset(ABC):
+
+    @abstractmethod
+    def __getitem__(self):
+        pass
+
+    @abstractmethod
+    def __len__(self):
+        pass
+
+
+class DataLoader(ABC):
+
+    @abstractmethod
+    def __next__(self):
+        pass
+
+    @abstractmethod
+    def __iter__(self):
         pass
