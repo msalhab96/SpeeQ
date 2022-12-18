@@ -36,10 +36,11 @@ def save_text(
 
 def load_csv(
         file_path,
-        encoding='utf-8'
+        encoding='utf-8',
+        sep=','
         ):
     with open(file_path, 'r', encoding=encoding) as f:
-        data = [*DictReader(f)]
+        data = [*DictReader(f, delimiter=sep)]
     return data
 
 
