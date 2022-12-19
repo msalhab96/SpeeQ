@@ -1,10 +1,11 @@
 import torch
 from torch import Tensor
-from typing import Tuple, Union
+from typing import List, Tuple, Union
 from pathlib import Path
 from .utils import load_csv
 from .processors import IProcessor
-from .interfaces import ITokenizer
+from .interfaces import ITokenizer, IPadder
+from .utils import get_pad_mask
 from constants import FileKeys
 
 
@@ -128,3 +129,86 @@ class DataLoader:
             self.length,
             (1 + self._counter) * self.batch_size
         )
+
+
+class SpeechTextLoader(DataLoader):
+    """Build the speech-text iterable data loader
+
+    Args:
+        dataset (object): The dataset.
+        rank (int): The process rank.
+        world_size (int): The number of total processes.
+        batch_size (int): The batch size.
+        text_padder (IPadder): The text padder.
+        speech_padder (IPadder): The speech padder.
+    """
+    def __init__(
+            self,
+            dataset: object,
+            rank: int,
+            world_size: int,
+            batch_size: int,
+            text_padder: IPadder,
+            speech_padder: IPadder,
+            ) -> None:
+        super().__init__(
+            dataset, rank, world_size, batch_size
+            )
+        self.text_padder = text_padder
+        self.speech_padder = speech_padder
+
+    def _stack_padded(self, batch: List[Tuple[Tensor, int]]) -> Tensor:
+        return torch.vstack(
+            list(map(lambda x: x[0], batch))
+        )
+
+    def _get_mask(
+            self, batch: List[Tuple[Tensor, int]], max_len_dim: int
+            ) -> Tensor:
+        def get_mask(x: Tuple[Tensor, int]):
+            (example, pad_len) = x
+            seq_len = example.shape[max_len_dim]
+            return get_pad_mask(
+                seq_len=seq_len - pad_len, pad_len=pad_len
+                )
+        masks = list(map(get_mask, batch))
+        return torch.vstack(masks)
+
+    def get_batch(self) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
+        # TODO: Add multi-threading here
+        max_speech_len = 0
+        max_text_len = 0
+        speeches = []
+        texts = []
+        for idx in self.indices[self.start_idx: self.end_idx]:
+            print(idx)
+            speech, speech_len, text, text_len = self.data[idx]
+            max_speech_len = max(max_speech_len, speech_len)
+            max_text_len = max(max_text_len, text_len)
+            speeches.append(speech)
+            texts.append(text)
+        speech = [
+            self.speech_padder.pad(speech, max_len=max_speech_len)
+            for speech in speeches
+            ]
+        text = [
+            self.text_padder.pad(text, max_text_len)
+            for text in texts
+        ]
+        speech_mask = self._get_mask(speech, max_len_dim=-2)
+        speech = self._stack_padded(speech)
+        text_mask = self._get_mask(text, max_len_dim=0)
+        text = self._stack_padded(text)
+        return speech, speech_mask, text, text_mask
+
+    def __iter__(self):
+        self._counter = 0
+        print('counter resett!')
+        return self
+
+    def __next__(self):
+        if self._counter >= self.n_batches:
+            raise StopIteration
+        batch = self.get_batch()
+        self._counter += 1
+        return batch
