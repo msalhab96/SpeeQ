@@ -81,7 +81,7 @@ class ITokenizer(ABC):
         pass
 
 
-class Dataset(ABC):
+class IDataset(ABC):
 
     @abstractmethod
     def __getitem__(self):
