@@ -7,9 +7,10 @@ from .processors import IProcessor
 from .interfaces import ITokenizer, IPadder
 from .utils import get_pad_mask
 from constants import FileKeys
+from .interfaces import IDataLoader, IDataset
 
 
-class CSVDataset:
+class CSVDataset(IDataset):
     """The base dataset class that handles
     CSV datasets.
 
@@ -92,7 +93,7 @@ class SpeechTextDataset(CSVDataset):
         return speech, speech_len, text, text_len
 
 
-class DataLoader:
+class DataLoader(IDataLoader):
     """Builds the iterable data loader basic class.
 
     Args:
