@@ -92,7 +92,7 @@ class IDataset(ABC):
         pass
 
 
-class DataLoader(ABC):
+class IDataLoader(ABC):
 
     @abstractmethod
     def __next__(self):
