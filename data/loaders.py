@@ -89,3 +89,42 @@ class SpeechTextDataset(CSVDataset):
             item[FileKeys.speech_key.value]
             )
         return speech, speech_len, text, text_len
+
+
+class DataLoader:
+    """Builds the iterable data loader basic class.
+
+    Args:
+        dataset (object): The dataset.
+        rank (int): The process rank.
+        world_size (int): The number of total processes.
+        batch_size (int): The batch size.
+    """
+    def __init__(
+            self,
+            dataset: object,
+            rank: int,
+            world_size: int,
+            batch_size: int
+            ) -> None:
+        self.rank = rank
+        self.world_size = world_size
+        self.data = dataset
+        self.indices = [
+            *range(0, len(self.data), self.world_size)
+            ]
+        self.length = len(self.indices)
+        self._counter = 0
+        self.batch_size = batch_size
+        self.n_batches = self.length // self.batch_size
+
+    @property
+    def start_idx(self):
+        return self._counter * self.batch_size
+
+    @property
+    def end_idx(self):
+        return min(
+            self.length,
+            (1 + self._counter) * self.batch_size
+        )
