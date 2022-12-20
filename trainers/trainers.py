@@ -1,4 +1,5 @@
 import os
+from torch import Tensor
 from typing import Union
 from data.interfaces import IDataLoader
 from .interfaces import ISchedular, ITrainer
@@ -50,6 +51,16 @@ class BaseTrainer(ITrainer):
             self.history[HistoryKeys.test_loss] = list()
         if HistoryKeys.train_loss not in self.history:
             self.history[HistoryKeys.train_loss] = list()
+        self.counter = 1
+
+    def backward_pass(self, loss: Tensor) -> None:
+        loss.backward()
+        self.optimizer.step()
+        self.optimizer.zero_grad()
+
+    def fit(self):
+        for _ in range(self.epochs):
+            self.train()
 
 
 class BaseDistTrainer(BaseTrainer):
