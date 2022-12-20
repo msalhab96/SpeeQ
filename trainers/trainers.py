@@ -1,6 +1,6 @@
 import os
 from torch import Tensor
-from typing import Union
+from typing import Tuple, Union
 from data.interfaces import IDataLoader
 from .interfaces import ISchedular, ITrainer
 from constants import HistoryKeys
@@ -134,3 +134,63 @@ class BaseDistTrainer(BaseTrainer):
     @property
     def is_master(self):
         return self.rank == 0
+
+
+class CTCTrainer(BaseTrainer):
+    def __init__(
+            self,
+            optimizer: Union[Optimizer, ISchedular],
+            criterion: Module,
+            model: Module,
+            train_loader: IDataLoader,
+            test_loader: IDataLoader,
+            epochs: int,
+            log_steps_frequency: int,
+            device: str,
+            history: dict = {}
+            ) -> None:
+        super().__init__(
+            optimizer=optimizer,
+            criterion=criterion,
+            model=model,
+            train_loader=train_loader,
+            test_loader=test_loader,
+            epochs=epochs,
+            log_steps_frequency=log_steps_frequency,
+            history=history
+        )
+        self.device = device
+
+    # TODO: add step test decorator
+    # TODO: add step log decorator
+    def forward_pass(
+            self, batch: Tuple[Tensor]) -> Tensor:
+        batch = [
+            item.to(self.device) for item in batch
+            ]
+        [speech, speech_mask, text, text_mask] = batch
+        preds, lengths = self.model(speech, speech_mask)
+        # preds of shape [T, B, C]
+        loss = self.criterion(
+            preds, text, lengths, text_mask.sum(dim=-1)
+            )
+        return loss
+
+    # TODO: add train epoch log decorator
+    def train(self) -> float:
+        self.model.train()
+        total_loss = 0.0
+        for batch in self.train_loader:
+            loss = self.forward_pass(batch)
+            self.backward_pass(loss)
+            total_loss += loss.item()
+        return total_loss / len(self.train_loader)
+
+    # TODO: add epoch test log decorator
+    def test(self) -> float:
+        self.model.eval()
+        total_loss = 0.0
+        for batch in self.test_loader:
+            loss = self.forward_pass(batch)
+            total_loss += loss
+        return total_loss / len(self.test_loader)
