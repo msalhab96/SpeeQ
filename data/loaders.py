@@ -118,7 +118,7 @@ class DataLoader(IDataLoader):
         self.world_size = world_size
         self.data = dataset
         self.indices = [
-            *range(0, len(self.data), self.world_size)
+            *range(rank, len(self.data), self.world_size)
             ]
         self.length = len(self.indices)
         self._counter = 0
