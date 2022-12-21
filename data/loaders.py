@@ -60,6 +60,8 @@ class SpeechTextDataset(CSVDataset):
             speech_processor: IProcessor,
             text_processor: IProcessor,
             sep: str,
+            add_sos=False,
+            add_eos=False,
             encoding='utf-8'
             ) -> None:
         super().__init__(
@@ -68,12 +70,15 @@ class SpeechTextDataset(CSVDataset):
         self.tokenizer = tokenizer
         self.speech_processor = speech_processor
         self.text_processor = text_processor
+        self.add_sos = add_sos
+        self.add_eos = add_eos
 
     def process_text(self, text: str) -> Tuple[Tensor, int]:
         text = self.text_processor.execute(text)
-        # FIX: eos and sos for CTC-based model
         tokens = self.tokenizer.tokenize(
-            text, add_sos=True, add_eos=True
+            text,
+            add_sos=self.add_sos,
+            add_eos=self.add_eos
             )
         return torch.LongTensor(tokens), len(tokens)
 
@@ -130,6 +135,9 @@ class DataLoader(IDataLoader):
             self.length,
             (1 + self._counter) * self.batch_size
         )
+
+    def __len__(self):
+        return self.n_batches
 
 
 class SpeechTextLoader(DataLoader):
