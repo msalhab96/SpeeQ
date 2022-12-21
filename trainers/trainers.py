@@ -1,4 +1,5 @@
 import os
+import torch
 from torch import Tensor
 from typing import Tuple, Union
 from data.interfaces import IDataLoader
@@ -6,7 +7,9 @@ from .interfaces import ISchedular, ITrainer
 from constants import HistoryKeys
 from torch.optim import Optimizer
 from torch.nn import Module
-from torch.distributed import init_process_group
+from torch.distributed import (
+    init_process_group, barrier, ReduceOp, all_reduce
+    )
 from torch.nn.parallel import DistributedDataParallel
 
 
@@ -200,3 +203,74 @@ class CTCTrainer(BaseTrainer):
             loss = self.forward_pass(batch)
             total_loss += loss
         return total_loss / len(self.test_loader)
+
+
+class DistCTCTrainer(CTCTrainer, BaseDistTrainer):
+    def __init__(
+            self,
+            optimizer: Union[Optimizer, ISchedular],
+            criterion: Module,
+            model: Module,
+            train_loader: IDataLoader,
+            test_loader: IDataLoader,
+            epochs: int,
+            log_steps_frequency: int,
+            rank: int,
+            world_size: int,
+            dist_address: int,
+            dist_port: int,
+            dist_backend: str,
+            history: dict = {}
+            ) -> None:
+        CTCTrainer.__init__(
+            self,
+            optimizer=optimizer,
+            criterion=criterion,
+            model=model,
+            train_loader=train_loader,
+            test_loader=test_loader,
+            epochs=epochs,
+            log_steps_frequency=log_steps_frequency,
+            device=f'cuda:{rank}',
+            history=history
+        )
+        BaseDistTrainer.__init__(
+            self,
+            optimizer=optimizer,
+            criterion=criterion,
+            model=model,
+            train_loader=train_loader,
+            test_loader=test_loader,
+            epochs=epochs,
+            log_steps_frequency=log_steps_frequency,
+            rank=rank,
+            world_size=world_size,
+            dist_address=dist_address,
+            dist_port=dist_port,
+            dist_backend=dist_backend,
+            history=history
+        )
+
+    def _all_reduce_loss(self, total_loss: float) -> Tensor:
+        total = torch.tensor([total_loss/self.counter]).cuda(self.rank)
+        all_reduce(total, op=ReduceOp.SUM)
+        return total / self.world_size
+
+    def train(self) -> float:
+        self.model.train()
+        total_loss = 0.0
+        for batch in self.train_loader:
+            loss = self.train_step(batch)
+            total_loss += loss
+            if self.counter % self.log_steps_frequency == 0:
+                total = self._all_reduce_loss(total_loss)
+                if self.is_master():
+                    # TODO: add the total to the logger
+                    self.test()
+                barrier()
+        return self._all_reduce_loss(total_loss)
+
+    def fit(self):
+        for _ in range(self.epochs):
+            self.train()
+            barrier()
