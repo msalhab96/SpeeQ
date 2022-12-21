@@ -176,14 +176,20 @@ class CTCTrainer(BaseTrainer):
             )
         return loss
 
+    def train_step(self, batch: Tuple[Tensor]) -> float:
+        loss = self.forward_pass(batch)
+        self.backward_pass(loss)
+        return loss.item()
+
     # TODO: add train epoch log decorator
     def train(self) -> float:
         self.model.train()
         total_loss = 0.0
         for batch in self.train_loader:
-            loss = self.forward_pass(batch)
-            self.backward_pass(loss)
-            total_loss += loss.item()
+            loss = self.train_step(batch)
+            total_loss += loss
+            if self.counter % self.log_steps_frequency == 0:
+                self.test()
         return total_loss / len(self.train_loader)
 
     # TODO: add epoch test log decorator
