@@ -3,8 +3,10 @@ import torch
 from torch import Tensor
 from typing import Tuple, Union
 from data.interfaces import IDataLoader
+from trainers.decorators import step_log
+from utils.loggers import ILogger
 from .interfaces import ISchedular, ITrainer
-from constants import HistoryKeys
+from constants import HistoryKeys, LogCategories
 from torch.optim import Optimizer
 from torch.nn import Module
 from torch.distributed import (
@@ -27,6 +29,7 @@ class BaseTrainer(ITrainer):
         epochs (int): The number of epochs.
         log_steps_frequency (int): The number of steps to log the
         results after.
+        logger (ILogger): The logger to be used.
         history (dict): The history of the training if there is
         any. Default {}.
     """
@@ -39,6 +42,7 @@ class BaseTrainer(ITrainer):
             test_loader: IDataLoader,
             epochs: int,
             log_steps_frequency: int,
+            logger: ILogger,
             history: dict = {}
             ) -> None:
         super().__init__()
@@ -49,6 +53,7 @@ class BaseTrainer(ITrainer):
         self.test_loader = test_loader
         self.epochs = epochs
         self.log_steps_frequency = log_steps_frequency
+        self.logger = logger
         self.history = history
         if HistoryKeys.test_loss not in self.history:
             self.history[HistoryKeys.test_loss] = list()
@@ -65,6 +70,14 @@ class BaseTrainer(ITrainer):
         for _ in range(self.epochs):
             self.train()
 
+    def inline_log(self, key: str, category: str, value: int):
+        tag = f'{key}_{category}'
+        if tag in self.history:
+            self.history[tag].append(key)
+        else:
+            self.history[tag] = [value]
+        self.logger.log_step(key, category, value)
+
 
 class BaseDistTrainer(BaseTrainer):
     """Builds the basic distributed data parallel trainer module
@@ -80,6 +93,7 @@ class BaseDistTrainer(BaseTrainer):
         epochs (int): The number of epochs.
         log_steps_frequency (int): The number of steps to log the
         results after.
+        logger (ILogger): The logger to be used.
         rank (int): The process index.
         world_size (int): The number of nodes/processes.
         dist_address (str): The address of the master node.
@@ -97,6 +111,7 @@ class BaseDistTrainer(BaseTrainer):
             test_loader: IDataLoader,
             epochs: int,
             log_steps_frequency: int,
+            logger: ILogger,
             rank: int,
             world_size: int,
             dist_address: str,
@@ -112,6 +127,7 @@ class BaseDistTrainer(BaseTrainer):
             test_loader=test_loader,
             epochs=epochs,
             log_steps_frequency=log_steps_frequency,
+            logger=logger,
             history=history
         )
         self.rank = rank
@@ -138,6 +154,13 @@ class BaseDistTrainer(BaseTrainer):
     def is_master(self):
         return self.rank == 0
 
+    def _all_reduce_loss(
+            self, total_loss: float, counter: int
+            ) -> Tensor:
+        total = torch.tensor([total_loss/counter]).cuda(self.rank)
+        all_reduce(total, op=ReduceOp.SUM)
+        return total / self.world_size
+
 
 class CTCTrainer(BaseTrainer):
     def __init__(
@@ -150,6 +173,7 @@ class CTCTrainer(BaseTrainer):
             epochs: int,
             log_steps_frequency: int,
             device: str,
+            logger: ILogger,
             history: dict = {}
             ) -> None:
         super().__init__(
@@ -160,12 +184,11 @@ class CTCTrainer(BaseTrainer):
             test_loader=test_loader,
             epochs=epochs,
             log_steps_frequency=log_steps_frequency,
+            logger=logger,
             history=history
         )
         self.device = device
 
-    # TODO: add step test decorator
-    # TODO: add step log decorator
     def forward_pass(
             self, batch: Tuple[Tensor]) -> Tensor:
         batch = [
@@ -179,23 +202,33 @@ class CTCTrainer(BaseTrainer):
             )
         return loss
 
+    @property
+    def is_master(self):
+        return True
+
+    @step_log(key=HistoryKeys.train_loss, category=LogCategories.batches)
     def train_step(self, batch: Tuple[Tensor]) -> float:
         loss = self.forward_pass(batch)
         self.backward_pass(loss)
         return loss.item()
 
-    # TODO: add train epoch log decorator
+    @step_log(key=HistoryKeys.train_loss, category=LogCategories.epochs)
     def train(self) -> float:
         self.model.train()
         total_loss = 0.0
-        for batch in self.train_loader:
+        for i, batch in enumerate(self.train_loader):
             loss = self.train_step(batch)
             total_loss += loss
             if self.counter % self.log_steps_frequency == 0:
                 self.test()
+                self.inline_log(
+                    key=HistoryKeys.train_loss,
+                    category=LogCategories.steps,
+                    value=total_loss / (i + 1)
+                    )
         return total_loss / len(self.train_loader)
 
-    # TODO: add epoch test log decorator
+    @step_log(key=HistoryKeys.test_loss, category=LogCategories.steps)
     def test(self) -> float:
         self.model.eval()
         total_loss = 0.0
@@ -214,6 +247,7 @@ class DistCTCTrainer(CTCTrainer, BaseDistTrainer):
             train_loader: IDataLoader,
             test_loader: IDataLoader,
             epochs: int,
+            logger: ILogger,
             log_steps_frequency: int,
             rank: int,
             world_size: int,
@@ -232,6 +266,7 @@ class DistCTCTrainer(CTCTrainer, BaseDistTrainer):
             epochs=epochs,
             log_steps_frequency=log_steps_frequency,
             device=f'cuda:{rank}',
+            logger=logger,
             history=history
         )
         BaseDistTrainer.__init__(
@@ -243,6 +278,7 @@ class DistCTCTrainer(CTCTrainer, BaseDistTrainer):
             test_loader=test_loader,
             epochs=epochs,
             log_steps_frequency=log_steps_frequency,
+            logger=logger,
             rank=rank,
             world_size=world_size,
             dist_address=dist_address,
@@ -251,26 +287,28 @@ class DistCTCTrainer(CTCTrainer, BaseDistTrainer):
             history=history
         )
 
-    def _all_reduce_loss(self, total_loss: float) -> Tensor:
-        total = torch.tensor([total_loss/self.counter]).cuda(self.rank)
-        all_reduce(total, op=ReduceOp.SUM)
-        return total / self.world_size
-
+    @step_log(key=HistoryKeys.train_loss, category=LogCategories.epochs)
     def train(self) -> float:
         self.model.train()
         total_loss = 0.0
-        for batch in self.train_loader:
+        for i, batch in enumerate(self.train_loader):
             loss = self.train_step(batch)
             total_loss += loss
             if self.counter % self.log_steps_frequency == 0:
-                total = self._all_reduce_loss(total_loss)
+                total = self._all_reduce_loss(total_loss, i + 1)
                 if self.is_master():
-                    # TODO: add the total to the logger
-                    self.test()
+                    self.inline_log(
+                        key=HistoryKeys.train_loss,
+                        category=LogCategories.steps,
+                        value=total
+                        )
+                    self.testdist_config()
                 barrier()
-        return self._all_reduce_loss(total_loss)
+        return self._all_reduce_loss(total_loss, len(self.train_loader))
 
     def fit(self):
         for _ in range(self.epochs):
             self.train()
+            if self.is_master:
+                self.logger.log()
             barrier()
