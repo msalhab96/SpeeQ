@@ -1,4 +1,3 @@
-import pandas as pd
 from pathlib import Path
 from typing import Union
 from .utils import clear
@@ -23,7 +22,6 @@ class TBLogger(ILogger):
         self.writer = SummaryWriter(log_dir)
         self.__counters = dict()
         self.n_logs = n_logs
-        clear()
         print('Started!')
 
     def log_step(
@@ -32,7 +30,7 @@ class TBLogger(ILogger):
             category: str,
             value: Union[int, float]
             ) -> None:
-        tag = f'{key/category}'
+        tag = f'{key}/{category}'
         if tag in self.__counters:
             self.__counters[tag] += 1
             counter = self.__counters[tag]
@@ -45,6 +43,6 @@ class TBLogger(ILogger):
         logs = {
             key: value[-self.n_logs:] for key, value in history.items()
             }
-        logs = pd.DataFrame(logs)
+        print(logs)
         clear()  # cleaning the screen up
         print(logs)
