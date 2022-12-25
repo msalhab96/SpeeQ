@@ -190,7 +190,6 @@ class SpeechTextLoader(DataLoader):
         speeches = []
         texts = []
         for idx in self.indices[self.start_idx: self.end_idx]:
-            print(idx)
             speech, speech_len, text, text_len = self.data[idx]
             max_speech_len = max(max_speech_len, speech_len)
             max_text_len = max(max_text_len, text_len)
@@ -212,7 +211,6 @@ class SpeechTextLoader(DataLoader):
 
     def __iter__(self):
         self._counter = 0
-        print('counter resett!')
         return self
 
     def __next__(self):
