@@ -1,7 +1,7 @@
 import torch
 from typing import Tuple
 from .layers import CReLu, PredModule
-from .registry import RNN_REGISTRY
+from . import registry
 from torch import nn
 from torch import Tensor
 
@@ -27,7 +27,7 @@ class DeepSpeechV1(nn.Module):
             hidden_size: int,
             n_linear_layers: int,
             bidirectional: bool,
-            n_clases: int,
+            n_classes: int,
             max_clip_value: int,
             rnn_type: str,
             p_dropout: float
@@ -48,7 +48,7 @@ class DeepSpeechV1(nn.Module):
             )
             for i in range(n_linear_layers)
         ])
-        self.rnn = RNN_REGISTRY[rnn_type](
+        self.rnn = registry.RNN_REGISTRY[rnn_type](
             input_size=hidden_size,
             hidden_size=hidden_size,
             bidirectional=bidirectional
@@ -60,7 +60,7 @@ class DeepSpeechV1(nn.Module):
         self.crelu = CReLu(max_val=max_clip_value)
         self.pred_net = PredModule(
             in_features=hidden_size,
-            n_classes=n_clases,
+            n_classes=n_classes,
             activation=nn.LogSoftmax(dim=-1)
         )
         self.bidirectional = bidirectional
@@ -72,7 +72,7 @@ class DeepSpeechV1(nn.Module):
         lengths = mask.sum(dim=-1)
         for layer in self.ff_layers:
             x = layer(x)
-        out, _, lengths = self.rnn(x, lengths)
+        out, _, lengths = self.rnn(x, lengths.cpu())
         if self.bidirectional is True:
             out = out[..., :self.hidden_size] + out[..., self.hidden_size:]
         out = self.crelu(self.fc(out))
