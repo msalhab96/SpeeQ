@@ -13,6 +13,7 @@ from torch.distributed import (
     init_process_group, barrier, ReduceOp, all_reduce
     )
 from torch.nn.parallel import DistributedDataParallel
+from tqdm import tqdm
 
 
 class BaseTrainer(ITrainer):
@@ -55,10 +56,6 @@ class BaseTrainer(ITrainer):
         self.log_steps_frequency = log_steps_frequency
         self.logger = logger
         self.history = history
-        if HistoryKeys.test_loss not in self.history:
-            self.history[HistoryKeys.test_loss] = list()
-        if HistoryKeys.train_loss not in self.history:
-            self.history[HistoryKeys.train_loss] = list()
         self.counter = 1
 
     def backward_pass(self, loss: Tensor) -> None:
@@ -69,11 +66,12 @@ class BaseTrainer(ITrainer):
     def fit(self):
         for _ in range(self.epochs):
             self.train()
+            self.logger.log(self.history)
 
     def inline_log(self, key: str, category: str, value: int):
         tag = f'{key}_{category}'
         if tag in self.history:
-            self.history[tag].append(key)
+            self.history[tag].append(value)
         else:
             self.history[tag] = [value]
         self.logger.log_step(key, category, value)
@@ -206,35 +204,46 @@ class CTCTrainer(BaseTrainer):
     def is_master(self):
         return True
 
-    @step_log(key=HistoryKeys.train_loss, category=LogCategories.batches)
+    @step_log(
+        key=HistoryKeys.train_loss.value,
+        category=LogCategories.batches.value
+        )
     def train_step(self, batch: Tuple[Tensor]) -> float:
         loss = self.forward_pass(batch)
         self.backward_pass(loss)
         return loss.item()
 
-    @step_log(key=HistoryKeys.train_loss, category=LogCategories.epochs)
+    @step_log(
+        key=HistoryKeys.train_loss.value,
+        category=LogCategories.epochs.value
+        )
     def train(self) -> float:
         self.model.train()
         total_loss = 0.0
-        for i, batch in enumerate(self.train_loader):
+        for i, batch in enumerate(tqdm(self.train_loader)):
             loss = self.train_step(batch)
             total_loss += loss
-            if self.counter % self.log_steps_frequency == 0:
+            if (i + 1) % self.log_steps_frequency == 0:
                 self.test()
+                self.model.train()
                 self.inline_log(
-                    key=HistoryKeys.train_loss,
-                    category=LogCategories.steps,
+                    key=HistoryKeys.train_loss.value,
+                    category=LogCategories.steps.value,
                     value=total_loss / (i + 1)
                     )
         return total_loss / len(self.train_loader)
 
-    @step_log(key=HistoryKeys.test_loss, category=LogCategories.steps)
+    @step_log(
+        key=HistoryKeys.test_loss.value,
+        category=LogCategories.steps.value
+        )
+    @torch.no_grad()
     def test(self) -> float:
         self.model.eval()
         total_loss = 0.0
         for batch in self.test_loader:
             loss = self.forward_pass(batch)
-            total_loss += loss
+            total_loss += loss.item()
         return total_loss / len(self.test_loader)
 
 
@@ -287,19 +296,22 @@ class DistCTCTrainer(CTCTrainer, BaseDistTrainer):
             history=history
         )
 
-    @step_log(key=HistoryKeys.train_loss, category=LogCategories.epochs)
+    @step_log(
+        key=HistoryKeys.train_loss.value,
+        category=LogCategories.epochs.value
+        )
     def train(self) -> float:
         self.model.train()
         total_loss = 0.0
         for i, batch in enumerate(self.train_loader):
             loss = self.train_step(batch)
             total_loss += loss
-            if self.counter % self.log_steps_frequency == 0:
+            if (i + 1) % self.log_steps_frequency == 0:
                 total = self._all_reduce_loss(total_loss, i + 1)
                 if self.is_master():
                     self.inline_log(
-                        key=HistoryKeys.train_loss,
-                        category=LogCategories.steps,
+                        key=HistoryKeys.train_loss.value,
+                        category=LogCategories.steps.value,
                         value=total
                         )
                     self.testdist_config()
@@ -310,5 +322,5 @@ class DistCTCTrainer(CTCTrainer, BaseDistTrainer):
         for _ in range(self.epochs):
             self.train()
             if self.is_master:
-                self.logger.log()
+                self.logger.log(self.history)
             barrier()
