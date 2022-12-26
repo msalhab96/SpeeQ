@@ -17,6 +17,7 @@ class TrainerConfig:
         logger (ILogger): The logger to be used.
         log_steps_frequency (int): The number of steps to log
         the results after.
+        criterion (str): The criterion name to be used.
         optimizer (str): The name of the optimizer to be used.
         optim_args (dict): The optimizer arguments.
         schedular (Union[str, None]): The name of the schedular to be used.
@@ -24,18 +25,22 @@ class TrainerConfig:
         schedular_args (dict): The schedular arguments. Default {}.
         dist_config (Union[object, None]): The DDP configuration object,
         for a single node/GPU training use None. Default None.
+        criterion_args (dict): The criterion arguments if there is any.
+        Default {}.
     """
     batch_size: int
     epochs: int
     outdir: Union[Path, str]
     logger: ILogger
     log_steps_frequency: int
+    criterion: str
     optimizer: str
     optim_args: dict
     schedular: Union[str, None] = None
     schedular_args: dict = field(default_factory=dict)
     dist_config: Union[object, None] = None
     device: str = 'cuda'
+    criterion_args: dict = field(default_factory=dict)
 
 
 @dataclass
