@@ -28,3 +28,9 @@ def get_criterion(
         *args,
         **kwargs
     )
+
+
+def get_optimizer(model, trainer_config):
+    return OPTIMIZERS[trainer_config.optimizer](
+        model.parameters(), **trainer_config.optim_args
+        )
