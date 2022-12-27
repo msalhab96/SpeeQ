@@ -1,10 +1,15 @@
 import os
+from data.factories import get_asr_loaders, get_tokenizer
+from models.registry import get_model
 import torch
 from torch import Tensor
 from typing import Tuple, Union
 from data.interfaces import IDataLoader
 from trainers.decorators import step_log
-from utils.loggers import ILogger
+from trainers.registry import get_optimizer
+from trainers.registry import get_criterion
+from trainers.utils import set_state_dict
+from utils.loggers import ILogger, get_logger
 from .interfaces import ISchedular, ITrainer
 from constants import HistoryKeys, LogCategories
 from torch.optim import Optimizer
@@ -13,6 +18,7 @@ from torch.distributed import (
     init_process_group, barrier, ReduceOp, all_reduce
     )
 from torch.nn.parallel import DistributedDataParallel
+from torch.multiprocessing import spawn
 from tqdm import tqdm
 
 
@@ -327,3 +333,107 @@ class DistCTCTrainer(BaseDistTrainer, CTCTrainer):
             if self.is_master:
                 self.logger.log(self.history)
             barrier()
+
+
+def run_asr_trainer(
+        rank: int,
+        world_size: int,
+        trainer_config,
+        data_config,
+        model_config
+        ):
+    # TODO: Refactor this code
+    if rank > 0:
+        import time
+        time.sleep(2)
+    logger = get_logger(
+        name=trainer_config.logger,
+        log_dir=trainer_config.logdir,
+        n_logs=trainer_config.n_logs,
+        clear_screen=trainer_config.clear_screen
+        )
+    tokenizer = get_tokenizer(
+        data_config=data_config
+        )
+    is_ctc = model_config.template._type == 'ctc'
+    model = get_model(
+        model_config,
+        n_classes=tokenizer.vocab_size
+        )
+    model = model.to(trainer_config.device)
+    optimizer = get_optimizer(model, trainer_config)
+    criterion = get_criterion(
+        name=trainer_config.criterion,
+        blank_id=tokenizer.special_tokens.blank_id,
+        pad_id=tokenizer.special_tokens.pad_id,
+        **trainer_config.criterion_args
+    )
+    if os.path.exists(model_config.model_path):
+        epoch, steps, history = set_state_dict(
+            model=model,
+            optimizer=optimizer,
+            state_path=model_config.model_path
+            )
+    else:
+        history = {}
+    train_loader, test_loader = get_asr_loaders(
+        data_config=data_config,
+        is_ctc=is_ctc,
+        tokenizer=tokenizer,
+        batch_size=trainer_config.batch_size,
+        world_size=world_size,
+        rank=rank
+    )
+    if world_size > 1:
+        if is_ctc:
+            trainer = DistCTCTrainer(
+                optimizer=optimizer,
+                criterion=criterion,
+                model=model,
+                train_loader=train_loader,
+                test_loader=test_loader,
+                epochs=trainer_config.epochs,
+                log_steps_frequency=trainer_config.log_steps_frequency,
+                world_size=world_size,
+                rank=rank,
+                dist_address=trainer_config.dist_config.address,
+                dist_port=trainer_config.dist_config.port,
+                dist_backend=trainer_config.dist_config.backend,
+                logger=logger,
+                history=history
+            )
+    else:
+        if is_ctc:
+            trainer = CTCTrainer(
+                optimizer=optimizer,
+                criterion=criterion,
+                model=model,
+                train_loader=train_loader,
+                test_loader=test_loader,
+                epochs=trainer_config.epochs,
+                log_steps_frequency=trainer_config.log_steps_frequency,
+                device=trainer_config.device,
+                logger=logger,
+                history=history
+            )
+    trainer.fit()
+
+
+def launch_asr_training(trainer_config, data_config, model_config):
+    if trainer_config.dist_config is None:
+        trainer = run_asr_trainer(
+            0, 1, trainer_config, data_config, model_config
+            )
+        trainer.fit()
+    else:
+        world_size = trainer_config.dist_config.n_gpus
+        spawn(
+            run_asr_trainer,
+            nprocs=trainer_config.dist_config.n_gpus,
+            args=(
+                world_size,
+                trainer_config,
+                data_config,
+                model_config
+                )
+            )
