@@ -117,7 +117,8 @@ class BaseDistTrainer(BaseTrainer):
             dist_backend: str,
             history={}
             ) -> None:
-        super().__init__(
+        BaseTrainer.__init__(
+            self,
             optimizer=optimizer,
             criterion=criterion,
             model=model,
@@ -134,6 +135,7 @@ class BaseDistTrainer(BaseTrainer):
         self.dist_address = dist_address
         self.dist_backend = dist_backend
         self.init_dist()
+        self.model.to(f'cuda:{rank}')
         self.model = DistributedDataParallel(
             self.model, device_ids=[self.rank]
         )
@@ -174,7 +176,8 @@ class CTCTrainer(BaseTrainer):
             logger: ILogger,
             history: dict = {}
             ) -> None:
-        super().__init__(
+        BaseTrainer.__init__(
+            self,
             optimizer=optimizer,
             criterion=criterion,
             model=model,
@@ -247,7 +250,7 @@ class CTCTrainer(BaseTrainer):
         return total_loss / len(self.test_loader)
 
 
-class DistCTCTrainer(CTCTrainer, BaseDistTrainer):
+class DistCTCTrainer(BaseDistTrainer, CTCTrainer):
     def __init__(
             self,
             optimizer: Union[Optimizer, ISchedular],
@@ -303,7 +306,7 @@ class DistCTCTrainer(CTCTrainer, BaseDistTrainer):
     def train(self) -> float:
         self.model.train()
         total_loss = 0.0
-        for i, batch in enumerate(self.train_loader):
+        for i, batch in enumerate(tqdm(self.train_loader)):
             loss = self.train_step(batch)
             total_loss += loss
             if (i + 1) % self.log_steps_frequency == 0:
