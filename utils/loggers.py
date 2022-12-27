@@ -21,6 +21,7 @@ class TBLogger(ILogger):
             self,
             log_dir: Union[str, Path],
             n_logs: int,
+            clear_screen: bool,
             *args,
             **kwargs
             ) -> None:
@@ -28,6 +29,7 @@ class TBLogger(ILogger):
         self.writer = SummaryWriter(log_dir)
         self.__counters = dict()
         self.n_logs = n_logs
+        self.clear_screen = clear_screen
         print('Started!')
 
     def log_step(
@@ -49,7 +51,8 @@ class TBLogger(ILogger):
         logs = {
             key: value[-self.n_logs:] for key, value in history.items()
             }
-        clear()  # cleaning the screen up
+        if self.clear_screen is True:
+            clear()  # cleaning the screen up
         print(logs)
 
 
