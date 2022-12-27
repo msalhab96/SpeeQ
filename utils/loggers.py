@@ -17,7 +17,13 @@ class ILogger(ABC):
 
 
 class TBLogger(ILogger):
-    def __init__(self, log_dir: Union[str, Path], n_logs: int) -> None:
+    def __init__(
+            self,
+            log_dir: Union[str, Path],
+            n_logs: int,
+            *args,
+            **kwargs
+            ) -> None:
         super().__init__()
         self.writer = SummaryWriter(log_dir)
         self.__counters = dict()
@@ -43,6 +49,20 @@ class TBLogger(ILogger):
         logs = {
             key: value[-self.n_logs:] for key, value in history.items()
             }
-        print(logs)
         clear()  # cleaning the screen up
         print(logs)
+
+
+def get_logger(
+        name: str,
+        log_dir: Union[str, Path],
+        n_logs: int,
+        *args, **kwargs
+        ) -> ILogger:
+    if name in 'tb':
+        return TBLogger(
+            log_dir=log_dir,
+            n_logs=n_logs,
+            *args, **kwargs
+        )
+    raise NotImplementedError
