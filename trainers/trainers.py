@@ -315,11 +315,11 @@ class DistCTCTrainer(BaseDistTrainer, CTCTrainer):
                     self.inline_log(
                         key=HistoryKeys.train_loss.value,
                         category=LogCategories.steps.value,
-                        value=total
+                        value=total.item()
                         )
                     self.testdist_config()
                 barrier()
-        return self._all_reduce_loss(total_loss, len(self.train_loader))
+        return self._all_reduce_loss(total_loss, len(self.train_loader)).item()
 
     def fit(self):
         for _ in range(self.epochs):
