@@ -1,6 +1,5 @@
 from pathlib import Path
 from typing import Union
-from utils.loggers import ILogger
 from dataclasses import dataclass, field
 from data.interfaces import IProcessor
 from models.templates import ITemplate
@@ -14,7 +13,7 @@ class TrainerConfig:
         batch_size (int): the batch size.
         epochs (int): The number of training epochs.
         outdir (Union[Path, str]): The path to save the results to.
-        logger (ILogger): The logger to be used.
+        logdir (Union[Path, str]): The path to save the logs to.
         log_steps_frequency (int): The number of steps to log
         the results after.
         criterion (str): The criterion name to be used.
@@ -25,13 +24,17 @@ class TrainerConfig:
         schedular_args (dict): The schedular arguments. Default {}.
         dist_config (Union[object, None]): The DDP configuration object,
         for a single node/GPU training use None. Default None.
+        logger (str): The logger name to be used. Default 'tb'.
+        n_logs (int): The number of steps to log. Default 5.
+        clear_screen (bool): whether to clear the screen after each log or
+        not. Default False.
         criterion_args (dict): The criterion arguments if there is any.
         Default {}.
     """
     batch_size: int
     epochs: int
     outdir: Union[Path, str]
-    logger: ILogger
+    logdir: Union[Path, str]
     log_steps_frequency: int
     criterion: str
     optimizer: str
@@ -40,6 +43,9 @@ class TrainerConfig:
     schedular_args: dict = field(default_factory=dict)
     dist_config: Union[object, None] = None
     device: str = 'cuda'
+    logger: str = 'tb'
+    n_logs: int = 5
+    clear_screen: bool = False
     criterion_args: dict = field(default_factory=dict)
 
 
