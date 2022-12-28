@@ -2,7 +2,6 @@ from dataclasses import asdict, dataclass
 from interfaces import ITemplate
 
 
-@dataclass
 class BaseTemplate(ITemplate):
     def get_dict(self):
         return asdict(self)
