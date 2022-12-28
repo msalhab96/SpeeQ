@@ -8,7 +8,7 @@ from data.interfaces import IDataLoader
 from trainers.decorators import step_log
 from trainers.registry import get_optimizer
 from trainers.registry import get_criterion
-from trainers.utils import set_state_dict
+from utils.utils import set_state_dict
 from utils.loggers import ILogger, get_logger
 from .interfaces import ISchedular, ITrainer
 from constants import HistoryKeys, LogCategories
