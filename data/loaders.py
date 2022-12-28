@@ -4,9 +4,10 @@ from typing import List, Tuple, Union
 from pathlib import Path
 from utils.utils import load_csv, get_pad_mask
 from .processors import IProcessor
-from .interfaces import ITokenizer, IPadder
 from constants import FileKeys
-from .interfaces import IDataLoader, IDataset
+from interfaces import (
+    IDataLoader, IDataset, ITokenizer, IPadder
+    )
 
 
 class CSVDataset(IDataset):

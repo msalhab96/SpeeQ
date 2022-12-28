@@ -1,8 +1,7 @@
 from pathlib import Path
 from typing import Union
 from dataclasses import dataclass, field
-from data.interfaces import IProcessor
-from models.templates import ITemplate
+from interfaces import IProcessor, ITemplate
 
 
 @dataclass

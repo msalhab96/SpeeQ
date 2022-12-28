@@ -1,5 +1,5 @@
 import torch
-from .interfaces import IPadder
+from interfaces import IPadder
 from torch import Tensor
 from typing import Union
 

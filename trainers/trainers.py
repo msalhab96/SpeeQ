@@ -4,13 +4,14 @@ from models.registry import get_model
 import torch
 from torch import Tensor
 from typing import Tuple, Union
-from data.interfaces import IDataLoader
 from trainers.decorators import step_log
 from trainers.registry import get_optimizer
 from trainers.registry import get_criterion
 from utils.utils import set_state_dict
 from utils.loggers import ILogger, get_logger
-from .interfaces import ISchedular, ITrainer
+from interfaces import (
+    ISchedular, ITrainer, IDataLoader
+    )
 from constants import HistoryKeys, LogCategories
 from torch.optim import Optimizer
 from torch.nn import Module

@@ -3,7 +3,7 @@ from typing import Union
 from constants import FileKeys
 from data.loaders import SpeechTextDataset, SpeechTextLoader
 from data.padders import DynamicPadder
-from .interfaces import IDataset, ITokenizer
+from interfaces import IDataset, ITokenizer
 from utils.utils import load_csv
 from .tokenizer import CharTokenizer
 

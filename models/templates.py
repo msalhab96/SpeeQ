@@ -1,20 +1,5 @@
 from dataclasses import asdict, dataclass
-from abc import ABC, abstractproperty, abstractmethod
-
-
-class ITemplate(ABC):
-
-    @abstractproperty
-    def name(self):
-        pass
-
-    @abstractproperty
-    def type(self):
-        pass
-
-    @abstractmethod
-    def get_dict(self):
-        pass
+from interfaces import ITemplate
 
 
 @dataclass

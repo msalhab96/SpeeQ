@@ -7,7 +7,7 @@ from typing import (
     )
 from pathlib import Path
 from utils.utils import save_json, load_json
-from .interfaces import ITokenizer
+from interfaces import ITokenizer
 from .decorators import check_token
 
 PAD = '<PAD>'
