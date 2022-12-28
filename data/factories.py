@@ -2,10 +2,15 @@ import os
 from typing import Union
 from constants import FileKeys
 from data.loaders import SpeechTextDataset, SpeechTextLoader
-from data.padders import DynamicPadder
-from interfaces import IDataset, ITokenizer
+from data.padders import DynamicPadder, StaticPadder
+from interfaces import IDataset, IPadder, ITokenizer
 from utils.utils import load_csv
 from .tokenizer import CharTokenizer
+
+PADDING_TYPES = {
+    'static': StaticPadder,
+    'dynamic': DynamicPadder
+}
 
 
 def get_tokenizer(data_config: object) -> ITokenizer:
@@ -18,8 +23,6 @@ def get_tokenizer(data_config: object) -> ITokenizer:
         tokenizer.add_pad_token().add_blank_token()
         tokenizer.add_sos_token().add_eos_token()
         data = load_csv(data_config.training_path, sep=data_config.sep)
-        print(data[0])
-        print(data[0]['text'])
         data = [item[FileKeys.text_key.value] for item in data]
         tokenizer.set_tokenizer(data)
         tokenizer.save_tokenizer(tokenizer_path)
@@ -56,17 +59,20 @@ def get_asr_datasets(
 def get_text_padder(
         data_config: object,
         pad_val: Union[float, int]
-        ):
-    # TODO: add static padding here!
-    return DynamicPadder(
-        dim=0, pad_val=pad_val
+        ) -> IPadder:
+    return PADDING_TYPES[data_config.padding_type](
+        dim=0,
+        pad_val=pad_val,
+        max_len=data_config.text_pad_max_len
     )
 
 
-def get_speech_padder(data_config):
-    return DynamicPadder(
-        dim=1, pad_val=0.0
-    )
+def get_speech_padder(data_config) -> IPadder:
+    return PADDING_TYPES[data_config.padding_type](
+            dim=1,
+            pad_val=0.0,
+            max_len=data_config.speech_pad_max_len
+        )
 
 
 def get_asr_loaders(

@@ -59,6 +59,16 @@ class ASRDataConfig:
         text_processor (IProcessor): The text processor.
         tokenizer_path (Union[str, Path]): The path to load or save
         the tokenizer.
+        sep (str): the csv file's fields seprator. Default ','.
+        type (str): the file type. Default 'csv'.
+        padding_type (str): The padding to use static or dynamic.
+        Default 'dynamic'.
+        text_pad_max_len (str): Used if padding_type is static, which
+        set the maximum sequence length it has to be larger than
+        the largest text sequence size in both training and testing data.
+        speech_pad_max_len (str): Used if padding_type is static, which
+        set the maximum sequence length it has to be larger than
+        the largest speech sequence size in both training and testing data.
     """
     training_path: Union[str, Path]
     testing_path: Union[str, Path]
@@ -68,7 +78,8 @@ class ASRDataConfig:
     sep: str = ','
     type: str = 'csv'
     padding_type: str = 'dynamic'
-    pad_max_len: int = -1
+    text_pad_max_len: int = -1
+    speech_pad_max_len: int = -1
 
 
 @dataclass

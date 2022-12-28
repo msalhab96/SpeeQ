@@ -17,7 +17,8 @@ class DynamicPadder(IPadder):
             self,
             dim: int,
             pad_val: Union[int, Tensor, float],
-            left_pad=False
+            left_pad=False,
+            *args, **kwargs
             ) -> None:
         super().__init__()
         self.dim = dim
@@ -59,7 +60,8 @@ class StaticPadder(DynamicPadder):
             dim: int,
             pad_val: Union[int, Tensor, float],
             max_len: int,
-            left_pad=False
+            left_pad=False,
+            *args, **kwargs
             ) -> None:
         super().__init__(dim, pad_val, left_pad)
         self.max_len = max_len
