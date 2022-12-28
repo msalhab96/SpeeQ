@@ -51,6 +51,10 @@ class SpeechTextDataset(CSVDataset):
         speech_processor (IProcessor): The speech processor.
         text_processor (IProcessor): The text processor.
         sep (str): The CSV separator.
+        add_sos (bool): a flag indicates if SOS token shall be added
+        to the text sequence. Default False.
+        add_eos (bool): a flag indicates if EOS token shall be added
+        to the text sequence. Default False.
         encoding (str): The file encoding. Default "utf-8".
     """
     def __init__(
