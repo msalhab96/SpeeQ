@@ -69,6 +69,8 @@ class ASRDataConfig:
         speech_pad_max_len (str): Used if padding_type is static, which
         set the maximum sequence length it has to be larger than
         the largest speech sequence size in both training and testing data.
+        add_pos_tokens (bool): a flag if positional tokens (i.e SOS, EOS)
+        shall be added to the text squences. Default True.
     """
     training_path: Union[str, Path]
     testing_path: Union[str, Path]
@@ -80,6 +82,7 @@ class ASRDataConfig:
     padding_type: str = 'dynamic'
     text_pad_max_len: int = -1
     speech_pad_max_len: int = -1
+    add_pos_tokens: bool = True
 
 
 @dataclass
