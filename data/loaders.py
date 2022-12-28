@@ -2,10 +2,9 @@ import torch
 from torch import Tensor
 from typing import List, Tuple, Union
 from pathlib import Path
-from .utils import load_csv
+from utils.utils import load_csv, get_pad_mask
 from .processors import IProcessor
 from .interfaces import ITokenizer, IPadder
-from .utils import get_pad_mask
 from constants import FileKeys
 from .interfaces import IDataLoader, IDataset
 

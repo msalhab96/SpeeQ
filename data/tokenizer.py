@@ -6,7 +6,7 @@ from typing import (
     Union
     )
 from pathlib import Path
-from .utils import save_json, load_json
+from utils.utils import save_json, load_json
 from .interfaces import ITokenizer
 from .decorators import check_token
 
