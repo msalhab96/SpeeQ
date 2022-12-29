@@ -95,7 +95,7 @@ def _get_asr_trainer_args(
         world_size=world_size,
         rank=rank
     )
-    return {
+    args = {
         'optimizer': optimizer,
         'criterion': criterion,
         'model': model,
@@ -103,15 +103,22 @@ def _get_asr_trainer_args(
         'test_loader': test_loader,
         'epochs': trainer_config.epochs,
         'log_steps_frequency': trainer_config.log_steps_frequency,
-        'world_size': world_size,
-        'rank': rank,
         'logger': logger,
-        'history': history
+        'history': history,
     }
+    if world_size == 1:
+        args['device'] = trainer_config.device
+    return args
 
 
-def _get_dist_args(trainer_config) -> dict:
+def _get_dist_args(
+        trainer_config,
+        rank: int,
+        world_size: int
+        ) -> dict:
     return {
+        'rank': rank,
+        'world_size': world_size,
         'dist_address': trainer_config.dist_config.address,
         'dist_port': trainer_config.dist_config.port,
         'dist_backend': trainer_config.dist_config.backend
@@ -127,8 +134,7 @@ def get_asr_trainer(
         ) -> ITrainer:
     name = trainer_config.name
     base_args = _get_asr_trainer_args(
-        rank=rank,
-        world_size=world_size,
+        rank=rank, world_size=world_size,
         trainer_config=trainer_config,
         data_config=data_config,
         model_config=model_config
@@ -136,6 +142,7 @@ def get_asr_trainer(
     args = dict(
         **base_args if world_size == 1 else dict(
             **base_args, **_get_dist_args(
+                rank=rank, world_size=world_size,
                 trainer_config=trainer_config
                 )
             )
