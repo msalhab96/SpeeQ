@@ -35,6 +35,9 @@ class BaseTrainer(ITrainer):
         log_steps_frequency (int): The number of steps to log the
         results after.
         logger (ILogger): The logger to be used.
+        grad_clip_thresh (Union[None, float]): max norm of the gradients.
+        Default None.
+        grad_clip_norm_type (float): type of the used p-norm. Default 2.0.
         history (dict): The history of the training if there is
         any. Default {}.
     """
@@ -48,6 +51,8 @@ class BaseTrainer(ITrainer):
             epochs: int,
             log_steps_frequency: int,
             logger: ILogger,
+            grad_clip_thresh: Union[None, float] = None,
+            grad_clip_norm_type: float = 2.0,
             history: dict = {}
             ) -> None:
         super().__init__()
@@ -59,10 +64,18 @@ class BaseTrainer(ITrainer):
         self.epochs = epochs
         self.log_steps_frequency = log_steps_frequency
         self.logger = logger
+        self.grad_clip_thresh = grad_clip_thresh
+        self.grad_clip_norm_type = grad_clip_norm_type
         self.history = history
         self.counter = 1
 
     def backward_pass(self, loss: Tensor) -> None:
+        if self.grad_clip_thresh is not None:
+            torch.nn.utils.clip_grad_norm_(
+                self.model,
+                max_norm=self.grad_clip_thresh,
+                norm_type=self.grad_clip_norm_type
+                )
         loss.backward()
         self.optimizer.step()
         self.optimizer.zero_grad()
@@ -101,6 +114,9 @@ class BaseDistTrainer(BaseTrainer):
         dist_address (str): The address of the master node.
         dist_port (int): The port of the master node.
         dist_backend (str): The backend used for DDP.
+        grad_clip_thresh (Union[None, float]): max norm of the gradients.
+        Default None.
+        grad_clip_norm_type (float): type of the used p-norm. Default 2.0.
         history (dict): The history of the training if there is
         any. Default {}.
     """
@@ -119,6 +135,8 @@ class BaseDistTrainer(BaseTrainer):
             dist_address: str,
             dist_port: int,
             dist_backend: str,
+            grad_clip_thresh: Union[None, float] = None,
+            grad_clip_norm_type: float = 2.0,
             history={}
             ) -> None:
         BaseTrainer.__init__(
@@ -131,6 +149,8 @@ class BaseDistTrainer(BaseTrainer):
             epochs=epochs,
             log_steps_frequency=log_steps_frequency,
             logger=logger,
+            grad_clip_thresh=grad_clip_thresh,
+            grad_clip_norm_type=grad_clip_norm_type,
             history=history
         )
         self.rank = rank
@@ -178,6 +198,8 @@ class CTCTrainer(BaseTrainer):
             log_steps_frequency: int,
             device: str,
             logger: ILogger,
+            grad_clip_thresh: Union[None, float] = None,
+            grad_clip_norm_type: float = 2.0,
             history: dict = {}
             ) -> None:
         BaseTrainer.__init__(
@@ -190,6 +212,8 @@ class CTCTrainer(BaseTrainer):
             epochs=epochs,
             log_steps_frequency=log_steps_frequency,
             logger=logger,
+            grad_clip_thresh=grad_clip_thresh,
+            grad_clip_norm_type=grad_clip_norm_type,
             history=history
         )
         self.device = device
@@ -272,6 +296,8 @@ class DistCTCTrainer(BaseDistTrainer, CTCTrainer):
             dist_address: int,
             dist_port: int,
             dist_backend: str,
+            grad_clip_thresh: Union[None, float] = None,
+            grad_clip_norm_type: float = 2.0,
             history: dict = {}
             ) -> None:
         CTCTrainer.__init__(
@@ -285,6 +311,8 @@ class DistCTCTrainer(BaseDistTrainer, CTCTrainer):
             log_steps_frequency=log_steps_frequency,
             device=f'cuda:{rank}',
             logger=logger,
+            grad_clip_thresh=grad_clip_thresh,
+            grad_clip_norm_type=grad_clip_norm_type,
             history=history
         )
         BaseDistTrainer.__init__(
@@ -302,6 +330,8 @@ class DistCTCTrainer(BaseDistTrainer, CTCTrainer):
             dist_address=dist_address,
             dist_port=dist_port,
             dist_backend=dist_backend,
+            grad_clip_thresh=grad_clip_thresh,
+            grad_clip_norm_type=grad_clip_norm_type,
             history=history
         )
 

@@ -30,6 +30,9 @@ class TrainerConfig:
         not. Default False.
         criterion_args (dict): The criterion arguments if there is any.
         Default {}.
+        grad_clip_thresh (Union[None, float]): max norm of the gradients.
+        Default None.
+        grad_clip_norm_type (float): type of the used p-norm. Default 2.0.
     """
     name: str
     batch_size: int
@@ -48,6 +51,8 @@ class TrainerConfig:
     n_logs: int = 5
     clear_screen: bool = False
     criterion_args: dict = field(default_factory=dict)
+    grad_clip_thresh: Union[None, float] = None
+    grad_clip_norm_type: float = 2.0
 
 
 @dataclass
