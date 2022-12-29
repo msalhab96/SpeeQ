@@ -414,9 +414,10 @@ def launch_training_job(
             rank=0,
             world_size=1
             )
-    world_size = trainer_config.dist_config.n_gpus
-    spawn(
-        trainer_launcher,
-        nprocs=trainer_config.dist_config.n_gpus,
-        args=(world_size,)
-        )
+    else:
+        world_size = trainer_config.dist_config.n_gpus
+        spawn(
+            trainer_launcher,
+            nprocs=trainer_config.dist_config.n_gpus,
+            args=(world_size,)
+            )
