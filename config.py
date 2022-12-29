@@ -9,6 +9,7 @@ class TrainerConfig:
     """The trainer configuration
 
     Args:
+        name (str): The trainer name.
         batch_size (int): the batch size.
         epochs (int): The number of training epochs.
         outdir (Union[Path, str]): The path to save the results to.
@@ -30,6 +31,7 @@ class TrainerConfig:
         criterion_args (dict): The criterion arguments if there is any.
         Default {}.
     """
+    name: str
     batch_size: int
     epochs: int
     outdir: Union[Path, str]
