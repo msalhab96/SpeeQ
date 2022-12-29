@@ -5,7 +5,6 @@ import torch
 from torch import Tensor
 from typing import Tuple, Union
 from trainers.decorators import step_log
-from trainers.registry import get_asr_trainer
 from utils.loggers import ILogger
 from interfaces import (
     ISchedular, ITrainer, IDataLoader
@@ -194,6 +193,7 @@ class CTCTrainer(BaseTrainer):
             history=history
         )
         self.device = device
+        self.model.to(device)
 
     def forward_pass(
             self, batch: Tuple[Tensor]) -> Tensor:
@@ -316,13 +316,14 @@ class DistCTCTrainer(BaseDistTrainer, CTCTrainer):
             total_loss += loss
             if (i + 1) % self.log_steps_frequency == 0:
                 total = self._all_reduce_loss(total_loss, i + 1)
-                if self.is_master():
+                if self.is_master:
                     self.inline_log(
                         key=HistoryKeys.train_loss.value,
                         category=LogCategories.steps.value,
                         value=total.item()
                         )
-                    self.testdist_config()
+                    self.test()
+                    self.model.train()
                 barrier()
         return self._all_reduce_loss(total_loss, len(self.train_loader)).item()
 
@@ -346,6 +347,7 @@ def _run_trainer(
         # This can be replaced if we pass the rank to the
         # factories depend on the master node
         time.sleep(5)
+    from trainers.registry import get_asr_trainer
     trainer = get_asr_trainer(
         rank=rank, world_size=world_size,
         trainer_config=trainer_config,
