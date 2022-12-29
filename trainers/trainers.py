@@ -231,7 +231,7 @@ class CTCTrainer(BaseTrainer):
         for i, batch in enumerate(tqdm(self.train_loader)):
             loss = self.train_step(batch)
             total_loss += loss
-            if (i + 1) % self.log_steps_frequency == 0:
+            if self.counter % self.log_steps_frequency == 0:
                 self.test()
                 self.model.train()
                 self.inline_log(
@@ -239,6 +239,7 @@ class CTCTrainer(BaseTrainer):
                     category=LogCategories.steps.value,
                     value=total_loss / (i + 1)
                     )
+            self.counter += 1
         return total_loss / len(self.train_loader)
 
     @step_log(
@@ -314,7 +315,7 @@ class DistCTCTrainer(BaseDistTrainer, CTCTrainer):
         for i, batch in enumerate(tqdm(self.train_loader)):
             loss = self.train_step(batch)
             total_loss += loss
-            if (i + 1) % self.log_steps_frequency == 0:
+            if self.counter % self.log_steps_frequency == 0:
                 total = self._all_reduce_loss(total_loss, i + 1)
                 if self.is_master:
                     self.inline_log(
@@ -325,6 +326,7 @@ class DistCTCTrainer(BaseDistTrainer, CTCTrainer):
                     self.test()
                     self.model.train()
                 barrier()
+            self.counter += 1
         return self._all_reduce_loss(total_loss, len(self.train_loader)).item()
 
     def fit(self):
