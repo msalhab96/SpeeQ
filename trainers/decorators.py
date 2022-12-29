@@ -1,5 +1,6 @@
 from typing import Callable
 from functools import wraps
+from utils.utils import get_key_tag, save_state_dict
 
 
 def step_log(key: str, category: str):
@@ -20,3 +21,29 @@ def step_log(key: str, category: str):
             return result
         return wrapper
     return logger
+
+
+def export_ckpt(key: str, category: str) -> Callable:
+    """Saves a checkpoint at any steps that the results
+    are less than the minimum global loss.
+    """
+    tag = get_key_tag(key, category)
+
+    def exporter(func: Callable) -> Callable:
+        @wraps(func)
+        def wrapper(trainer, *args, **kwargs):
+            results = func(trainer, *args, **kwargs)
+            loss = trainer.history[tag][-1]
+            if loss < trainer.min_loss:
+                trainer.min_loss = loss
+                save_state_dict(
+                    model_name='checkpoint',
+                    outdir=trainer.outdir,
+                    model=trainer.model,
+                    optimizer=trainer.optimizer,
+                    step=trainer.counter,
+                    history=trainer.history
+                )
+            return results
+        return wrapper
+    return exporter

@@ -1,10 +1,12 @@
 from functools import partial
+from math import inf
 import os
+from pathlib import Path
 import time
 import torch
 from torch import Tensor
 from typing import Tuple, Union
-from trainers.decorators import step_log
+from trainers.decorators import export_ckpt, step_log
 from utils.loggers import ILogger
 from interfaces import (
     ISchedular, ITrainer, IDataLoader
@@ -18,6 +20,8 @@ from torch.distributed import (
 from torch.nn.parallel import DistributedDataParallel
 from torch.multiprocessing import spawn
 from tqdm import tqdm
+
+from utils.utils import get_key_tag
 
 
 class BaseTrainer(ITrainer):
@@ -35,6 +39,11 @@ class BaseTrainer(ITrainer):
         log_steps_frequency (int): The number of steps to log the
         results after.
         logger (ILogger): The logger to be used.
+        outdir (Union[str, Path]): The output directory to save
+        checkpoints into.
+        grad_clip_thresh (Union[None, float]): max norm of the gradients.
+        Default None.
+        grad_clip_norm_type (float): type of the used p-norm. Default 2.0.
         history (dict): The history of the training if there is
         any. Default {}.
     """
@@ -48,6 +57,9 @@ class BaseTrainer(ITrainer):
             epochs: int,
             log_steps_frequency: int,
             logger: ILogger,
+            outdir: Union[str, Path],
+            grad_clip_thresh: Union[None, float] = None,
+            grad_clip_norm_type: float = 2.0,
             history: dict = {}
             ) -> None:
         super().__init__()
@@ -59,10 +71,20 @@ class BaseTrainer(ITrainer):
         self.epochs = epochs
         self.log_steps_frequency = log_steps_frequency
         self.logger = logger
+        self.outdir = outdir
+        self.grad_clip_thresh = grad_clip_thresh
+        self.grad_clip_norm_type = grad_clip_norm_type
         self.history = history
         self.counter = 1
+        self.min_loss = inf
 
     def backward_pass(self, loss: Tensor) -> None:
+        if self.grad_clip_thresh is not None:
+            torch.nn.utils.clip_grad_norm_(
+                self.model,
+                max_norm=self.grad_clip_thresh,
+                norm_type=self.grad_clip_norm_type
+                )
         loss.backward()
         self.optimizer.step()
         self.optimizer.zero_grad()
@@ -73,7 +95,7 @@ class BaseTrainer(ITrainer):
             self.logger.log(self.history)
 
     def inline_log(self, key: str, category: str, value: int):
-        tag = f'{key}_{category}'
+        tag = get_key_tag(key=key, category=category)
         if tag in self.history:
             self.history[tag].append(value)
         else:
@@ -96,11 +118,16 @@ class BaseDistTrainer(BaseTrainer):
         log_steps_frequency (int): The number of steps to log the
         results after.
         logger (ILogger): The logger to be used.
+        outdir (Union[str, Path]): The output directory to save
+        checkpoints into.
         rank (int): The process index.
         world_size (int): The number of nodes/processes.
         dist_address (str): The address of the master node.
         dist_port (int): The port of the master node.
         dist_backend (str): The backend used for DDP.
+        grad_clip_thresh (Union[None, float]): max norm of the gradients.
+        Default None.
+        grad_clip_norm_type (float): type of the used p-norm. Default 2.0.
         history (dict): The history of the training if there is
         any. Default {}.
     """
@@ -114,11 +141,14 @@ class BaseDistTrainer(BaseTrainer):
             epochs: int,
             log_steps_frequency: int,
             logger: ILogger,
+            outdir: Union[str, Path],
             rank: int,
             world_size: int,
             dist_address: str,
             dist_port: int,
             dist_backend: str,
+            grad_clip_thresh: Union[None, float] = None,
+            grad_clip_norm_type: float = 2.0,
             history={}
             ) -> None:
         BaseTrainer.__init__(
@@ -131,6 +161,9 @@ class BaseDistTrainer(BaseTrainer):
             epochs=epochs,
             log_steps_frequency=log_steps_frequency,
             logger=logger,
+            outdir=outdir,
+            grad_clip_thresh=grad_clip_thresh,
+            grad_clip_norm_type=grad_clip_norm_type,
             history=history
         )
         self.rank = rank
@@ -178,6 +211,9 @@ class CTCTrainer(BaseTrainer):
             log_steps_frequency: int,
             device: str,
             logger: ILogger,
+            outdir: Union[str, Path],
+            grad_clip_thresh: Union[None, float] = None,
+            grad_clip_norm_type: float = 2.0,
             history: dict = {}
             ) -> None:
         BaseTrainer.__init__(
@@ -190,6 +226,9 @@ class CTCTrainer(BaseTrainer):
             epochs=epochs,
             log_steps_frequency=log_steps_frequency,
             logger=logger,
+            outdir=outdir,
+            grad_clip_thresh=grad_clip_thresh,
+            grad_clip_norm_type=grad_clip_norm_type,
             history=history
         )
         self.device = device
@@ -242,6 +281,10 @@ class CTCTrainer(BaseTrainer):
             self.counter += 1
         return total_loss / len(self.train_loader)
 
+    @export_ckpt(
+        key=HistoryKeys.test_loss.value,
+        category=LogCategories.steps.value
+        )
     @step_log(
         key=HistoryKeys.test_loss.value,
         category=LogCategories.steps.value
@@ -253,7 +296,8 @@ class CTCTrainer(BaseTrainer):
         for batch in self.test_loader:
             loss = self.forward_pass(batch)
             total_loss += loss.item()
-        return total_loss / len(self.test_loader)
+        total_loss /= len(self.test_loader)
+        return total_loss
 
 
 class DistCTCTrainer(BaseDistTrainer, CTCTrainer):
@@ -266,12 +310,15 @@ class DistCTCTrainer(BaseDistTrainer, CTCTrainer):
             test_loader: IDataLoader,
             epochs: int,
             logger: ILogger,
+            outdir: Union[str, Path],
             log_steps_frequency: int,
             rank: int,
             world_size: int,
             dist_address: int,
             dist_port: int,
             dist_backend: str,
+            grad_clip_thresh: Union[None, float] = None,
+            grad_clip_norm_type: float = 2.0,
             history: dict = {}
             ) -> None:
         CTCTrainer.__init__(
@@ -285,6 +332,9 @@ class DistCTCTrainer(BaseDistTrainer, CTCTrainer):
             log_steps_frequency=log_steps_frequency,
             device=f'cuda:{rank}',
             logger=logger,
+            outdir=outdir,
+            grad_clip_thresh=grad_clip_thresh,
+            grad_clip_norm_type=grad_clip_norm_type,
             history=history
         )
         BaseDistTrainer.__init__(
@@ -297,11 +347,14 @@ class DistCTCTrainer(BaseDistTrainer, CTCTrainer):
             epochs=epochs,
             log_steps_frequency=log_steps_frequency,
             logger=logger,
+            outdir=outdir,
             rank=rank,
             world_size=world_size,
             dist_address=dist_address,
             dist_port=dist_port,
             dist_backend=dist_backend,
+            grad_clip_thresh=grad_clip_thresh,
+            grad_clip_norm_type=grad_clip_norm_type,
             history=history
         )
 
@@ -384,9 +437,10 @@ def launch_training_job(
             rank=0,
             world_size=1
             )
-    world_size = trainer_config.dist_config.n_gpus
-    spawn(
-        trainer_launcher,
-        nprocs=trainer_config.dist_config.n_gpus,
-        args=(world_size,)
-        )
+    else:
+        world_size = trainer_config.dist_config.n_gpus
+        spawn(
+            trainer_launcher,
+            nprocs=trainer_config.dist_config.n_gpus,
+            args=(world_size,)
+            )

@@ -104,6 +104,7 @@ def _get_asr_trainer_args(
         'epochs': trainer_config.epochs,
         'log_steps_frequency': trainer_config.log_steps_frequency,
         'logger': logger,
+        'outdir': trainer_config.outdir,
         'history': history,
     }
     if world_size == 1:
