@@ -1,11 +1,10 @@
 import torch
 import functools
 import torchaudio
-from torch import nn
-from torch import Tensor
 from typing import Union
 from pathlib import Path
-from .processors import IProcess
+from torch import nn, Tensor
+from interfaces import IProcess
 from torchaudio import transforms
 SAMPLER_CACHE_SIZE = 5
 

@@ -1,14 +1,28 @@
 import os
-from typing import Union
+from typing import Tuple, Union
 from constants import FileKeys
 from data.loaders import SpeechTextDataset, SpeechTextLoader
-from data.padders import DynamicPadder
-from .interfaces import IDataset, ITokenizer
-from .utils import load_csv
+from data.padders import DynamicPadder, StaticPadder
+from interfaces import IDataLoader, IDataset, IPadder, ITokenizer
+from utils.utils import load_csv
 from .tokenizer import CharTokenizer
+
+PADDING_TYPES = {
+    'static': StaticPadder,
+    'dynamic': DynamicPadder
+}
 
 
 def get_tokenizer(data_config: object) -> ITokenizer:
+    """Creates a tokenizer based on the training data,
+    or load a pre-built tokenizer from file.
+
+    Args:
+        data_config (object): Data configuration object.
+
+    Returns:
+        ITokenizer: A tokenizer object.
+    """
     tokenizer_path = data_config.tokenizer_path
     tokenizer = CharTokenizer()
     if os.path.exists(tokenizer_path) is True:
@@ -18,8 +32,6 @@ def get_tokenizer(data_config: object) -> ITokenizer:
         tokenizer.add_pad_token().add_blank_token()
         tokenizer.add_sos_token().add_eos_token()
         data = load_csv(data_config.training_path, sep=data_config.sep)
-        print(data[0])
-        print(data[0]['text'])
         data = [item[FileKeys.text_key.value] for item in data]
         tokenizer.set_tokenizer(data)
         tokenizer.save_tokenizer(tokenizer_path)
@@ -29,17 +41,25 @@ def get_tokenizer(data_config: object) -> ITokenizer:
 
 def get_asr_datasets(
         data_config: object,
-        is_ctc: bool,
         tokenizer: ITokenizer
-        ) -> IDataset:
+        ) -> Tuple[IDataset, IDataset]:
+    """Creates a train and test dataset objects
+
+    Args:
+        data_config (object): Data configuration object.
+        tokenizer (ITokenizer): The tokenizer to tokenize the test data.
+
+    Returns:
+        Tuple[IDataset, IDataset]: The train and test datasets.
+    """
     train_dataset = SpeechTextDataset(
         data_path=data_config.training_path,
         tokenizer=tokenizer,
         speech_processor=data_config.speech_processor,
         text_processor=data_config.text_processor,
         sep=data_config.sep,
-        add_eos=is_ctc,
-        add_sos=is_ctc
+        add_eos=data_config.add_pos_tokens,
+        add_sos=data_config.add_pos_tokens
     )
     test_dataset = SpeechTextDataset(
         data_path=data_config.testing_path,
@@ -47,8 +67,8 @@ def get_asr_datasets(
         speech_processor=data_config.speech_processor,
         text_processor=data_config.text_processor,
         sep=data_config.sep,
-        add_eos=is_ctc,
-        add_sos=is_ctc
+        add_eos=data_config.add_pos_tokens,
+        add_sos=data_config.add_pos_tokens
     )
     return train_dataset, test_dataset
 
@@ -56,30 +76,45 @@ def get_asr_datasets(
 def get_text_padder(
         data_config: object,
         pad_val: Union[float, int]
-        ):
-    # TODO: add static padding here!
-    return DynamicPadder(
-        dim=0, pad_val=pad_val
+        ) -> IPadder:
+    return PADDING_TYPES[data_config.padding_type](
+        dim=0,
+        pad_val=pad_val,
+        max_len=data_config.text_pad_max_len
     )
 
 
-def get_speech_padder(data_config):
-    return DynamicPadder(
-        dim=1, pad_val=0.0
-    )
+def get_speech_padder(data_config) -> IPadder:
+    return PADDING_TYPES[data_config.padding_type](
+            dim=1,
+            pad_val=0.0,
+            max_len=data_config.speech_pad_max_len
+        )
 
 
 def get_asr_loaders(
         data_config: object,
-        is_ctc: bool,
         tokenizer: ITokenizer,
         batch_size: int,
         world_size: int,
         rank: int
-        ):
+        ) -> Tuple[IDataLoader, IDataLoader]:
+    """Builds training and testing dataloaders.
+
+    Args:
+        data_config (object): Data configuration object.
+        tokenizer (ITokenizer): the text tokenizer.
+        batch_size (int): The batch size.
+        world_size (int): The number of nodes/gpus.
+        rank (int): the index of the current process/gpu
+        will use the data loaders.
+
+    Returns:
+        Tuple[IDataLoader, IDataLoader]: The training and testing data
+        loaders.
+    """
     train_dataset, test_dataset = get_asr_datasets(
         data_config=data_config,
-        is_ctc=is_ctc,
         tokenizer=tokenizer
     )
     text_padder = get_text_padder(

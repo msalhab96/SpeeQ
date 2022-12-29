@@ -1,8 +1,7 @@
 from pathlib import Path
 from typing import Union
 from dataclasses import dataclass, field
-from data.interfaces import IProcessor
-from models.templates import ITemplate
+from interfaces import IProcessor, ITemplate
 
 
 @dataclass
@@ -10,6 +9,7 @@ class TrainerConfig:
     """The trainer configuration
 
     Args:
+        name (str): The trainer name.
         batch_size (int): the batch size.
         epochs (int): The number of training epochs.
         outdir (Union[Path, str]): The path to save the results to.
@@ -31,6 +31,7 @@ class TrainerConfig:
         criterion_args (dict): The criterion arguments if there is any.
         Default {}.
     """
+    name: str
     batch_size: int
     epochs: int
     outdir: Union[Path, str]
@@ -60,6 +61,18 @@ class ASRDataConfig:
         text_processor (IProcessor): The text processor.
         tokenizer_path (Union[str, Path]): The path to load or save
         the tokenizer.
+        sep (str): the csv file's fields seprator. Default ','.
+        type (str): the file type. Default 'csv'.
+        padding_type (str): The padding to use static or dynamic.
+        Default 'dynamic'.
+        text_pad_max_len (str): Used if padding_type is static, which
+        set the maximum sequence length it has to be larger than
+        the largest text sequence size in both training and testing data.
+        speech_pad_max_len (str): Used if padding_type is static, which
+        set the maximum sequence length it has to be larger than
+        the largest speech sequence size in both training and testing data.
+        add_pos_tokens (bool): a flag if positional tokens (i.e SOS, EOS)
+        shall be added to the text squences. Default True.
     """
     training_path: Union[str, Path]
     testing_path: Union[str, Path]
@@ -69,7 +82,9 @@ class ASRDataConfig:
     sep: str = ','
     type: str = 'csv'
     padding_type: str = 'dynamic'
-    pad_max_len: int = -1
+    text_pad_max_len: int = -1
+    speech_pad_max_len: int = -1
+    add_pos_tokens: bool = True
 
 
 @dataclass

@@ -101,3 +101,71 @@ class IDataLoader(ABC):
     @abstractmethod
     def __iter__(self):
         pass
+
+
+class ITrainer(ABC):
+
+    @abstractmethod
+    def train():
+        pass
+
+    @abstractmethod
+    def test():
+        pass
+
+    @abstractmethod
+    def fit():
+        pass
+
+    @abstractmethod
+    def inline_log():
+        pass
+
+    @abstractproperty
+    def is_master():
+        pass
+
+
+class ISchedular(ABC):
+
+    @abstractmethod
+    def state_dict(self):
+        pass
+
+    @abstractmethod
+    def load_state_dict(self):
+        pass
+
+    @abstractmethod
+    def zero_grad(self):
+        pass
+
+    @abstractmethod
+    def step(self):
+        pass
+
+
+class ILogger(ABC):
+
+    @abstractmethod
+    def log_step(self):
+        pass
+
+    @abstractmethod
+    def log(self):
+        pass
+
+
+class ITemplate(ABC):
+
+    @abstractproperty
+    def name(self):
+        pass
+
+    @abstractproperty
+    def type(self):
+        pass
+
+    @abstractmethod
+    def get_dict(self):
+        pass

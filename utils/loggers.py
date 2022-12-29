@@ -1,19 +1,8 @@
 from pathlib import Path
 from typing import Union
 from .utils import clear
-from abc import ABC, abstractmethod
 from torch.utils.tensorboard import SummaryWriter
-
-
-class ILogger(ABC):
-
-    @abstractmethod
-    def log_step(self):
-        pass
-
-    @abstractmethod
-    def log(self):
-        pass
+from interfaces import ILogger
 
 
 class TBLogger(ILogger):

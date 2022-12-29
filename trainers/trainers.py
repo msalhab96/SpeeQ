@@ -1,11 +1,14 @@
+from functools import partial
 import os
+import time
 import torch
 from torch import Tensor
 from typing import Tuple, Union
-from data.interfaces import IDataLoader
 from trainers.decorators import step_log
 from utils.loggers import ILogger
-from .interfaces import ISchedular, ITrainer
+from interfaces import (
+    ISchedular, ITrainer, IDataLoader
+    )
 from constants import HistoryKeys, LogCategories
 from torch.optim import Optimizer
 from torch.nn import Module
@@ -13,6 +16,7 @@ from torch.distributed import (
     init_process_group, barrier, ReduceOp, all_reduce
     )
 from torch.nn.parallel import DistributedDataParallel
+from torch.multiprocessing import spawn
 from tqdm import tqdm
 
 
@@ -189,6 +193,7 @@ class CTCTrainer(BaseTrainer):
             history=history
         )
         self.device = device
+        self.model.to(device)
 
     def forward_pass(
             self, batch: Tuple[Tensor]) -> Tensor:
@@ -311,13 +316,14 @@ class DistCTCTrainer(BaseDistTrainer, CTCTrainer):
             total_loss += loss
             if (i + 1) % self.log_steps_frequency == 0:
                 total = self._all_reduce_loss(total_loss, i + 1)
-                if self.is_master():
+                if self.is_master:
                     self.inline_log(
                         key=HistoryKeys.train_loss.value,
                         category=LogCategories.steps.value,
                         value=total.item()
                         )
-                    self.testdist_config()
+                    self.test()
+                    self.model.train()
                 barrier()
         return self._all_reduce_loss(total_loss, len(self.train_loader)).item()
 
@@ -327,3 +333,58 @@ class DistCTCTrainer(BaseDistTrainer, CTCTrainer):
             if self.is_master:
                 self.logger.log(self.history)
             barrier()
+
+
+def _run_trainer(
+        rank: int,
+        world_size: int,
+        trainer_config,
+        data_config,
+        model_config
+        ) -> None:
+    if rank != 0:
+        # To make sure the master node created any dependancies
+        # This can be replaced if we pass the rank to the
+        # factories depend on the master node
+        time.sleep(5)
+    from trainers.registry import get_asr_trainer
+    trainer = get_asr_trainer(
+        rank=rank, world_size=world_size,
+        trainer_config=trainer_config,
+        data_config=data_config,
+        model_config=model_config
+    )
+    trainer.fit()
+
+
+def launch_training_job(
+        trainer_config: object,
+        data_config: object,
+        model_config: object
+        ) -> None:
+    """Launches ASR training job by constructing
+    a trainer from the passed configuration and run it
+    on single or multiple GPUS.
+
+    Args:
+        trainer_config (object): Trainer configuration object.
+        data_config (object): Data configuration object.
+        model_config (object): Model configuration object.
+    """
+    trainer_launcher = partial(
+        _run_trainer,
+        trainer_config=trainer_config,
+        data_config=data_config,
+        model_config=model_config
+        )
+    if trainer_config.dist_config is None:
+        trainer_launcher(
+            rank=0,
+            world_size=1
+            )
+    world_size = trainer_config.dist_config.n_gpus
+    spawn(
+        trainer_launcher,
+        nprocs=trainer_config.dist_config.n_gpus,
+        args=(world_size,)
+        )
