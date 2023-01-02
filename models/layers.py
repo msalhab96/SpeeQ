@@ -134,3 +134,34 @@ class CReLu(nn.Module):
         return torch.clamp(
             x, min=0, max=self.max_val
             )
+
+
+class FeedForwardModule(nn.Module):
+    """Implements the feed-forward module
+    described in https://arxiv.org/abs/1706.03762
+
+    Args:
+        d_model (int): The model dimensionality.
+        hidden_size (int): The inner layer's dimensionality.
+    """
+    def __init__(
+            self,
+            d_model: int,
+            hidden_size: int
+            ) -> None:
+        super().__init__()
+        self.fc1 = nn.Linear(
+            in_features=d_model,
+            out_features=hidden_size
+        )
+        self.relu = nn.ReLU()
+        self.fc2 = nn.Linear(
+            in_features=hidden_size,
+            out_features=d_model
+        )
+
+    def forward(self, x: Tensor) -> Tensor:
+        out = self.fc1(x)
+        out = self.relu(out)
+        out = self.fc2(out)
+        return out
