@@ -180,3 +180,93 @@ class AddAndNorm(nn.Module):
 
     def forward(self, x: Tensor, sub_x: Tensor):
         return self.lnorm(x + sub_x)
+
+
+class MultiHeadSelfAtt(nn.Module):
+    """Implements the multi-head self attention module
+    described in https://arxiv.org/abs/1706.03762
+
+    Args:
+        d_model (int): The model dimensionality.
+        h (int): The number of heads.
+    """
+    def __init__(
+            self,
+            d_model: int,
+            h: int
+            ) -> None:
+        super().__init__()
+        self.h = h
+        self.dk = d_model // h
+        self.d_model = d_model
+        assert d_model % h == 0, ValueError
+        self.query_fc = nn.Linear(
+            in_features=d_model,
+            out_features=d_model
+        )
+        self.key_fc = nn.Linear(
+            in_features=d_model,
+            out_features=d_model
+        )
+        self.value_fc = nn.Linear(
+            in_features=d_model,
+            out_features=d_model
+        )
+        self.softmax = nn.Softmax(dim=-1)
+
+    def _reshape(self, x: Tensor) -> List[Tensor]:
+        batch_size, max_len, _ = x.shape
+        x = x.view(
+            batch_size, max_len, self.h, self.dk
+            )
+        return x
+
+    def _mask(
+            self,
+            att: Tensor,
+            mask: Tensor
+            ):
+        # mask of shape [B, M]
+        mask = mask.unsqueeze(dim=1)
+        mask = mask.unsqueeze(dim=2) | mask.unsqueeze(dim=-1)
+        return att.masked_fill(mask, 1e-15)
+
+    def perform_attention(
+            self,
+            key: Tensor,
+            query: Tensor,
+            value: Tensor,
+            mask: Union[Tensor, None]
+            ) -> Tensor:
+        key = self._reshape(key)  # B, M, h, dk
+        query = self._reshape(query)  # B, M, h, dk
+        value = self._reshape(value)  # B, M, h, dk
+        key = key.permute(0, 2, 3, 1)  # B, h, dk, M
+        query = query.permute(0, 2, 1, 3)  # B, h, M, dk
+        value = value.permute(0, 2, 1, 3)  # B, h, M, dk
+        att = self.softmax(
+            torch.matmul(query, key) / self.d_model
+            )
+        if mask is not None:
+            att = self._mask(att, mask)
+        out = torch.matmul(att, value)
+        out = out.permute(0, 2, 1, 3)
+        out = out.contiguous()
+        out = out.view(
+            out.shape[0], out.shape[1], -1
+            )
+        return out
+
+    def forward(
+            self,
+            key: Tensor,
+            query: Tensor,
+            value: Tensor,
+            mask: Union[Tensor, None]
+            ) -> Tensor:
+        key = self.key_fc(key)
+        query = self.query_fc(query)
+        value = self.value_fc(value)
+        return self.perform_attention(
+            key=key, query=query, value=value, mask=mask
+        )
