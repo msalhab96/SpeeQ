@@ -165,3 +165,18 @@ class FeedForwardModule(nn.Module):
         out = self.relu(out)
         out = self.fc2(out)
         return out
+
+
+class AddAndNorm(nn.Module):
+    """Implements the Add and norm module
+    described in https://arxiv.org/abs/1706.03762
+
+    Args:
+        d_model (int): The model dimensionality.
+    """
+    def __init__(self, d_model: int) -> None:
+        super().__init__()
+        self.lnorm = nn.LayerNorm(normalized_shape=d_model)
+
+    def forward(self, x: Tensor, sub_x: Tensor):
+        return self.lnorm(x + sub_x)
