@@ -270,3 +270,49 @@ class MultiHeadSelfAtt(nn.Module):
         return self.perform_attention(
             key=key, query=query, value=value, mask=mask
         )
+
+
+class TransformerEncLayer(nn.Module):
+    """Implements a single encoder layer of the transformer
+    as described in https://arxiv.org/abs/1706.03762
+
+    Args:
+        d_model (int): The model dimensionality.
+        hidden_size (int): The feed forward inner
+            layer dimensionality..
+        h (int): The number of heads.
+    """
+    def __init__(
+            self,
+            d_model: int,
+            hidden_size: int,
+            h: int
+            ) -> None:
+        super().__init__()
+        self.mhsa = MultiHeadSelfAtt(
+            d_model=d_model, h=h
+            )
+        self.add_and_norm1 = AddAndNorm(
+            d_model=d_model
+            )
+        self.ff = FeedForwardModule(
+            d_model=d_model, hidden_size=hidden_size
+            )
+        self.add_and_norm2 = AddAndNorm(
+            d_model=d_model
+            )
+
+    def forward(
+            self,
+            x: Tensor,
+            mask: Tensor
+            ) -> Tensor:
+        out = self.mhsa(
+            key=x, query=x,
+            value=x, mask=mask
+            )
+        out = self.add_and_norm1(x, out)
+        result = self.ff(out)
+        return self.add_and_norm2(
+            out, result
+            )
