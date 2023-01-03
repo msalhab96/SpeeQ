@@ -89,6 +89,21 @@ class DeepSpeechV1(nn.Module):
 
 
 class BERT(nn.Module):
+    """Implements the BERT Model as
+    described in https://arxiv.org/abs/1810.04805
+
+    Args:
+        max_len (int): The maximum length for positional
+            encoding.
+        in_feature (int): The input/speech feature size.
+        d_model (int): The model dimensionality.
+        h (int): The number of heads.
+        hidden_size (int): The inner size of the feed forward
+            module.
+        n_layers (int): The number of transformer encoders.
+        n_classes (int): The number of classes.
+        p_dropout (float): The dropout rate.
+    """
     def __init__(
             self,
             max_len: int,
@@ -108,32 +123,32 @@ class BERT(nn.Module):
         self.pos_emb = nn.Parameter(
             torch.randn(max_len, d_model)
             )
-        self.layers = nn.Sequential(*[
-            nn.Sequential(
-                TransformerEncLayer(
-                    d_model=d_model,
-                    hidden_size=hidden_size,
-                    h=h
-                    ),
-                nn.Dropout(p_dropout)
+        self.layers = nn.ModuleList([
+            TransformerEncLayer(
+                d_model=d_model,
+                hidden_size=hidden_size,
+                h=h
                 )
             for _ in range(n_layers)
         ])
         self.pred_module = PredModule(
-            in_features=hidden_size,
+            in_features=d_model,
             n_classes=n_classes,
             activation=nn.Softmax(dim=-1)
         )
+        self.dropout = nn.Dropout(p_dropout)
 
     def embed(self, x: Tensor, mask: Tensor):
         # this is valid as long the padding is dynamic!
+        # TODO
         max_len = mask.shape[-1]
         emb = self.pos_emb[:max_len]  # M, d
         emb = emb.unsqueeze(dim=0)  # 1, M, d
         emb = emb.repeat(
             mask.shape[0], 1, 1
             )  # B, M , d
-        mask = mask.unsqueeze(dim=1)  # B, M, 1
+        mask = mask.unsqueeze(dim=-1)  # B, M, 1
+        print(mask.shape, emb.shape)
         emb = mask * emb
         return emb + x
 
@@ -142,8 +157,10 @@ class BERT(nn.Module):
         # x of shape [B, T, F]
         lengths = mask.sum(dim=-1)
         out = self.fc(x)
-        out = self.embed(out)
-        out = self.layers(out)
+        out = self.embed(out, mask)
+        for layer in self.layers:
+            out = layer(out, mask)
+            out = self.dropout(out)
         preds = self.pred_module(out)
         preds = preds.permute(1, 0, 2)
         return preds, lengths
