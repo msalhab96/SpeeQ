@@ -26,3 +26,16 @@ class DeepSpeechV1Temp(BaseTemplate):
     rnn_type: str = 'rnn'
     _name = 'deep_speech_v1'
     _type = 'ctc'
+
+
+@dataclass
+class BERTTemp(BaseTemplate):
+    max_len: int
+    in_feature: int
+    d_model: int
+    h: int
+    hidden_size: int
+    n_layers: int
+    p_dropout: float
+    _name = 'bert'
+    _type = 'ctc'
