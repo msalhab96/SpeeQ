@@ -134,7 +134,7 @@ class BERT(nn.Module):
         self.pred_module = PredModule(
             in_features=d_model,
             n_classes=n_classes,
-            activation=nn.Softmax(dim=-1)
+            activation=nn.LogSoftmax(dim=-1)
         )
         self.dropout = nn.Dropout(p_dropout)
 
@@ -148,7 +148,6 @@ class BERT(nn.Module):
             mask.shape[0], 1, 1
             )  # B, M , d
         mask = mask.unsqueeze(dim=-1)  # B, M, 1
-        print(mask.shape, emb.shape)
         emb = mask * emb
         return emb + x
 
