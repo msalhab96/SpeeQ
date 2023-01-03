@@ -4,7 +4,7 @@ from .layers import (
     PackedLSTM,
     PackedRNN
     )
-from .ctc import DeepSpeechV1
+from .ctc import BERT, DeepSpeechV1
 
 RNN_REGISTRY = {
     'rnn': PackedRNN,
@@ -14,7 +14,8 @@ RNN_REGISTRY = {
 
 
 CTC_MODELS = {
-    'deep_speech_v1': DeepSpeechV1
+    'deep_speech_v1': DeepSpeechV1,
+    'bert': BERT
 }
 
 
