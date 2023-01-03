@@ -134,3 +134,185 @@ class CReLu(nn.Module):
         return torch.clamp(
             x, min=0, max=self.max_val
             )
+
+
+class FeedForwardModule(nn.Module):
+    """Implements the feed-forward module
+    described in https://arxiv.org/abs/1706.03762
+
+    Args:
+        d_model (int): The model dimensionality.
+        hidden_size (int): The inner layer's dimensionality.
+    """
+    def __init__(
+            self,
+            d_model: int,
+            hidden_size: int
+            ) -> None:
+        super().__init__()
+        self.fc1 = nn.Linear(
+            in_features=d_model,
+            out_features=hidden_size
+        )
+        self.relu = nn.ReLU()
+        self.fc2 = nn.Linear(
+            in_features=hidden_size,
+            out_features=d_model
+        )
+
+    def forward(self, x: Tensor) -> Tensor:
+        out = self.fc1(x)
+        out = self.relu(out)
+        out = self.fc2(out)
+        return out
+
+
+class AddAndNorm(nn.Module):
+    """Implements the Add and norm module
+    described in https://arxiv.org/abs/1706.03762
+
+    Args:
+        d_model (int): The model dimensionality.
+    """
+    def __init__(self, d_model: int) -> None:
+        super().__init__()
+        self.lnorm = nn.LayerNorm(normalized_shape=d_model)
+
+    def forward(self, x: Tensor, sub_x: Tensor):
+        return self.lnorm(x + sub_x)
+
+
+class MultiHeadSelfAtt(nn.Module):
+    """Implements the multi-head self attention module
+    described in https://arxiv.org/abs/1706.03762
+
+    Args:
+        d_model (int): The model dimensionality.
+        h (int): The number of heads.
+    """
+    def __init__(
+            self,
+            d_model: int,
+            h: int
+            ) -> None:
+        super().__init__()
+        self.h = h
+        self.dk = d_model // h
+        self.d_model = d_model
+        assert d_model % h == 0, ValueError
+        self.query_fc = nn.Linear(
+            in_features=d_model,
+            out_features=d_model
+        )
+        self.key_fc = nn.Linear(
+            in_features=d_model,
+            out_features=d_model
+        )
+        self.value_fc = nn.Linear(
+            in_features=d_model,
+            out_features=d_model
+        )
+        self.softmax = nn.Softmax(dim=-1)
+
+    def _reshape(self, x: Tensor) -> List[Tensor]:
+        batch_size, max_len, _ = x.shape
+        x = x.view(
+            batch_size, max_len, self.h, self.dk
+            )
+        return x
+
+    def _mask(
+            self,
+            att: Tensor,
+            mask: Tensor
+            ):
+        # mask of shape [B, M]
+        mask = mask.unsqueeze(dim=1)
+        mask = mask.unsqueeze(dim=2) | mask.unsqueeze(dim=-1)
+        return att.masked_fill(mask, 1e-15)
+
+    def perform_attention(
+            self,
+            key: Tensor,
+            query: Tensor,
+            value: Tensor,
+            mask: Union[Tensor, None]
+            ) -> Tensor:
+        key = self._reshape(key)  # B, M, h, dk
+        query = self._reshape(query)  # B, M, h, dk
+        value = self._reshape(value)  # B, M, h, dk
+        key = key.permute(0, 2, 3, 1)  # B, h, dk, M
+        query = query.permute(0, 2, 1, 3)  # B, h, M, dk
+        value = value.permute(0, 2, 1, 3)  # B, h, M, dk
+        att = self.softmax(
+            torch.matmul(query, key) / self.d_model
+            )
+        if mask is not None:
+            att = self._mask(att, mask)
+        out = torch.matmul(att, value)
+        out = out.permute(0, 2, 1, 3)
+        out = out.contiguous()
+        out = out.view(
+            out.shape[0], out.shape[1], -1
+            )
+        return out
+
+    def forward(
+            self,
+            key: Tensor,
+            query: Tensor,
+            value: Tensor,
+            mask: Union[Tensor, None]
+            ) -> Tensor:
+        key = self.key_fc(key)
+        query = self.query_fc(query)
+        value = self.value_fc(value)
+        return self.perform_attention(
+            key=key, query=query, value=value, mask=mask
+        )
+
+
+class TransformerEncLayer(nn.Module):
+    """Implements a single encoder layer of the transformer
+    as described in https://arxiv.org/abs/1706.03762
+
+    Args:
+        d_model (int): The model dimensionality.
+        hidden_size (int): The feed forward inner
+            layer dimensionality..
+        h (int): The number of heads.
+    """
+    def __init__(
+            self,
+            d_model: int,
+            hidden_size: int,
+            h: int
+            ) -> None:
+        super().__init__()
+        self.mhsa = MultiHeadSelfAtt(
+            d_model=d_model, h=h
+            )
+        self.add_and_norm1 = AddAndNorm(
+            d_model=d_model
+            )
+        self.ff = FeedForwardModule(
+            d_model=d_model, hidden_size=hidden_size
+            )
+        self.add_and_norm2 = AddAndNorm(
+            d_model=d_model
+            )
+
+    def forward(
+            self,
+            x: Tensor,
+            mask: Tensor
+            ) -> Tensor:
+        out = self.mhsa(
+            key=x, query=x,
+            value=x, mask=mask
+            )
+        out = self.add_and_norm1(x, out)
+        result = self.ff(out)
+        return self.add_and_norm2(
+            out, result
+            )

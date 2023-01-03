@@ -1,6 +1,6 @@
 import torch
 from typing import Tuple
-from .layers import CReLu, PredModule
+from .layers import CReLu, PredModule, TransformerEncLayer
 from . import registry
 from torch import nn
 from torch import Tensor
@@ -86,3 +86,80 @@ class DeepSpeechV1(nn.Module):
         mask = torch.ones(1, x.shape[1]).long()
         preds, _ = self(x, mask)
         return preds
+
+
+class BERT(nn.Module):
+    """Implements the BERT Model as
+    described in https://arxiv.org/abs/1810.04805
+
+    Args:
+        max_len (int): The maximum length for positional
+            encoding.
+        in_feature (int): The input/speech feature size.
+        d_model (int): The model dimensionality.
+        h (int): The number of heads.
+        hidden_size (int): The inner size of the feed forward
+            module.
+        n_layers (int): The number of transformer encoders.
+        n_classes (int): The number of classes.
+        p_dropout (float): The dropout rate.
+    """
+    def __init__(
+            self,
+            max_len: int,
+            in_feature: int,
+            d_model: int,
+            h: int,
+            hidden_size: int,
+            n_layers: int,
+            n_classes: int,
+            p_dropout: float
+            ) -> None:
+        super().__init__()
+        self.fc = nn.Linear(
+            in_features=in_feature,
+            out_features=d_model,
+        )
+        self.pos_emb = nn.Parameter(
+            torch.randn(max_len, d_model)
+            )
+        self.layers = nn.ModuleList([
+            TransformerEncLayer(
+                d_model=d_model,
+                hidden_size=hidden_size,
+                h=h
+                )
+            for _ in range(n_layers)
+        ])
+        self.pred_module = PredModule(
+            in_features=d_model,
+            n_classes=n_classes,
+            activation=nn.LogSoftmax(dim=-1)
+        )
+        self.dropout = nn.Dropout(p_dropout)
+
+    def embed(self, x: Tensor, mask: Tensor):
+        # this is valid as long the padding is dynamic!
+        # TODO
+        max_len = mask.shape[-1]
+        emb = self.pos_emb[:max_len]  # M, d
+        emb = emb.unsqueeze(dim=0)  # 1, M, d
+        emb = emb.repeat(
+            mask.shape[0], 1, 1
+            )  # B, M , d
+        mask = mask.unsqueeze(dim=-1)  # B, M, 1
+        emb = mask * emb
+        return emb + x
+
+    def forward(self, x: Tensor, mask: Tensor) -> Tuple[Tensor, Tensor]:
+        # mask of shape [B, M] and True if there's no padding
+        # x of shape [B, T, F]
+        lengths = mask.sum(dim=-1)
+        out = self.fc(x)
+        out = self.embed(out, mask)
+        for layer in self.layers:
+            out = layer(out, mask)
+            out = self.dropout(out)
+        preds = self.pred_module(out)
+        preds = preds.permute(1, 0, 2)
+        return preds, lengths
