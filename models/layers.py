@@ -1,10 +1,11 @@
 import torch
 import torch.nn as nn
 from torch import Tensor
-from typing import List, Union
+from typing import List, Tuple, Union
 from torch.nn.utils.rnn import (
     pack_padded_sequence, pad_packed_sequence
 )
+from utils.utils import calc_data_len
 
 
 class PackedRNN(nn.Module):
@@ -368,3 +369,49 @@ class RowConv1D(nn.Module):
         out = out[..., :max_len]
         out = out.transpose(1, 2)
         return out
+
+
+class Conv1DLayers(nn.Module):
+    def __init__(
+            self,
+            in_size: int,
+            out_size: int,
+            kernel_size: int,
+            stride: int,
+            n_layers: int,
+            p_dropout: float
+            ) -> None:
+        super().__init__()
+        self.layers = nn.ModuleList([
+            nn.Conv1d(
+                in_channels=in_size if i == 0 else out_size,
+                out_channels=out_size,
+                kernel_size=kernel_size,
+                stride=stride
+            )
+            for i in range(n_layers)
+        ])
+        self.dropout = nn.Dropout(p_dropout)
+
+    def forward(
+            self, x: Tensor, mask: Tensor
+            ) -> Tuple[Tensor, Tensor]:
+        # x of shape [B, M, d]
+        x = x.transpose(1, 2)
+        out = x
+        data_len = mask.sum(dim=-1)
+        pad_len = mask.shape[-1] - data_len
+        for layer in self.layers:
+            out = layer(out)
+            out = self.dropout(out)
+            result_len = out.shape[-1]
+            data_len = calc_data_len(
+                result_len=result_len,
+                pad_len=pad_len,
+                data_len=data_len,
+                kernel_size=layer.kernel_size[0],
+                stride=layer.stride[0]
+            )
+            pad_len = result_len - data_len
+        out = out.transpose(1, 2)
+        return out, data_len
