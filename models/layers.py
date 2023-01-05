@@ -316,3 +316,55 @@ class TransformerEncLayer(nn.Module):
         return self.add_and_norm2(
             out, result
             )
+
+
+class RowConv1D(nn.Module):
+    """Implements the row convolution module
+    proposed in https://arxiv.org/abs/1512.02595
+
+    Args:
+        tau (int): The size of future context.
+        hidden_size (int): The input feature size.
+    """
+    def __init__(
+            self,
+            tau: int,
+            hidden_size: int
+            ) -> None:
+        super().__init__()
+        self.tau = tau
+        self.conv = nn.Conv1d(
+            in_channels=hidden_size,
+            out_channels=hidden_size,
+            kernel_size=tau, stride=1,
+            padding=0, dilation=1
+        )
+
+    def _pad(self, x: Tensor):
+        """pads the input with zeros along the
+        time dim.
+
+        Args:
+            x (Tensor): The input tensor of shape [B, d, M].
+
+        Returns:
+            Tensor: The padded tensor.
+        """
+        zeros = torch.zeros(
+            *x.shape[:-1], self.tau
+            )
+        zeros = zeros.to(x.device)
+        return torch.cat(
+            [x, zeros], dim=-1
+        )
+
+    def forward(self, x: Tensor):
+        # x of shape [B, M, d]
+        max_len = x.shape[1]
+        x = x.transpose(1, 2)
+        x = self._pad(x)
+        out = self.conv(x)
+        # remove the conv on the padding if there is any
+        out = out[..., :max_len]
+        out = out.transpose(1, 2)
+        return out
