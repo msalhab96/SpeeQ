@@ -153,7 +153,7 @@ def calc_data_len(
     """
     inp_len = data_len + pad_len
     new_pad_len = 0
-    if pad_len > kernel_size:
+    if pad_len >= kernel_size:
         unconvolved = (inp_len - kernel_size) % stride
         if unconvolved < pad_len:
             convolved = pad_len - unconvolved
