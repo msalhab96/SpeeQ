@@ -394,13 +394,12 @@ class Conv1DLayers(nn.Module):
         self.dropout = nn.Dropout(p_dropout)
 
     def forward(
-            self, x: Tensor, mask: Tensor
+            self, x: Tensor, data_len: Tensor
             ) -> Tuple[Tensor, Tensor]:
         # x of shape [B, M, d]
         x = x.transpose(1, 2)
         out = x
-        data_len = mask.sum(dim=-1)
-        pad_len = mask.shape[-1] - data_len
+        pad_len = x.shape[-1] - data_len
         for layer in self.layers:
             out = layer(out)
             out = self.dropout(out)
