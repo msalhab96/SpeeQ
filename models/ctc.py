@@ -1,6 +1,9 @@
 import torch
 from typing import Tuple
-from .layers import CReLu, PredModule, TransformerEncLayer
+from .layers import (
+    CReLu, Conv1DLayers, PredModule,
+    RowConv1D, TransformerEncLayer
+    )
 from . import registry
 from torch import nn
 from torch import Tensor
@@ -161,5 +164,79 @@ class BERT(nn.Module):
             out = layer(out, mask)
             out = self.dropout(out)
         preds = self.pred_module(out)
+        preds = preds.permute(1, 0, 2)
+        return preds, lengths
+
+
+class DeepSpeechV2(nn.Module):
+    # TODO: validate the model arch
+    # TODO: Add docstring
+    def __init__(
+            self,
+            n_conv: int,
+            kernel_size: int,
+            stride: int,
+            in_features: int,
+            hidden_size: int,
+            n_rnn: int,
+            n_linear_layers: int,
+            n_classes: int,
+            max_clip_value: int,
+            rnn_type: str,
+            tau: int,
+            p_dropout: float
+            ) -> None:
+        super().__init__()
+        self.conv = Conv1DLayers(
+            in_size=in_features,
+            out_size=hidden_size,
+            kernel_size=kernel_size,
+            stride=stride,
+            n_layers=n_conv,
+            p_dropout=p_dropout
+        )
+        self.rnns = nn.ModuleList(
+            [
+                registry.RNN_REGISTRY[rnn_type](
+                    input_size=hidden_size,
+                    hidden_size=hidden_size
+                    )
+                for _ in range(n_rnn)
+                ]
+            )
+        self.linear_layers = nn.ModuleList(
+            [
+                nn.Linear(
+                    in_features=hidden_size,
+                    out_features=hidden_size
+                )
+                for _ in range(n_linear_layers)
+            ]
+            )
+        self.crelu = CReLu(max_val=max_clip_value)
+        self.context_conv = RowConv1D(
+            tau=tau, hidden_size=hidden_size
+        )
+        self.pred_net = PredModule(
+            in_features=hidden_size,
+            n_classes=n_classes,
+            activation=nn.LogSoftmax(dim=-1)
+        )
+
+    def forward(self, x: Tensor, mask: Tensor):
+        lengths = mask.sum(dim=-1)
+        lengths = lengths.cpu()
+        out = self.conv(x, lengths)
+        out = self.crelu(out)
+        for layer in self.rnns:
+            out, _, lengths = layer(
+                out, lengths
+                )
+            out = self.crelu(out)
+        out = self.context_conv(out)
+        for layer in self.linear_layers:
+            out = self.linear_layers(out)
+            out = self.crelu(out)
+        preds = self.pred_net(out)
         preds = preds.permute(1, 0, 2)
         return preds, lengths
