@@ -133,7 +133,7 @@ def get_key_tag(key: str, category: str) -> str:
 
 
 def calc_data_len(
-        result_len: Union[Tensor, int],
+        result_len: int,
         pad_len: Union[Tensor, int],
         data_len: Union[Tensor, int],
         kernel_size: int,
@@ -143,7 +143,7 @@ def calc_data_len(
     after applying convolution on a padded tensor
 
     Args:
-        result_len Union[Tensor, int]: The length after the
+        result_len int: The length after the
             convolution iss applied.
         pad_len Union[Tensor, int]: The original padding portion length.
         data_len Union[Tensor, int]: The original data portion legnth.
