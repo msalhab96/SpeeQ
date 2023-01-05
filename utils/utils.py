@@ -129,3 +129,33 @@ def set_state_dict(model, optimizer, state_path):
 
 def get_key_tag(key: str, category: str) -> str:
     return f'{key}_key_{category}'
+
+
+def calc_data_len(
+        result_len: int,
+        pad_len: int,
+        data_len: int,
+        kernel_size: int,
+        stride: int
+        ):
+    """Calculates the new data portion size
+    after applying convolution on a padded tensor
+
+    Args:
+        result_len (int): The length after the convolution iss applied.
+        pad_len (int): The original padding portion length.
+        data_len (int): The original data portion legnth.
+        kernel_size (int): The convolution kernel size.
+        stride (int): The convolution stride.
+
+    Returns:
+        int: The new data portion length.
+    """
+    inp_len = data_len + pad_len
+    new_pad_len = 0
+    if pad_len > kernel_size:
+        unconvolved = (inp_len - kernel_size) % stride
+        if unconvolved < pad_len:
+            convolved = pad_len - unconvolved
+            new_pad_len = (convolved - kernel_size) // stride + 1
+    return result_len - new_pad_len
