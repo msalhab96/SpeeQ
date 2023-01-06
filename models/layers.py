@@ -1,10 +1,11 @@
 import torch
 import torch.nn as nn
 from torch import Tensor
-from typing import List, Union
+from typing import List, Tuple, Union
 from torch.nn.utils.rnn import (
     pack_padded_sequence, pad_packed_sequence
 )
+from utils.utils import calc_data_len
 
 
 class PackedRNN(nn.Module):
@@ -316,3 +317,100 @@ class TransformerEncLayer(nn.Module):
         return self.add_and_norm2(
             out, result
             )
+
+
+class RowConv1D(nn.Module):
+    """Implements the row convolution module
+    proposed in https://arxiv.org/abs/1512.02595
+
+    Args:
+        tau (int): The size of future context.
+        hidden_size (int): The input feature size.
+    """
+    def __init__(
+            self,
+            tau: int,
+            hidden_size: int
+            ) -> None:
+        super().__init__()
+        self.tau = tau
+        self.conv = nn.Conv1d(
+            in_channels=hidden_size,
+            out_channels=hidden_size,
+            kernel_size=tau, stride=1,
+            padding=0, dilation=1
+        )
+
+    def _pad(self, x: Tensor):
+        """pads the input with zeros along the
+        time dim.
+
+        Args:
+            x (Tensor): The input tensor of shape [B, d, M].
+
+        Returns:
+            Tensor: The padded tensor.
+        """
+        zeros = torch.zeros(
+            *x.shape[:-1], self.tau
+            )
+        zeros = zeros.to(x.device)
+        return torch.cat(
+            [x, zeros], dim=-1
+        )
+
+    def forward(self, x: Tensor):
+        # x of shape [B, M, d]
+        max_len = x.shape[1]
+        x = x.transpose(1, 2)
+        x = self._pad(x)
+        out = self.conv(x)
+        # remove the conv on the padding if there is any
+        out = out[..., :max_len]
+        out = out.transpose(1, 2)
+        return out
+
+
+class Conv1DLayers(nn.Module):
+    def __init__(
+            self,
+            in_size: int,
+            out_size: int,
+            kernel_size: int,
+            stride: int,
+            n_layers: int,
+            p_dropout: float
+            ) -> None:
+        super().__init__()
+        self.layers = nn.ModuleList([
+            nn.Conv1d(
+                in_channels=in_size if i == 0 else out_size,
+                out_channels=out_size,
+                kernel_size=kernel_size,
+                stride=stride
+            )
+            for i in range(n_layers)
+        ])
+        self.dropout = nn.Dropout(p_dropout)
+
+    def forward(
+            self, x: Tensor, data_len: Tensor
+            ) -> Tuple[Tensor, Tensor]:
+        # x of shape [B, M, d]
+        x = x.transpose(1, 2)
+        out = x
+        pad_len = x.shape[-1] - data_len
+        for layer in self.layers:
+            out = layer(out)
+            out = self.dropout(out)
+            result_len = out.shape[-1]
+            data_len = calc_data_len(
+                result_len=result_len,
+                pad_len=pad_len,
+                data_len=data_len,
+                kernel_size=layer.kernel_size[0],
+                stride=layer.stride[0]
+            )
+            pad_len = result_len - data_len
+        out = out.transpose(1, 2)
+        return out, data_len

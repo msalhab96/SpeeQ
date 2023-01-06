@@ -39,3 +39,20 @@ class BERTTemp(BaseTemplate):
     p_dropout: float
     _name = 'bert'
     _type = 'ctc'
+
+
+@dataclass
+class DeepSpeechV2Temp(BaseTemplate):
+    n_conv: int
+    kernel_size: int
+    stride: int
+    in_features: int
+    hidden_size: int
+    n_rnn: int
+    n_linear_layers: int
+    max_clip_value: int
+    tau: int
+    p_dropout: float
+    rnn_type: str = 'rnn'
+    _name = 'deep_speech_v2'
+    _type = 'ctc'

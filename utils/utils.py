@@ -2,6 +2,7 @@ import os
 import json
 import torch
 import platform
+from torch import Tensor
 from pathlib import Path
 from typing import Union, List
 from csv import DictReader
@@ -129,3 +130,40 @@ def set_state_dict(model, optimizer, state_path):
 
 def get_key_tag(key: str, category: str) -> str:
     return f'{key}_key_{category}'
+
+
+def calc_data_len(
+        result_len: int,
+        pad_len: Union[Tensor, int],
+        data_len: Union[Tensor, int],
+        kernel_size: int,
+        stride: int
+        ) -> Union[Tensor, int]:
+    """Calculates the new data portion size
+    after applying convolution on a padded tensor
+
+    Args:
+        result_len int: The length after the
+            convolution iss applied.
+        pad_len Union[Tensor, int]: The original padding portion length.
+        data_len Union[Tensor, int]: The original data portion legnth.
+        kernel_size (int): The convolution kernel size.
+        stride (int): The convolution stride.
+
+    Returns:
+        Union[Tensor, int]: The new data portion length.
+    """
+    inp_len = data_len + pad_len
+    new_pad_len = 0
+    # if padding size less than the kernel size
+    # then it will be convolved with the data.
+    convolved_pad_mask = pad_len >= kernel_size
+    # calculating the size of the discarded items (not convolved)
+    unconvolved = (inp_len - kernel_size) % stride
+    undiscarded_pad_mask = unconvolved < pad_len
+    convolved = pad_len - unconvolved
+    new_pad_len = (convolved - kernel_size) // stride + 1
+    # setting any condition violation to zeros using masks
+    new_pad_len *= convolved_pad_mask
+    new_pad_len *= undiscarded_pad_mask
+    return result_len - new_pad_len
