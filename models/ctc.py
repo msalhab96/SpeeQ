@@ -4,7 +4,6 @@ from .layers import (
     CReLu, Conv1DLayers, PredModule,
     RowConv1D, TransformerEncLayer
     )
-from . import registry
 from torch import nn
 from torch import Tensor
 
@@ -51,7 +50,8 @@ class DeepSpeechV1(nn.Module):
             )
             for i in range(n_linear_layers)
         ])
-        self.rnn = registry.RNN_REGISTRY[rnn_type](
+        from .registry import RNN_REGISTRY
+        self.rnn = RNN_REGISTRY[rnn_type](
             input_size=hidden_size,
             hidden_size=hidden_size,
             bidirectional=bidirectional
@@ -169,8 +169,6 @@ class BERT(nn.Module):
 
 
 class DeepSpeechV2(nn.Module):
-    # TODO: validate the model arch
-    # TODO: Add docstring
     def __init__(
             self,
             n_conv: int,
@@ -195,9 +193,10 @@ class DeepSpeechV2(nn.Module):
             n_layers=n_conv,
             p_dropout=p_dropout
         )
+        from .registry import RNN_REGISTRY
         self.rnns = nn.ModuleList(
             [
-                registry.RNN_REGISTRY[rnn_type](
+                RNN_REGISTRY[rnn_type](
                     input_size=hidden_size,
                     hidden_size=hidden_size
                     )
@@ -209,9 +208,9 @@ class DeepSpeechV2(nn.Module):
                 nn.Linear(
                     in_features=hidden_size,
                     out_features=hidden_size
-                )
+                    )
                 for _ in range(n_linear_layers)
-            ]
+                ]
             )
         self.crelu = CReLu(max_val=max_clip_value)
         self.context_conv = RowConv1D(
@@ -226,7 +225,7 @@ class DeepSpeechV2(nn.Module):
     def forward(self, x: Tensor, mask: Tensor):
         lengths = mask.sum(dim=-1)
         lengths = lengths.cpu()
-        out = self.conv(x, lengths)
+        out, lengths = self.conv(x, lengths)
         out = self.crelu(out)
         for layer in self.rnns:
             out, _, lengths = layer(
@@ -235,7 +234,7 @@ class DeepSpeechV2(nn.Module):
             out = self.crelu(out)
         out = self.context_conv(out)
         for layer in self.linear_layers:
-            out = self.linear_layers(out)
+            out = layer(out)
             out = self.crelu(out)
         preds = self.pred_net(out)
         preds = preds.permute(1, 0, 2)
