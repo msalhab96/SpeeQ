@@ -169,6 +169,23 @@ class BERT(nn.Module):
 
 
 class DeepSpeechV2(nn.Module):
+    """Implements the deep speech model
+    proposed in https://arxiv.org/abs/1512.02595
+
+    Args:
+        n_conv (int): The number of convolution layers.
+        kernel_size (int): The convolution layers' kernel size.
+        stride (int): The convolution layers' stride.
+        in_features (int): The input/speech feature size.
+        hidden_size (int): The layers' hidden size.
+        n_rnn (int): The number of RNN layers.
+        n_linear_layers (int): The number of linear layers.
+        n_classes (int): The number of classes.
+        max_clip_value (int): The maximum relu value.
+        rnn_type (str): rnn, gru or lstm.
+        tau (int): The future context size.
+        p_dropout (float): The dropout rate.
+    """
     def __init__(
             self,
             n_conv: int,
