@@ -178,6 +178,8 @@ class DeepSpeechV2(nn.Module):
         stride (int): The convolution layers' stride.
         in_features (int): The input/speech feature size.
         hidden_size (int): The layers' hidden size.
+        bidirectional (bidirectional): if the rnn is bidirectional
+            or not.
         n_rnn (int): The number of RNN layers.
         n_linear_layers (int): The number of linear layers.
         n_classes (int): The number of classes.
@@ -193,6 +195,7 @@ class DeepSpeechV2(nn.Module):
             stride: int,
             in_features: int,
             hidden_size: int,
+            bidirectional: bool,
             n_rnn: int,
             n_linear_layers: int,
             n_classes: int,
@@ -215,7 +218,8 @@ class DeepSpeechV2(nn.Module):
             [
                 RNN_REGISTRY[rnn_type](
                     input_size=hidden_size,
-                    hidden_size=hidden_size
+                    hidden_size=hidden_size,
+                    bidirectional=bidirectional
                     )
                 for _ in range(n_rnn)
                 ]
@@ -238,6 +242,8 @@ class DeepSpeechV2(nn.Module):
             n_classes=n_classes,
             activation=nn.LogSoftmax(dim=-1)
         )
+        self.hidden_size = hidden_size
+        self.bidirectional = bidirectional
 
     def forward(self, x: Tensor, mask: Tensor):
         lengths = mask.sum(dim=-1)
@@ -248,6 +254,9 @@ class DeepSpeechV2(nn.Module):
             out, _, lengths = layer(
                 out, lengths
                 )
+            if self.bidirectional is True:
+                out = out[..., :self.hidden_size] +\
+                    out[..., self.hidden_size:]
             out = self.crelu(out)
         out = self.context_conv(out)
         for layer in self.linear_layers:
