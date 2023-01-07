@@ -48,6 +48,7 @@ class DeepSpeechV2Temp(BaseTemplate):
     stride: int
     in_features: int
     hidden_size: int
+    bidirectional: bool
     n_rnn: int
     n_linear_layers: int
     max_clip_value: int
