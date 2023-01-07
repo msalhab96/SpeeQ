@@ -414,3 +414,74 @@ class Conv1DLayers(nn.Module):
             pad_len = result_len - data_len
         out = out.transpose(1, 2)
         return out, data_len
+
+
+class GlobalMulAttention(nn.Module):
+    """Implements the global multiplicative
+    attention mechanism as described in
+    https://arxiv.org/abs/1508.04025 with direct
+    dot product for scoring.
+
+    Args:
+        enc_feat_size (int): The encoder feature size.
+        dec_feat_size (int): The decoder feature size.
+        scaling_factor (Union[float, int]): The scaling factor
+            for numerical stability used inside the softmax.
+            Default 1.
+        mask_val (float): the masking value. Default 1e-12.
+    """
+    def __init__(
+            self,
+            enc_feat_size: int,
+            dec_feat_size: int,
+            scaling_factor: Union[float, int] = 1,
+            mask_val: float = 1e-12
+            ) -> None:
+        super().__init__()
+        self.fc_query = nn.Linear(
+            in_features=dec_feat_size,
+            out_features=dec_feat_size
+            )
+        self.fc_key = nn.Linear(
+            in_features=enc_feat_size,
+            out_features=dec_feat_size
+            )
+        self.fc_value = nn.Linear(
+            in_features=enc_feat_size,
+            out_features=dec_feat_size
+            )
+        self.fc = nn.Linear(
+            in_features=2 * dec_feat_size,
+            out_features=dec_feat_size
+        )
+        self.scaling_factor = scaling_factor
+        self.mask_val = mask_val
+
+    def forward(
+            self,
+            key: Tensor,
+            query: Tensor,
+            mask=None
+            ) -> Tensor:
+        # key of shape [B, M, feat_size]
+        # query of shape [B, 1, feat_size]
+        # mask of shape [B, M], False for padding
+        value = self.fc_value(key)
+        key = self.fc_key(key)
+        query = self.fc_query(query)
+        att_weights = torch.matmul(
+            query, key.transpose(-1, -2)
+            )
+        if mask is not None:
+            mask = mask.unsqueeze(dim=-2)
+            att_weights = att_weights.masked_fill(
+                ~mask, self.mask_val
+                )
+        att_weights = torch.softmax(
+            att_weights / self.scaling_factor, dim=-1
+            )
+        context = torch.matmul(att_weights, value)
+        results = torch.cat([context, query], dim=-1)
+        results = self.fc(results)
+        results = torch.tanh(results)
+        return results
