@@ -560,3 +560,59 @@ class ConformerRelativeMHSA(MultiHeadSelfAtt):
             )
         out = self.dropout(out)
         return out
+
+
+class ConformerBlock(nn.Module):
+    """Implements the conformer block
+    described in https://arxiv.org/abs/2005.08100
+
+    Args:
+        d_model (int): The model dimension.
+        ff_expansion_factor (int): The linear layer's expansion factor.
+        h (int): The number of heads.
+        kernel_size (int): The depth-wise convolution kernel size.
+        p_dropout (float): The dropout rate.
+        res_scaling (float): The residual connection multiplier.
+    """
+    def __init__(
+            self,
+            d_model: int,
+            ff_expansion_factor: int,
+            h: int,
+            kernel_size: int,
+            p_dropout: float,
+            res_scaling: float = 0.5
+            ) -> None:
+        super().__init__()
+        self.ff1 = ConformerFeedForward(
+            d_model=d_model,
+            expansion_factor=ff_expansion_factor,
+            p_dropout=p_dropout
+        )
+        self.mhsa = ConformerRelativeMHSA(
+            d_model=d_model,
+            h=h, p_dropout=p_dropout
+        )
+        self.conv = ConformerConvModule(
+            d_model=d_model,
+            kernel_size=kernel_size,
+            p_dropout=p_dropout
+        )
+        self.ff2 = ConformerFeedForward(
+            d_model=d_model,
+            expansion_factor=ff_expansion_factor,
+            p_dropout=p_dropout
+        )
+        self.lnrom = nn.LayerNorm(
+            normalized_shape=d_model
+            )
+        self.res_scaling = res_scaling
+
+    def forward(self, x: Tensor, mask: Union[None, Tensor]) -> Tensor:
+        out = self.ff1(x)
+        out = x + self.res_scaling * out
+        out = out + self.mhsa(out, mask)
+        out = out + self.conv(out)
+        out = out + self.res_scaling * self.ff2(out)
+        out = self.lnrom(out)
+        return out
