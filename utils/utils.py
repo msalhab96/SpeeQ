@@ -167,3 +167,22 @@ def calc_data_len(
     new_pad_len *= convolved_pad_mask
     new_pad_len *= undiscarded_pad_mask
     return result_len - new_pad_len
+
+
+def get_positional_encoding(max_length: int, d_model: int) -> Tensor:
+    """Create positional encoding tensor as described in
+    https://arxiv.org/abs/1706.03762
+    Args:
+        max_length (int): The maximum length of the positionals sequence.
+        d_model (int): The dimensionality of the positionals sequence.
+    Returns:
+        Tensor: Positional tensor of shape [1, max_length, d_model]
+    """
+    result = torch.zeros(max_length, d_model, dtype=torch.float)
+    feat_range = torch.arange(0, d_model, 2)
+    time_range = torch.arange(0, max_length)
+    denominator = pow(10000, 2 * feat_range / d_model)
+    result[:, 0::2] = torch.sin(time_range[:, None] / denominator)
+    result[:, 1::2] = torch.cos(time_range[:, None] / denominator)
+    result = result.unsqueeze(dim=0)
+    return result
