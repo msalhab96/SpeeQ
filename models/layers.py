@@ -5,7 +5,7 @@ from typing import List, Tuple, Union
 from torch.nn.utils.rnn import (
     pack_padded_sequence, pad_packed_sequence
 )
-from utils.utils import calc_data_len
+from utils.utils import calc_data_len, get_positional_encoding
 
 
 class PackedRNN(nn.Module):
@@ -513,4 +513,50 @@ class ConformerConvModule(nn.Module):
         out = self.pwise_conv2(out)
         out = self.dropout(out)
         out = out.transpose(-1, -2)  # [B, M, d]
+        return out
+
+
+class ConformerRelativeMHSA(MultiHeadSelfAtt):
+    """Implements the multi-head self attention module with
+    relative positional encoding as described in
+    https://arxiv.org/abs/2005.08100
+
+    Args:
+        d_model (int): The model dimension.
+        h (int): The number of heads.
+        p_dropout (float): The dropout rate.
+    """
+    def __init__(
+            self,
+            d_model: int,
+            h: int,
+            p_dropout: float
+            ) -> None:
+        super().__init__(
+            d_model=d_model, h=h
+            )
+        self.lnrom = nn.LayerNorm(
+            normalized_shape=d_model
+            )
+        self.dropout = nn.Dropout(p_dropout)
+
+    def _add_pos_enc(self, x: Tensor) -> Tensor:
+        pe = get_positional_encoding(
+            x.shape[1], self.d_model
+            )
+        pe = pe.to(x.device)
+        return pe + x
+
+    def forward(
+            self,
+            x: Tensor,
+            mask: Union[None, Tensor]
+            ) -> Tensor:
+        out = self.lnrom(x)
+        out = self._add_pos_enc(out)
+        out = super().forward(
+            key=out, query=out,
+            value=out, mask=mask
+            )
+        out = self.dropout(out)
         return out
