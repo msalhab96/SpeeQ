@@ -414,3 +414,44 @@ class Conv1DLayers(nn.Module):
             pad_len = result_len - data_len
         out = out.transpose(1, 2)
         return out, data_len
+
+
+class ConformerFeedForward(nn.Module):
+    """Implements the conformer feed-forward module
+    as described in https://arxiv.org/abs/2005.08100
+
+    Args:
+        d_model (int): The model dimension.
+        expansion_factor (int): The linear layer's expansion
+            factor.
+        p_dropout (float): The dropout rate.
+    """
+    def __init__(
+            self,
+            d_model: int,
+            expansion_factor: int,
+            p_dropout: float
+            ) -> None:
+        super().__init__()
+        self.lnrom = nn.LayerNorm(
+            normalized_shape=d_model
+            )
+        self.fc1 = nn.Linear(
+            in_features=d_model,
+            out_features=expansion_factor * d_model
+        )
+        self.fc2 = nn.Linear(
+            in_features=expansion_factor * d_model,
+            out_features=d_model
+        )
+        self.swish = nn.SiLU()
+        self.dropout = nn.Dropout(p_dropout)
+
+    def forward(self, x: Tensor) -> Tensor:
+        out = self.lnrom(x)
+        out = self.fc1(out)
+        out = self.swish(out)
+        out = self.dropout(out)
+        out = self.fc2(out)
+        out = self.dropout(out)
+        return out
