@@ -186,3 +186,19 @@ def get_positional_encoding(max_length: int, d_model: int) -> Tensor:
     result[:, 1::2] = torch.cos(time_range[:, None] / denominator)
     result = result.unsqueeze(dim=0)
     return result
+
+
+def get_mask_from_lens(lengths: Tensor, max_len: int) -> Tensor:
+    """Creates a mask tensor from lengths tensor.
+
+    Args:
+        lengths (Tensor): The lengths of the original tensors of shape [B].
+        max_len (int): the maximum lengths.
+
+    Returns:
+        Tensor: The mask of shape [B, max_len] and True whenever the index
+            in the data portion.
+    """
+    indices = torch.arange(max_len)
+    indices = indices.expand(len(lengths), max_len)
+    return indices < lengths.unsqueeze(dim=1)
