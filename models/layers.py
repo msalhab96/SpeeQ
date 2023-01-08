@@ -616,3 +616,50 @@ class ConformerBlock(nn.Module):
         out = out + self.res_scaling * self.ff2(out)
         out = self.lnrom(out)
         return out
+
+
+class ConformerPreNet(nn.Module):
+    """Implements the pre-conformer blocks that contains
+    the subsampling as described in https://arxiv.org/abs/2005.08100
+
+    Args:
+        in_features (int): The input/speech feature size.
+        kernel_size (int): The kernel size of the subsampling layer.
+        d_model (int): The model dimension.
+        p_dropout (float): The dropout rate.
+    """
+    def __init__(
+            self,
+            in_features: int,
+            kernel_size: int,
+            d_model: int,
+            p_dropout: float
+            ) -> None:
+        super().__init__()
+        self.conv = nn.Conv1d(
+            in_channels=in_features,
+            out_channels=d_model,
+            kernel_size=kernel_size,
+            stride=1
+            )
+        self.fc = nn.Linear(
+            in_features=d_model,
+            out_features=d_model
+        )
+        self.drpout = nn.Dropout(p_dropout)
+
+    def forward(self, x: Tensor, lengths: Tensor) -> Tensor:
+        # x of shape [B, M, d]
+        x = x.transpose(-1, -2)  # [B, d, M]
+        out = self.conv(x)
+        lengths = calc_data_len(
+            result_len=out.shape[-1],
+            pad_len=x.shape[-1] - lengths,
+            data_len=lengths,
+            kernel_size=self.conv.kernel_size,
+            stride=self.conv.stride
+        )
+        out = out.transpose(-1, -2)
+        out = self.fc(out)
+        out = self.drpout(out)
+        return out
