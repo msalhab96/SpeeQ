@@ -648,7 +648,9 @@ class ConformerPreNet(nn.Module):
         )
         self.drpout = nn.Dropout(p_dropout)
 
-    def forward(self, x: Tensor, lengths: Tensor) -> Tensor:
+    def forward(
+            self, x: Tensor, lengths: Tensor
+            ) -> Tuple[Tensor, Tensor]:
         # x of shape [B, M, d]
         x = x.transpose(-1, -2)  # [B, d, M]
         out = self.conv(x)
@@ -662,4 +664,4 @@ class ConformerPreNet(nn.Module):
         out = out.transpose(-1, -2)
         out = self.fc(out)
         out = self.drpout(out)
-        return out
+        return out, lengths
