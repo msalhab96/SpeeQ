@@ -747,8 +747,8 @@ class JasperBlock(nn.Module):
     https://arxiv.org/abs/1904.03288
 
     Args:
-        num_sub_blocks (int): The number of subblocks, denoted
-            r in the paper.
+        num_sub_blocks (int): The number of subblocks, which is
+            denoted as 'R' in the paper.
         in_channels (int): The number of the input's channels.
         out_channels (int): The number of the output's channels.
         kernel_size (int): The convolution layer's kernel size.
