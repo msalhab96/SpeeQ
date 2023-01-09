@@ -709,3 +709,33 @@ class JasperSubBlock(nn.Module):
         out = self.relu(out)
         out = self.dropout(out)
         return out
+
+
+class JasperResidual(nn.Module):
+    """Implements the the residual connection
+    module as described in https://arxiv.org/abs/1904.03288
+
+    Args:
+        in_channels (int): The number of the input's channels.
+        out_channels (int): The number of the output's channels.
+    """
+    def __init__(
+            self,
+            in_channels: int,
+            out_channels: int
+            ) -> None:
+        super().__init__()
+        self.conv = nn.Conv1d(
+            in_channels=in_channels,
+            out_channels=out_channels,
+            kernel_size=1
+        )
+        self.bnorm = nn.BatchNorm1d(
+            num_features=out_channels
+        )
+
+    def forward(self, x: Tensor) -> Tensor:
+        # x of shape [B, d, M]
+        out = self.conv(x)
+        out = self.bnorm(out)
+        return out
