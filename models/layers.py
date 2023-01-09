@@ -739,3 +739,53 @@ class JasperResidual(nn.Module):
         out = self.conv(x)
         out = self.bnorm(out)
         return out
+
+
+class JasperBlock(nn.Module):
+    """Implements the main jasper block of the
+    Jasper model as described in
+    https://arxiv.org/abs/1904.03288
+
+    Args:
+        num_sub_blocks (int): The number of subblocks, denoted
+            r in the paper.
+        in_channels (int): The number of the input's channels.
+        out_channels (int): The number of the output's channels.
+        kernel_size (int): The convolution layer's kernel size.
+        p_dropout (float): The dropout rate.
+    """
+    def __init__(
+            self,
+            num_sub_blocks: int,
+            in_channels: int,
+            out_channels: int,
+            kernel_size: int,
+            p_dropout: float
+            ) -> None:
+        super().__init__()
+        self.blocks = nn.ModuleList([
+            JasperSubBlock(
+                in_channels=in_channels if i == 1 else out_channels,
+                out_channels=out_channels,
+                kernel_size=kernel_size,
+                p_dropout=p_dropout
+            )
+            for i in range(1, 1 + num_sub_blocks)
+        ])
+        self.residual_layer = JasperResidual(
+                in_channels=in_channels,
+                out_channels=out_channels
+            )
+        self.num_sub_blocks = num_sub_blocks
+
+    def forward(self, x: Tensor) -> Tensor:
+        # x of shape [B, d, M]
+        out = x
+        for i, block in enumerate(self.blocks):
+            if (i + 1) == self.num_sub_blocks:
+                out = block(
+                    out, residual=self.residual_layer(x)
+                    )
+            else:
+                out = block(out)
+        return out
