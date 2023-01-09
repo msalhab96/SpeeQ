@@ -57,3 +57,18 @@ class DeepSpeechV2Temp(BaseTemplate):
     rnn_type: str = 'rnn'
     _name = 'deep_speech_v2'
     _type = 'ctc'
+
+
+@dataclass
+class ConformerCTCTemp(BaseTemplate):
+    d_model: int
+    n_conf_layers: int
+    ff_expansion_factor: int
+    h: int
+    kernel_size: int
+    ss_kernel_size: int
+    in_features: int
+    res_scaling: float
+    p_dropout: float
+    _name = 'conformer'
+    _type = 'ctc'
