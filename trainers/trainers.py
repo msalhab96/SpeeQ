@@ -172,7 +172,11 @@ class BaseDistTrainer(BaseTrainer):
         self.dist_address = dist_address
         self.dist_backend = dist_backend
         self.init_dist()
+        self.has_bnorm = self.has_bnorm
         self.model.to(f'cuda:{rank}')
+        self.model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(
+            self.model
+        )
         self.model = DistributedDataParallel(
             self.model, device_ids=[self.rank]
         )
@@ -378,7 +382,8 @@ class DistCTCTrainer(BaseDistTrainer, CTCTrainer):
                         )
                     self.test()
                     self.model.train()
-                barrier()
+                if self.has_bnorm is False:
+                    barrier()
             self.counter += 1
         return self._all_reduce_loss(total_loss, len(self.train_loader)).item()
 

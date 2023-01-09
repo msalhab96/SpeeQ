@@ -70,6 +70,7 @@ class DeepSpeechV1(nn.Module):
         )
         self.bidirectional = bidirectional
         self.hidden_size = hidden_size
+        self.has_bnorm = False
 
     def forward(self, x: Tensor, mask: Tensor) -> Tuple[Tensor, Tensor]:
         # mask of shape [B, M] and True if there's no padding
@@ -142,6 +143,7 @@ class BERT(nn.Module):
             activation=nn.LogSoftmax(dim=-1)
         )
         self.dropout = nn.Dropout(p_dropout)
+        self.has_bnorm = False
 
     def embed(self, x: Tensor, mask: Tensor):
         # this is valid as long the padding is dynamic!
@@ -246,6 +248,7 @@ class DeepSpeechV2(nn.Module):
         )
         self.hidden_size = hidden_size
         self.bidirectional = bidirectional
+        self.has_bnorm = False
 
     def forward(self, x: Tensor, mask: Tensor):
         lengths = mask.sum(dim=-1)
@@ -320,6 +323,7 @@ class Conformer(nn.Module):
             n_classes=n_classes,
             activation=nn.LogSoftmax(dim=-1)
         )
+        self.has_bnorm = True
 
     def forward(
             self, x: Tensor, mask: Tensor
