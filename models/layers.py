@@ -5,7 +5,7 @@ from typing import List, Tuple, Union
 from torch.nn.utils.rnn import (
     pack_padded_sequence, pad_packed_sequence
 )
-from utils.utils import calc_data_len
+from utils.utils import calc_data_len, get_positional_encoding
 
 
 class PackedRNN(nn.Module):
@@ -414,3 +414,254 @@ class Conv1DLayers(nn.Module):
             pad_len = result_len - data_len
         out = out.transpose(1, 2)
         return out, data_len
+
+
+class ConformerFeedForward(nn.Module):
+    """Implements the conformer feed-forward module
+    as described in https://arxiv.org/abs/2005.08100
+
+    Args:
+        d_model (int): The model dimension.
+        expansion_factor (int): The linear layer's expansion
+            factor.
+        p_dropout (float): The dropout rate.
+    """
+    def __init__(
+            self,
+            d_model: int,
+            expansion_factor: int,
+            p_dropout: float
+            ) -> None:
+        super().__init__()
+        self.lnrom = nn.LayerNorm(
+            normalized_shape=d_model
+            )
+        self.fc1 = nn.Linear(
+            in_features=d_model,
+            out_features=expansion_factor * d_model
+        )
+        self.fc2 = nn.Linear(
+            in_features=expansion_factor * d_model,
+            out_features=d_model
+        )
+        self.swish = nn.SiLU()
+        self.dropout = nn.Dropout(p_dropout)
+
+    def forward(self, x: Tensor) -> Tensor:
+        out = self.lnrom(x)
+        out = self.fc1(out)
+        out = self.swish(out)
+        out = self.dropout(out)
+        out = self.fc2(out)
+        out = self.dropout(out)
+        return out
+
+
+class ConformerConvModule(nn.Module):
+    """Implements the conformer convolution module
+    as described in https://arxiv.org/abs/2005.08100
+
+    Args:
+        d_model (int): The model dimension.
+        kernel_size (int): The depth-wise convolution kernel size.
+        p_dropout (float): The dropout rate.
+    """
+    def __init__(
+            self,
+            d_model: int,
+            kernel_size: int,
+            p_dropout: float
+            ) -> None:
+        super().__init__()
+        self.lnrom = nn.LayerNorm(
+            normalized_shape=d_model
+            )
+        self.pwise_conv1 = nn.Conv1d(
+            in_channels=d_model,
+            out_channels=2 * d_model,
+            kernel_size=1
+        )
+        self.glu = nn.GLU(dim=1)
+        self.dwise_conv = nn.Conv1d(
+            in_channels=d_model,
+            out_channels=d_model,
+            kernel_size=kernel_size,
+            groups=d_model,
+            padding='same'
+        )
+        # TODO: handle the BN with DDL
+        self.bnorm = nn.BatchNorm1d(
+            num_features=d_model
+        )
+        self.swish = nn.SiLU()
+        self.pwise_conv2 = nn.Conv1d(
+            in_channels=d_model,
+            out_channels=d_model,
+            kernel_size=1
+        )
+        self.dropout = nn.Dropout(p_dropout)
+
+    def forward(self, x: Tensor) -> Tensor:
+        # x of shape [B, M, d]
+        out = self.lnrom(x)
+        out = out.transpose(-1, -2)  # [B, d, M]
+        out = self.pwise_conv1(out)  # [B, 2d, M]
+        out = self.glu(out)  # [B, d, M]
+        out = self.dwise_conv(out)
+        out = self.bnorm(out)
+        out = self.swish(out)
+        out = self.pwise_conv2(out)
+        out = self.dropout(out)
+        out = out.transpose(-1, -2)  # [B, M, d]
+        return out
+
+
+class ConformerRelativeMHSA(MultiHeadSelfAtt):
+    """Implements the multi-head self attention module with
+    relative positional encoding as described in
+    https://arxiv.org/abs/2005.08100
+
+    Args:
+        d_model (int): The model dimension.
+        h (int): The number of heads.
+        p_dropout (float): The dropout rate.
+    """
+    def __init__(
+            self,
+            d_model: int,
+            h: int,
+            p_dropout: float
+            ) -> None:
+        super().__init__(
+            d_model=d_model, h=h
+            )
+        self.lnrom = nn.LayerNorm(
+            normalized_shape=d_model
+            )
+        self.dropout = nn.Dropout(p_dropout)
+
+    def _add_pos_enc(self, x: Tensor) -> Tensor:
+        pe = get_positional_encoding(
+            x.shape[1], self.d_model
+            )
+        pe = pe.to(x.device)
+        return pe + x
+
+    def forward(
+            self,
+            x: Tensor,
+            mask: Union[None, Tensor]
+            ) -> Tensor:
+        out = self.lnrom(x)
+        out = self._add_pos_enc(out)
+        out = super().forward(
+            key=out, query=out,
+            value=out, mask=mask
+            )
+        out = self.dropout(out)
+        return out
+
+
+class ConformerBlock(nn.Module):
+    """Implements the conformer block
+    described in https://arxiv.org/abs/2005.08100
+
+    Args:
+        d_model (int): The model dimension.
+        ff_expansion_factor (int): The linear layer's expansion factor.
+        h (int): The number of heads.
+        kernel_size (int): The depth-wise convolution kernel size.
+        p_dropout (float): The dropout rate.
+        res_scaling (float): The residual connection multiplier.
+    """
+    def __init__(
+            self,
+            d_model: int,
+            ff_expansion_factor: int,
+            h: int,
+            kernel_size: int,
+            p_dropout: float,
+            res_scaling: float = 0.5
+            ) -> None:
+        super().__init__()
+        self.ff1 = ConformerFeedForward(
+            d_model=d_model,
+            expansion_factor=ff_expansion_factor,
+            p_dropout=p_dropout
+        )
+        self.mhsa = ConformerRelativeMHSA(
+            d_model=d_model,
+            h=h, p_dropout=p_dropout
+        )
+        self.conv = ConformerConvModule(
+            d_model=d_model,
+            kernel_size=kernel_size,
+            p_dropout=p_dropout
+        )
+        self.ff2 = ConformerFeedForward(
+            d_model=d_model,
+            expansion_factor=ff_expansion_factor,
+            p_dropout=p_dropout
+        )
+        self.lnrom = nn.LayerNorm(
+            normalized_shape=d_model
+            )
+        self.res_scaling = res_scaling
+
+    def forward(self, x: Tensor, mask: Union[None, Tensor]) -> Tensor:
+        out = self.ff1(x)
+        out = x + self.res_scaling * out
+        out = out + self.mhsa(out, mask)
+        out = out + self.conv(out)
+        out = out + self.res_scaling * self.ff2(out)
+        out = self.lnrom(out)
+        return out
+
+
+class ConformerPreNet(nn.Module):
+    """Implements the pre-conformer blocks that contains
+    the subsampling as described in https://arxiv.org/abs/2005.08100
+
+    Args:
+        in_features (int): The input/speech feature size.
+        kernel_size (int): The kernel size of the subsampling layer.
+        d_model (int): The model dimension.
+        p_dropout (float): The dropout rate.
+    """
+    def __init__(
+            self,
+            in_features: int,
+            kernel_size: int,
+            d_model: int,
+            p_dropout: float
+            ) -> None:
+        super().__init__()
+        self.conv = nn.Conv1d(
+            in_channels=in_features,
+            out_channels=d_model,
+            kernel_size=kernel_size,
+            stride=1
+            )
+        self.fc = nn.Linear(
+            in_features=d_model,
+            out_features=d_model
+        )
+        self.drpout = nn.Dropout(p_dropout)
+
+    def forward(
+            self, x: Tensor, lengths: Tensor
+            ) -> Tuple[Tensor, Tensor]:
+        # x of shape [B, M, d]
+        x = x.transpose(-1, -2)  # [B, d, M]
+        out = self.conv(x)
+        lengths = calc_data_len(
+            result_len=out.shape[-1],
+            pad_len=x.shape[-1] - lengths,
+            data_len=lengths,
+            kernel_size=self.conv.kernel_size[0],
+            stride=self.conv.stride[0]
+        )
+        out = out.transpose(-1, -2)
+        out = self.fc(out)
+        out = self.drpout(out)
+        return out, lengths

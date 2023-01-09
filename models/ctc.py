@@ -1,7 +1,9 @@
 import torch
 from typing import Tuple
+
+from utils.utils import get_mask_from_lens
 from .layers import (
-    CReLu, Conv1DLayers, PredModule,
+    CReLu, ConformerBlock, ConformerPreNet, Conv1DLayers, PredModule,
     RowConv1D, TransformerEncLayer
     )
 from torch import nn
@@ -262,6 +264,75 @@ class DeepSpeechV2(nn.Module):
         for layer in self.linear_layers:
             out = layer(out)
             out = self.crelu(out)
+        preds = self.pred_net(out)
+        preds = preds.permute(1, 0, 2)
+        return preds, lengths
+
+
+class Conformer(nn.Module):
+    """Implements the confformer model proposed in
+    https://arxiv.org/abs/2005.08100, this model used
+    with CTC, while in the paper used RNN-T.
+
+    Args:
+        n_classes (int): The number of classes.
+        d_model (int): The model dimension.
+        n_conf_layers (int): The number of conformer blocks.
+        ff_expansion_factor (int): The feed-forward expansion factor.
+        h (int): The number of heads.
+        kernel_size (int): The kernel size of conv module.
+        ss_kernel_size (int): The kernel size of the subsampling layer.
+        in_features (int): The input/speech feature size.
+        res_scaling (float): The residual connection multiplier.
+        p_dropout (float): The dropout rate.
+    """
+    def __init__(
+            self,
+            n_classes: int,
+            d_model: int,
+            n_conf_layers: int,
+            ff_expansion_factor: int,
+            h: int,
+            kernel_size: int,
+            ss_kernel_size: int,
+            in_features: int,
+            res_scaling: float,
+            p_dropout: float
+            ) -> None:
+        super().__init__()
+        self.sub_sampling = ConformerPreNet(
+            in_features=in_features,
+            kernel_size=ss_kernel_size,
+            d_model=d_model,
+            p_dropout=p_dropout
+        )
+        self.blocks = nn.ModuleList([
+            ConformerBlock(
+                d_model=d_model,
+                ff_expansion_factor=ff_expansion_factor,
+                h=h, kernel_size=kernel_size,
+                p_dropout=p_dropout, res_scaling=res_scaling
+            )
+            for _ in range(n_conf_layers)
+        ])
+        self.pred_net = PredModule(
+            in_features=d_model,
+            n_classes=n_classes,
+            activation=nn.LogSoftmax(dim=-1)
+        )
+
+    def forward(
+            self, x: Tensor, mask: Tensor
+            ) -> Tuple[Tensor, Tensor]:
+        lengths = mask.sum(dim=-1)
+        lengths = lengths.cpu()
+        out, lengths = self.sub_sampling(x, lengths)
+        mask = get_mask_from_lens(
+            lengths, lengths.max().item()
+            )
+        mask = mask.to(x.device)
+        for layer in self.blocks:
+            out = layer(out, mask)
         preds = self.pred_net(out)
         preds = preds.permute(1, 0, 2)
         return preds, lengths
