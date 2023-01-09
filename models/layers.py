@@ -664,3 +664,48 @@ class ConformerPreNet(nn.Module):
         out = self.fc(out)
         out = self.drpout(out)
         return out, lengths
+
+
+class JasperSubBlock(nn.Module):
+    """Implements the subblock of the
+    Jasper model as described in
+    https://arxiv.org/abs/1904.03288
+
+    Args:
+        in_channels (int): The number of the input's channels.
+        out_channels (int): The number of the output's channels.
+        kernel_size (int): The convolution layer's kernel size.
+        p_dropout (float): The dropout rate.
+    """
+    def __init__(
+            self,
+            in_channels: int,
+            out_channels: int,
+            kernel_size: int,
+            p_dropout: float
+            ) -> None:
+        super().__init__()
+        self.conv = nn.Conv1d(
+            in_channels=in_channels,
+            out_channels=out_channels,
+            kernel_size=kernel_size,
+            padding='same'
+        )
+        self.bnorm = nn.BatchNorm1d(
+            num_features=out_channels
+        )
+        self.relu = nn.ReLU()
+        self.dropout = nn.Dropout(p_dropout)
+
+    def forward(
+            self, x: Tensor,
+            residual: Union[Tensor, None] = None
+            ) -> Tensor:
+        # x and residual of shape [B, d, M]
+        out = self.conv(x)
+        out = self.bnorm(out)
+        if residual is not None:
+            out = out + residual
+        out = self.relu(out)
+        out = self.dropout(out)
+        return out
