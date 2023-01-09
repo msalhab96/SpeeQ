@@ -172,7 +172,7 @@ class BaseDistTrainer(BaseTrainer):
         self.dist_address = dist_address
         self.dist_backend = dist_backend
         self.init_dist()
-        self.has_bnorm = self.has_bnorm
+        self.has_bnorm = self.model.has_bnorm
         self.model.to(f'cuda:{rank}')
         self.model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(
             self.model
