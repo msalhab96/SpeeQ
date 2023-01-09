@@ -489,7 +489,6 @@ class ConformerConvModule(nn.Module):
             groups=d_model,
             padding='same'
         )
-        # TODO: handle the BN with DDL
         self.bnorm = nn.BatchNorm1d(
             num_features=d_model
         )
