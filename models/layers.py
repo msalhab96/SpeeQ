@@ -658,8 +658,8 @@ class ConformerPreNet(nn.Module):
             result_len=out.shape[-1],
             pad_len=x.shape[-1] - lengths,
             data_len=lengths,
-            kernel_size=self.conv.kernel_size,
-            stride=self.conv.stride
+            kernel_size=self.conv.kernel_size[0],
+            stride=self.conv.stride[0]
         )
         out = out.transpose(-1, -2)
         out = self.fc(out)
