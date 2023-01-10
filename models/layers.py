@@ -676,20 +676,25 @@ class JasperSubBlock(nn.Module):
         out_channels (int): The number of the output's channels.
         kernel_size (int): The convolution layer's kernel size.
         p_dropout (float): The dropout rate.
+        stride (int): The convolution layer's stride. Default 1.
+        padding (Union[str, int]): The padding mood/size. Default 'same'.
     """
     def __init__(
             self,
             in_channels: int,
             out_channels: int,
             kernel_size: int,
-            p_dropout: float
+            p_dropout: float,
+            stride: int = 1,
+            padding: Union[str, int] = 'same'
             ) -> None:
         super().__init__()
         self.conv = nn.Conv1d(
             in_channels=in_channels,
             out_channels=out_channels,
             kernel_size=kernel_size,
-            padding='same'
+            padding=padding,
+            stride=stride
         )
         self.bnorm = nn.BatchNorm1d(
             num_features=out_channels
