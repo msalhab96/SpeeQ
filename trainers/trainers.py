@@ -374,7 +374,13 @@ class DistCTCTrainer(BaseDistTrainer, CTCTrainer):
             total_loss += loss
             if self.counter % self.log_steps_frequency == 0:
                 total = self._all_reduce_loss(total_loss, i + 1)
-                if self.is_master:
+                if self.is_master or self.has_bnorm is True:
+                    """The extra condition to solve a dummy issue caused when
+                    we have DDP with batch norm, it works only if the
+                    evaluation is done on all nodes!, the link below
+                    is similar issue
+                    discuss.pytorch.org/t/validation-hangs-up-when-using-ddp-and-syncbatchnorm/104831
+                    """
                     self.inline_log(
                         key=HistoryKeys.train_loss.value,
                         category=LogCategories.steps.value,
@@ -390,10 +396,14 @@ class DistCTCTrainer(BaseDistTrainer, CTCTrainer):
     def fit(self):
         for _ in range(self.epochs):
             self.train()
-            if self.is_master:
+            if self.is_master or self.has_bnorm is True:
+                """The extra condition to solve a dummy issue caused when
+                we have DDP with batch norm, it works only if the evaluation is done on all nodes!
+                the link below is similar issue
+                discuss.pytorch.org/t/validation-hangs-up-when-using-ddp-and-syncbatchnorm/104831
+                """
                 self.logger.log(self.history)
             barrier()
-
 
 def _run_trainer(
         rank: int,
