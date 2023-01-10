@@ -1,4 +1,5 @@
 from dataclasses import asdict, dataclass
+from typing import List, Union
 from interfaces import ITemplate
 
 
@@ -71,4 +72,20 @@ class ConformerCTCTemp(BaseTemplate):
     res_scaling: float
     p_dropout: float
     _name = 'conformer'
+    _type = 'ctc'
+
+
+@dataclass
+class JasperTemp(BaseTemplate):
+    in_features: int
+    num_blocks: int
+    num_sub_blocks: int
+    channel_inc: int
+    epilog_kernel_size: int
+    prelog_kernel_size: int
+    prelog_stride: int
+    prelog_n_channels: int
+    blocks_kernel_size: Union[int, List[int]]
+    p_dropout: float
+    _name = 'jasper'
     _type = 'ctc'
