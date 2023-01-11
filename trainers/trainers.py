@@ -172,7 +172,11 @@ class BaseDistTrainer(BaseTrainer):
         self.dist_address = dist_address
         self.dist_backend = dist_backend
         self.init_dist()
+        self.has_bnorm = self.model.has_bnorm
         self.model.to(f'cuda:{rank}')
+        self.model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(
+            self.model
+        )
         self.model = DistributedDataParallel(
             self.model, device_ids=[self.rank]
         )
@@ -370,7 +374,13 @@ class DistCTCTrainer(BaseDistTrainer, CTCTrainer):
             total_loss += loss
             if self.counter % self.log_steps_frequency == 0:
                 total = self._all_reduce_loss(total_loss, i + 1)
-                if self.is_master:
+                if self.is_master or self.has_bnorm is True:
+                    """The extra condition to solve a dummy issue caused when
+                    we have DDP with batch norm, it works only if the
+                    evaluation is done on all nodes!, the link below
+                    is similar issue
+                    discuss.pytorch.org/t/validation-hangs-up-when-using-ddp-and-syncbatchnorm/104831
+                    """
                     self.inline_log(
                         key=HistoryKeys.train_loss.value,
                         category=LogCategories.steps.value,
@@ -378,17 +388,22 @@ class DistCTCTrainer(BaseDistTrainer, CTCTrainer):
                         )
                     self.test()
                     self.model.train()
-                barrier()
+                if self.has_bnorm is False:
+                    barrier()
             self.counter += 1
         return self._all_reduce_loss(total_loss, len(self.train_loader)).item()
 
     def fit(self):
         for _ in range(self.epochs):
             self.train()
-            if self.is_master:
+            if self.is_master or self.has_bnorm is True:
+                """The extra condition to solve a dummy issue caused when
+                we have DDP with batch norm, it works only if the evaluation is done on all nodes!
+                the link below is similar issue
+                discuss.pytorch.org/t/validation-hangs-up-when-using-ddp-and-syncbatchnorm/104831
+                """
                 self.logger.log(self.history)
             barrier()
-
 
 def _run_trainer(
         rank: int,

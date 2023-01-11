@@ -33,17 +33,18 @@ def export_ckpt(key: str, category: str) -> Callable:
         @wraps(func)
         def wrapper(trainer, *args, **kwargs):
             results = func(trainer, *args, **kwargs)
-            loss = trainer.history[tag][-1]
-            if loss < trainer.min_loss:
-                trainer.min_loss = loss
-                save_state_dict(
-                    model_name='checkpoint',
-                    outdir=trainer.outdir,
-                    model=trainer.model,
-                    optimizer=trainer.optimizer,
-                    step=trainer.counter,
-                    history=trainer.history
-                )
+            if trainer.is_master:
+                loss = trainer.history[tag][-1]
+                if loss < trainer.min_loss:
+                    trainer.min_loss = loss
+                    save_state_dict(
+                        model_name='checkpoint',
+                        outdir=trainer.outdir,
+                        model=trainer.model,
+                        optimizer=trainer.optimizer,
+                        step=trainer.counter,
+                        history=trainer.history
+                    )
             return results
         return wrapper
     return exporter

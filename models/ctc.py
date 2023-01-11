@@ -1,8 +1,11 @@
 import torch
-from typing import Tuple
+from typing import List, Optional, Tuple, Union
+
+from utils.utils import calc_data_len, get_mask_from_lens
 from .layers import (
-    CReLu, Conv1DLayers, PredModule,
-    RowConv1D, TransformerEncLayer
+    CReLu, ConformerBlock, ConformerPreNet,
+    Conv1DLayers, JasperBlocks, JasperSubBlock,
+    PredModule, RowConv1D, TransformerEncLayer
     )
 from torch import nn
 from torch import Tensor
@@ -68,6 +71,7 @@ class DeepSpeechV1(nn.Module):
         )
         self.bidirectional = bidirectional
         self.hidden_size = hidden_size
+        self.has_bnorm = False
 
     def forward(self, x: Tensor, mask: Tensor) -> Tuple[Tensor, Tensor]:
         # mask of shape [B, M] and True if there's no padding
@@ -140,6 +144,7 @@ class BERT(nn.Module):
             activation=nn.LogSoftmax(dim=-1)
         )
         self.dropout = nn.Dropout(p_dropout)
+        self.has_bnorm = False
 
     def embed(self, x: Tensor, mask: Tensor):
         # this is valid as long the padding is dynamic!
@@ -244,6 +249,7 @@ class DeepSpeechV2(nn.Module):
         )
         self.hidden_size = hidden_size
         self.bidirectional = bidirectional
+        self.has_bnorm = False
 
     def forward(self, x: Tensor, mask: Tensor):
         lengths = mask.sum(dim=-1)
@@ -264,4 +270,304 @@ class DeepSpeechV2(nn.Module):
             out = self.crelu(out)
         preds = self.pred_net(out)
         preds = preds.permute(1, 0, 2)
+        return preds, lengths
+
+
+class Conformer(nn.Module):
+    """Implements the confformer model proposed in
+    https://arxiv.org/abs/2005.08100, this model used
+    with CTC, while in the paper used RNN-T.
+
+    Args:
+        n_classes (int): The number of classes.
+        d_model (int): The model dimension.
+        n_conf_layers (int): The number of conformer blocks.
+        ff_expansion_factor (int): The feed-forward expansion factor.
+        h (int): The number of heads.
+        kernel_size (int): The kernel size of conv module.
+        ss_kernel_size (int): The kernel size of the subsampling layer.
+        in_features (int): The input/speech feature size.
+        res_scaling (float): The residual connection multiplier.
+        p_dropout (float): The dropout rate.
+    """
+    def __init__(
+            self,
+            n_classes: int,
+            d_model: int,
+            n_conf_layers: int,
+            ff_expansion_factor: int,
+            h: int,
+            kernel_size: int,
+            ss_kernel_size: int,
+            in_features: int,
+            res_scaling: float,
+            p_dropout: float
+            ) -> None:
+        super().__init__()
+        self.sub_sampling = ConformerPreNet(
+            in_features=in_features,
+            kernel_size=ss_kernel_size,
+            d_model=d_model,
+            p_dropout=p_dropout
+        )
+        self.blocks = nn.ModuleList([
+            ConformerBlock(
+                d_model=d_model,
+                ff_expansion_factor=ff_expansion_factor,
+                h=h, kernel_size=kernel_size,
+                p_dropout=p_dropout, res_scaling=res_scaling
+            )
+            for _ in range(n_conf_layers)
+        ])
+        self.pred_net = PredModule(
+            in_features=d_model,
+            n_classes=n_classes,
+            activation=nn.LogSoftmax(dim=-1)
+        )
+        self.has_bnorm = True
+
+    def forward(
+            self, x: Tensor, mask: Tensor
+            ) -> Tuple[Tensor, Tensor]:
+        lengths = mask.sum(dim=-1)
+        lengths = lengths.cpu()
+        out, lengths = self.sub_sampling(x, lengths)
+        mask = get_mask_from_lens(
+            lengths, lengths.max().item()
+            )
+        mask = mask.to(x.device)
+        for layer in self.blocks:
+            out = layer(out, mask)
+        preds = self.pred_net(out)
+        preds = preds.permute(1, 0, 2)
+        return preds, lengths
+
+
+class Jasper(nn.Module):
+    """Implements Jasper model architecture proposed
+    in https://arxiv.org/abs/1904.03288
+
+    Args:
+        n_classes (int): The number of classes.
+        in_features (int): The input/speech feature size.
+        num_blocks (int): The number of jasper blocks, denoted
+            as 'B' in the paper.
+        num_sub_blocks (int): The number of jasper subblocks, denoted
+            as 'R' in the paper.
+        channel_inc (int): The rate to increase the number of channels
+            across the blocks.
+        epilog_kernel_size (int): The epilog block convolution's kernel size.
+        prelog_kernel_size (int): The prelog block convolution's kernel size.
+        prelog_stride (int): The prelog block convolution's stride.
+        prelog_n_channels (int): The prelog block convolution's number of
+            output channnels.
+        blocks_kernel_size (Union[int, List[int]]): The convolution layer's
+            kernel size of each jasper block.
+        p_dropout (float): The dropout rate.
+    """
+    def __init__(
+            self,
+            n_classes: int,
+            in_features: int,
+            num_blocks: int,
+            num_sub_blocks: int,
+            channel_inc: int,
+            epilog_kernel_size: int,
+            prelog_kernel_size: int,
+            prelog_stride: int,
+            prelog_n_channels: int,
+            blocks_kernel_size: Union[int, List[int]],
+            p_dropout: float
+            ) -> None:
+        super().__init__()
+        # TODO: Add activation function options
+        # TODO: Add normalization options
+        # TODO: Add residual connections options
+        # TODO: passing dropout list
+        self.has_bnorm = True
+        self.prelog = JasperSubBlock(
+            in_channels=in_features,
+            out_channels=prelog_n_channels,
+            kernel_size=prelog_kernel_size,
+            p_dropout=p_dropout,
+            padding=0,
+            stride=prelog_stride
+        )
+        self.prelog_stride = prelog_stride
+        self.prelog_kernel_size = prelog_kernel_size
+        self.blocks = JasperBlocks(
+            num_blocks=num_blocks,
+            num_sub_blocks=num_sub_blocks,
+            in_channels=prelog_n_channels,
+            channel_inc=channel_inc,
+            kernel_size=blocks_kernel_size,
+            p_dropout=p_dropout
+        )
+        self.epilog1 = JasperSubBlock(
+            in_channels=prelog_n_channels + channel_inc * num_blocks,
+            out_channels=prelog_n_channels + channel_inc * (1 + num_blocks),
+            kernel_size=epilog_kernel_size,
+            p_dropout=p_dropout,
+        )
+        self.epilog2 = JasperSubBlock(
+            in_channels=prelog_n_channels + channel_inc * (1 + num_blocks),
+            out_channels=prelog_n_channels + channel_inc * (2 + num_blocks),
+            kernel_size=1,
+            p_dropout=p_dropout
+        )
+        self.pred_net = nn.Conv1d(
+            in_channels=prelog_n_channels + channel_inc * (2 + num_blocks),
+            out_channels=n_classes,
+            kernel_size=1
+        )
+        self.log_softmax = nn.LogSoftmax(dim=-2)
+
+    def forward(
+            self, x: Tensor, mask: Tensor
+            ) -> Tuple[Tensor, Tensor]:
+        # x of shape [B, M, d]
+        lengths = mask.sum(dim=-1)
+        lengths = lengths.cpu()
+        x = x.transpose(-1, -2)
+        out = self.prelog(x)
+        lengths = calc_data_len(
+            result_len=out.shape[-1],
+            pad_len=x.shape[-1] - lengths,
+            data_len=lengths,
+            kernel_size=self.prelog_kernel_size,
+            stride=self.prelog_stride
+        )
+        out = self.blocks(out)
+        out = self.epilog1(out)
+        out = self.epilog2(out)
+        preds = self.pred_net(out)
+        preds = self.log_softmax(preds)
+        preds = preds.permute(2, 0, 1)
+        return preds, lengths
+
+
+class Wav2Letter(nn.Module):
+    """Implements Wav2Letter model proposed in
+    https://arxiv.org/abs/1609.03193
+
+    Args:
+        in_features (int): The input/speech feature size.
+        n_classes (int): The number of classes.
+        n_conv_layers (int): The number of convolution layers.
+        layers_kernel_size (int): The convolution layers' kernel size.
+        layers_channels_size (int): The convolution layers' channel size.
+        pre_conv_stride (int): The prenet convolution stride.
+        pre_conv_kernel_size (int): The prenet convolution kernel size.
+        post_conv_channels_size (int): The postnet convolution channel size.
+        post_conv_kernel_size (int): The postnet convolution kernel size.
+        p_dropout (float): The dropout rate.
+        wav_kernel_size (Optional[int]): The kernel size of the first
+            layer that process the wav samples directly if wav is modeled.
+            Default None.
+        wav_stride (Optional[int]): The stride size of the first
+            layer that process the wav samples directly if wav is modeled.
+            Default None.
+    """
+    def __init__(
+            self,
+            in_features: int,
+            n_classes: int,
+            n_conv_layers: int,
+            layers_kernel_size: int,
+            layers_channels_size: int,
+            pre_conv_stride: int,
+            pre_conv_kernel_size: int,
+            post_conv_channels_size: int,
+            post_conv_kernel_size: int,
+            p_dropout: float,
+            wav_kernel_size: Optional[int] = None,
+            wav_stride: Optional[int] = None
+            ) -> None:
+        super().__init__()
+        self.is_wav = in_features == 1
+        self.has_bnorm = False
+        if self.is_wav:
+            assert wav_kernel_size is not None
+            assert wav_stride is not None
+            self.raw_conv = nn.Conv1d(
+                in_channels=1,
+                out_channels=layers_channels_size,
+                kernel_size=wav_kernel_size,
+                stride=wav_stride
+                )
+        self.pre_conv = nn.Conv1d(
+            in_channels=layers_channels_size if self.is_wav else in_features,
+            out_channels=layers_channels_size,
+            kernel_size=pre_conv_kernel_size,
+            stride=pre_conv_stride
+            )
+        self.convs = nn.ModuleList([
+            nn.Conv1d(
+                in_channels=layers_channels_size,
+                out_channels=layers_channels_size,
+                kernel_size=layers_kernel_size,
+                padding='same'
+            )
+            for _ in range(n_conv_layers - 1)
+        ])
+        self.convs.append(
+            nn.Conv1d(
+                in_channels=layers_channels_size,
+                out_channels=post_conv_channels_size,
+                kernel_size=post_conv_kernel_size,
+                padding='same'
+            )
+        )
+        self.post_conv = nn.Conv1d(
+            in_channels=post_conv_channels_size,
+            out_channels=post_conv_channels_size,
+            kernel_size=1,
+            padding='same'
+        )
+        self.pred_net = nn.Conv1d(
+            in_channels=post_conv_channels_size,
+            out_channels=n_classes,
+            kernel_size=1
+        )
+        self.log_softmax = nn.LogSoftmax(dim=-2)
+        self.dropout = nn.Dropout(p_dropout)
+
+    def forward(self, x: Tensor, mask: Tensor) -> Tuple[Tensor, Tensor]:
+        # x of shape [B, M, d]
+        lengths = mask.sum(dim=-1)
+        lengths = lengths.cpu()
+        x = x.transpose(-1, -2)
+        out = x
+        if self.is_wav:
+            out = self.raw_conv(out)
+            out = torch.tanh(out)
+            out = self.dropout(out)
+            lengths = calc_data_len(
+                result_len=out.shape[-1],
+                pad_len=x.shape[-1] - lengths,
+                data_len=lengths,
+                kernel_size=self.raw_conv.kernel_size[0],
+                stride=self.raw_conv.stride[0]
+            )
+        results = self.pre_conv(out)
+        lengths = calc_data_len(
+            result_len=results.shape[-1],
+            pad_len=out.shape[-1] - lengths,
+            data_len=lengths,
+            kernel_size=self.pre_conv.kernel_size[0],
+            stride=self.pre_conv.stride[0]
+        )
+        out = results
+        out = torch.tanh(out)
+        out = self.dropout(out)
+        for layer in self.convs:
+            out = layer(out)
+            out = torch.tanh(out)
+            out = self.dropout(out)
+        out = self.post_conv(out)
+        out = torch.tanh(out)
+        out = self.dropout(out)
+        preds = self.pred_net(out)
+        preds = self.log_softmax(preds)
+        preds = preds.permute(2, 0, 1)
         return preds, lengths
