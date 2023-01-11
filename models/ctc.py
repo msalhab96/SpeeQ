@@ -1,5 +1,5 @@
 import torch
-from typing import List, Tuple, Union
+from typing import List, Optional, Tuple, Union
 
 from utils.utils import calc_data_len, get_mask_from_lens
 from .layers import (
@@ -440,6 +440,133 @@ class Jasper(nn.Module):
         out = self.blocks(out)
         out = self.epilog1(out)
         out = self.epilog2(out)
+        preds = self.pred_net(out)
+        preds = self.log_softmax(preds)
+        preds = preds.permute(2, 0, 1)
+        return preds, lengths
+
+
+class Wav2Letter(nn.Module):
+    """Implements Wav2Letter model proposed in
+    https://arxiv.org/abs/1609.03193
+
+    Args:
+        in_features (int): The input/speech feature size.
+        n_classes (int): The number of classes.
+        n_conv_layers (int): The number of convolution layers.
+        layers_kernel_size (int): The convolution layers' kernel size.
+        layers_channels_size (int): The convolution layers' channel size.
+        pre_conv_stride (int): The prenet convolution stride.
+        pre_conv_kernel_size (int): The prenet convolution kernel size.
+        post_conv_channels_size (int): The postnet convolution channel size.
+        post_conv_kernel_size (int): The postnet convolution kernel size.
+        p_dropout (float): The dropout rate.
+        wav_kernel_size (Optional[int]): The kernel size of the first
+            layer that process the wav samples directly if wav is modeled.
+            Default None.
+        wav_stride (Optional[int]): The stride size of the first
+            layer that process the wav samples directly if wav is modeled.
+            Default None.
+    """
+    def __init__(
+            self,
+            in_features: int,
+            n_classes: int,
+            n_conv_layers: int,
+            layers_kernel_size: int,
+            layers_channels_size: int,
+            pre_conv_stride: int,
+            pre_conv_kernel_size: int,
+            post_conv_channels_size: int,
+            post_conv_kernel_size: int,
+            p_dropout: float,
+            wav_kernel_size: Optional[int] = None,
+            wav_stride: Optional[int] = None
+            ) -> None:
+        super().__init__()
+        self.is_wav = in_features == 1
+        self.has_bnorm = False
+        if self.is_wav:
+            assert wav_kernel_size is not None
+            assert wav_stride is not None
+            self.raw_conv = nn.Conv1d(
+                in_channels=1,
+                out_channels=layers_channels_size,
+                kernel_size=wav_kernel_size,
+                stride=wav_stride
+                )
+        self.pre_conv = nn.Conv1d(
+            in_channels=layers_channels_size if self.is_wav else in_features,
+            out_channels=layers_channels_size,
+            kernel_size=pre_conv_kernel_size,
+            stride=pre_conv_stride
+            )
+        self.convs = nn.ModuleList([
+            nn.Conv1d(
+                in_channels=layers_channels_size,
+                out_channels=layers_channels_size,
+                kernel_size=layers_kernel_size,
+                padding='same'
+            )
+            for _ in range(n_conv_layers - 1)
+        ])
+        self.convs.append(
+            nn.Conv1d(
+                in_channels=layers_channels_size,
+                out_channels=post_conv_channels_size,
+                kernel_size=post_conv_kernel_size,
+                padding='same'
+            )
+        )
+        self.post_conv = nn.Conv1d(
+            in_channels=post_conv_channels_size,
+            out_channels=post_conv_channels_size,
+            kernel_size=1,
+            padding='same'
+        )
+        self.pred_net = nn.Conv1d(
+            in_channels=post_conv_channels_size,
+            out_channels=n_classes,
+            kernel_size=1
+        )
+        self.log_softmax = nn.LogSoftmax(dim=-2)
+        self.dropout = nn.Dropout(p_dropout)
+
+    def forward(self, x: Tensor, mask: Tensor) -> Tuple[Tensor, Tensor]:
+        # x of shape [B, M, d]
+        lengths = mask.sum(dim=-1)
+        lengths = lengths.cpu()
+        x = x.transpose(-1, -2)
+        out = x
+        if self.is_wav:
+            out = self.raw_conv(out)
+            out = torch.tanh(out)
+            out = self.dropout(out)
+            lengths = calc_data_len(
+                result_len=out.shape[-1],
+                pad_len=x.shape[-1] - lengths,
+                data_len=lengths,
+                kernel_size=self.raw_conv.kernel_size[0],
+                stride=self.raw_conv.stride[0]
+            )
+        results = self.pre_conv(out)
+        lengths = calc_data_len(
+            result_len=results.shape[-1],
+            pad_len=out.shape[-1] - lengths,
+            data_len=lengths,
+            kernel_size=self.pre_conv.kernel_size[0],
+            stride=self.pre_conv.stride[0]
+        )
+        out = results
+        out = torch.tanh(out)
+        out = self.dropout(out)
+        for layer in self.convs:
+            out = layer(out)
+            out = torch.tanh(out)
+            out = self.dropout(out)
+        out = self.post_conv(out)
+        out = torch.tanh(out)
+        out = self.dropout(out)
         preds = self.pred_net(out)
         preds = self.log_softmax(preds)
         preds = preds.permute(2, 0, 1)
