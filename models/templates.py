@@ -1,5 +1,5 @@
 from dataclasses import asdict, dataclass
-from typing import List, Union
+from typing import List, Optional, Union
 from interfaces import ITemplate
 
 
@@ -88,4 +88,21 @@ class JasperTemp(BaseTemplate):
     blocks_kernel_size: Union[int, List[int]]
     p_dropout: float
     _name = 'jasper'
+    _type = 'ctc'
+
+
+@dataclass
+class Wav2LetterTemp(BaseTemplate):
+    in_features: int
+    n_conv_layers: int
+    layers_kernel_size: int
+    layers_channels_size: int
+    pre_conv_stride: int
+    pre_conv_kernel_size: int
+    post_conv_channels_size: int
+    post_conv_kernel_size: int
+    p_dropout: float
+    wav_kernel_size: Optional[int] = None
+    wav_stride: Optional[int] = None
+    _name = 'wav2letter'
     _type = 'ctc'
