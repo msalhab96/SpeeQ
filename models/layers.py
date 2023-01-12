@@ -912,3 +912,49 @@ class JasperBlocks(nn.Module):
         for block in self.blocks:
             out = block(out)
         return out
+
+
+class RNNLayers(nn.Module):
+    """Implements a stack of RNN layers.
+
+    Args:
+        in_features (int): The input features size.
+        hidden_size (int): The RNN hidden size.
+        bidirectional (bool): if the RNN is bidirectional or not.
+        n_layers (int): The number of RNN layers.
+        p_dropout (float): The dropout rate.
+        rnn_type (str): The rnn type. default 'rnn'.
+    """
+    def __init__(
+            self,
+            in_features: int,
+            hidden_size: int,
+            bidirectional: bool,
+            n_layers: int,
+            p_dropout: float,
+            rnn_type: str = 'rnn'
+            ) -> None:
+        super().__init__()
+        from .registry import PACKED_RNN_REGISTRY
+        if bidirectional is True:
+            assert hidden_size % 2 == 0
+        if bidirectional is True:
+            hidden_size = hidden_size // 2
+        self.rnns = nn.ModuleList([
+            PACKED_RNN_REGISTRY[rnn_type](
+                input_size=in_features if i == 0 else hidden_size,
+                hidden_size=hidden_size,
+                batch_first=True,
+                enforce_sorted=False,
+                bidirectional=bidirectional
+            )
+            for i in range(n_layers)
+        ])
+        self.dropout = nn.Dropout(p_dropout)
+
+    def forward(self, x: Tensor) -> Tuple[Tensor, Tensor]:
+        out = x
+        for layer in self.rnns:
+            out, h = layer(out)
+            out = self.dropout(out)
+        return out, h
