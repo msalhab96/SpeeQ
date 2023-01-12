@@ -958,3 +958,64 @@ class RNNLayers(nn.Module):
             out, h = layer(out)
             out = self.dropout(out)
         return out, h
+
+
+class PyramidRNNLayers(RNNLayers):
+    """Implements a pyramid of RNN as described in
+    https://arxiv.org/abs/1508.01211.
+
+    Args:
+        in_features (int): The input features size.
+        hidden_size (int): The RNN hidden size.
+        reduction_factor (int): The tiem resolution reduction factor.
+        bidirectional (bool): if the RNN is bidirectional or not.
+        n_layers (int): The number of RNN layers.
+        p_dropout (float): The dropout rate.
+        rnn_type (str): The rnn type. default 'rnn'.
+    """
+    def __init__(
+            self,
+            in_features: int,
+            hidden_size: int,
+            reduction_factor: int,
+            bidirectional: bool,
+            n_layers: int,
+            p_dropout: float,
+            rnn_type: str = 'rnn'
+            ) -> None:
+        super().__init__(
+            in_features,
+            hidden_size,
+            bidirectional,
+            n_layers,
+            p_dropout,
+            rnn_type
+            )
+        self.reduction_factor = reduction_factor
+
+    def _reduce(self, x: Tensor) -> Tensor:
+        # x of shape [B, M, d]
+        max_len = x.shape[1]
+        assert max_len > self.reduction_factor
+        # making sure it's divisible by the reduction factor
+        res_len = max_len % self.reduction_factor
+        res_len = self.reduction_factor if res_len == 0 else res_len
+        pad_len = self.reduction_factor - res_len
+        # adding trailing zeros to make the sequence divisible
+        x = torch.cat(
+            [
+                x,
+                torch.zeros(x.shape[0], pad_len, x.shape[-1]).to(x.device)
+                ],
+            dim=1
+        )
+        x = x.view(x.shape[0], x.shape[1] // self.reduction_factor, -1)
+        return x
+
+    def forward(self, x: Tensor) -> Tuple[Tensor, Tensor]:
+        out = x
+        for layer in self.rnns:
+            out, h = layer(out)
+            out = self._reduce(out)
+            out = self.dropout(out)
+        return out, h
