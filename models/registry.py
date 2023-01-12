@@ -1,3 +1,4 @@
+from torch import nn
 from typing import List
 from .layers import (
     PackedGRU,
@@ -8,12 +9,17 @@ from .ctc import (
     BERT, Conformer, DeepSpeechV1, DeepSpeechV2, Jasper, Wav2Letter
     )
 
-RNN_REGISTRY = {
+PACKED_RNN_REGISTRY = {
     'rnn': PackedRNN,
     'lstm': PackedLSTM,
     'gru': PackedGRU
 }
 
+RNN_REGISTRY = {
+    'rnn': nn.RNN,
+    'lstm': nn.LSTM,
+    'gru': nn.GRU
+}
 
 CTC_MODELS = {
     'deep_speech_v1': DeepSpeechV1,
