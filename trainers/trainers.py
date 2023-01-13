@@ -102,6 +102,54 @@ class BaseTrainer(ITrainer):
             self.history[tag] = [value]
         self.logger.log_step(key, category, value)
 
+    @step_log(
+        key=HistoryKeys.train_loss.value,
+        category=LogCategories.batches.value
+        )
+    def train_step(self, batch: Tuple[Tensor]) -> float:
+        loss = self.forward_pass(batch)
+        self.backward_pass(loss)
+        return loss.item()
+
+    @step_log(
+        key=HistoryKeys.train_loss.value,
+        category=LogCategories.epochs.value
+        )
+    def train(self) -> float:
+        self.model.train()
+        total_loss = 0.0
+        for i, batch in enumerate(tqdm(self.train_loader)):
+            loss = self.train_step(batch)
+            total_loss += loss
+            if self.counter % self.log_steps_frequency == 0:
+                self.test()
+                self.model.train()
+                self.inline_log(
+                    key=HistoryKeys.train_loss.value,
+                    category=LogCategories.steps.value,
+                    value=total_loss / (i + 1)
+                    )
+            self.counter += 1
+        return total_loss / len(self.train_loader)
+
+    @export_ckpt(
+        key=HistoryKeys.test_loss.value,
+        category=LogCategories.steps.value
+        )
+    @step_log(
+        key=HistoryKeys.test_loss.value,
+        category=LogCategories.steps.value
+        )
+    @torch.no_grad()
+    def test(self) -> float:
+        self.model.eval()
+        total_loss = 0.0
+        for batch in self.test_loader:
+            loss = self.forward_pass(batch)
+            total_loss += loss.item()
+        total_loss /= len(self.test_loader)
+        return total_loss
+
 
 class BaseDistTrainer(BaseTrainer):
     """Builds the basic distributed data parallel trainer module
@@ -202,6 +250,49 @@ class BaseDistTrainer(BaseTrainer):
         all_reduce(total, op=ReduceOp.SUM)
         return total / self.world_size
 
+    @step_log(
+        key=HistoryKeys.train_loss.value,
+        category=LogCategories.epochs.value
+        )
+    def train(self) -> float:
+        self.model.train()
+        total_loss = 0.0
+        for i, batch in enumerate(tqdm(self.train_loader)):
+            loss = self.train_step(batch)
+            total_loss += loss
+            if self.counter % self.log_steps_frequency == 0:
+                total = self._all_reduce_loss(total_loss, i + 1)
+                if self.is_master or self.has_bnorm is True:
+                    """The extra condition to solve a dummy issue caused when
+                    we have DDP with batch norm, it works only if the
+                    evaluation is done on all nodes!, the link below
+                    is similar issue
+                    discuss.pytorch.org/t/validation-hangs-up-when-using-ddp-and-syncbatchnorm/104831
+                    """
+                    self.inline_log(
+                        key=HistoryKeys.train_loss.value,
+                        category=LogCategories.steps.value,
+                        value=total.item()
+                        )
+                    self.test()
+                    self.model.train()
+                if self.has_bnorm is False:
+                    barrier()
+            self.counter += 1
+        return self._all_reduce_loss(total_loss, len(self.train_loader)).item()
+
+    def fit(self):
+        for _ in range(self.epochs):
+            self.train()
+            if self.is_master or self.has_bnorm is True:
+                """The extra condition to solve a dummy issue caused when
+                we have DDP with batch norm, it works only if the evaluation is done on all nodes!
+                the link below is similar issue
+                discuss.pytorch.org/t/validation-hangs-up-when-using-ddp-and-syncbatchnorm/104831
+                """
+                self.logger.log(self.history)
+            barrier()
+
 
 class CTCTrainer(BaseTrainer):
     def __init__(
@@ -254,54 +345,6 @@ class CTCTrainer(BaseTrainer):
     @property
     def is_master(self):
         return True
-
-    @step_log(
-        key=HistoryKeys.train_loss.value,
-        category=LogCategories.batches.value
-        )
-    def train_step(self, batch: Tuple[Tensor]) -> float:
-        loss = self.forward_pass(batch)
-        self.backward_pass(loss)
-        return loss.item()
-
-    @step_log(
-        key=HistoryKeys.train_loss.value,
-        category=LogCategories.epochs.value
-        )
-    def train(self) -> float:
-        self.model.train()
-        total_loss = 0.0
-        for i, batch in enumerate(tqdm(self.train_loader)):
-            loss = self.train_step(batch)
-            total_loss += loss
-            if self.counter % self.log_steps_frequency == 0:
-                self.test()
-                self.model.train()
-                self.inline_log(
-                    key=HistoryKeys.train_loss.value,
-                    category=LogCategories.steps.value,
-                    value=total_loss / (i + 1)
-                    )
-            self.counter += 1
-        return total_loss / len(self.train_loader)
-
-    @export_ckpt(
-        key=HistoryKeys.test_loss.value,
-        category=LogCategories.steps.value
-        )
-    @step_log(
-        key=HistoryKeys.test_loss.value,
-        category=LogCategories.steps.value
-        )
-    @torch.no_grad()
-    def test(self) -> float:
-        self.model.eval()
-        total_loss = 0.0
-        for batch in self.test_loader:
-            loss = self.forward_pass(batch)
-            total_loss += loss.item()
-        total_loss /= len(self.test_loader)
-        return total_loss
 
 
 class DistCTCTrainer(BaseDistTrainer, CTCTrainer):
@@ -362,48 +405,6 @@ class DistCTCTrainer(BaseDistTrainer, CTCTrainer):
             history=history
         )
 
-    @step_log(
-        key=HistoryKeys.train_loss.value,
-        category=LogCategories.epochs.value
-        )
-    def train(self) -> float:
-        self.model.train()
-        total_loss = 0.0
-        for i, batch in enumerate(tqdm(self.train_loader)):
-            loss = self.train_step(batch)
-            total_loss += loss
-            if self.counter % self.log_steps_frequency == 0:
-                total = self._all_reduce_loss(total_loss, i + 1)
-                if self.is_master or self.has_bnorm is True:
-                    """The extra condition to solve a dummy issue caused when
-                    we have DDP with batch norm, it works only if the
-                    evaluation is done on all nodes!, the link below
-                    is similar issue
-                    discuss.pytorch.org/t/validation-hangs-up-when-using-ddp-and-syncbatchnorm/104831
-                    """
-                    self.inline_log(
-                        key=HistoryKeys.train_loss.value,
-                        category=LogCategories.steps.value,
-                        value=total.item()
-                        )
-                    self.test()
-                    self.model.train()
-                if self.has_bnorm is False:
-                    barrier()
-            self.counter += 1
-        return self._all_reduce_loss(total_loss, len(self.train_loader)).item()
-
-    def fit(self):
-        for _ in range(self.epochs):
-            self.train()
-            if self.is_master or self.has_bnorm is True:
-                """The extra condition to solve a dummy issue caused when
-                we have DDP with batch norm, it works only if the evaluation is done on all nodes!
-                the link below is similar issue
-                discuss.pytorch.org/t/validation-hangs-up-when-using-ddp-and-syncbatchnorm/104831
-                """
-                self.logger.log(self.history)
-            barrier()
 
 def _run_trainer(
         rank: int,
