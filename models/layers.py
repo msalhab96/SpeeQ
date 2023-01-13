@@ -943,7 +943,7 @@ class RNNLayers(nn.Module):
         self.rnns = nn.ModuleList([
             PACKED_RNN_REGISTRY[rnn_type](
                 input_size=in_features if i == 0 else hidden_size,
-                hidden_size=hidden_size,
+                hidden_size=hidden_size // 2 if bidirectional else hidden_size,
                 batch_first=True,
                 enforce_sorted=False,
                 bidirectional=bidirectional
@@ -952,15 +952,17 @@ class RNNLayers(nn.Module):
         ])
         self.dropout = nn.Dropout(p_dropout)
 
-    def forward(self, x: Tensor) -> Tuple[Tensor, Tensor]:
+    def forward(
+            self, x: Tensor, mask: Tensor
+            ) -> Tuple[Tensor, Tensor, Tensor]:
         out = x
+        lengths = mask.sum(dim=-1).cpu()
         for layer in self.rnns:
-            out, h = layer(out)
-            out = self.dropout(out)
-        return out, h
+            out, h, lengths = layer(out, lengths)
+        return out, h, lengths
 
 
-class PyramidRNNLayers(RNNLayers):
+class PyramidRNNLayers(nn.Module):
     """Implements a pyramid of RNN as described in
     https://arxiv.org/abs/1508.01211.
 
@@ -983,15 +985,35 @@ class PyramidRNNLayers(RNNLayers):
             p_dropout: float,
             rnn_type: str = 'rnn'
             ) -> None:
-        super().__init__(
-            in_features,
-            hidden_size,
-            bidirectional,
-            n_layers,
-            p_dropout,
-            rnn_type
-            )
+        super().__init__()
         self.reduction_factor = reduction_factor
+        from .registry import PACKED_RNN_REGISTRY
+        if bidirectional is True:
+            assert hidden_size % 2 == 0
+        if bidirectional is True:
+            hidden_size = hidden_size // 2
+        self.rnns = nn.ModuleList([
+            PACKED_RNN_REGISTRY[rnn_type](
+                input_size=in_features,
+                hidden_size=hidden_size,
+                batch_first=True,
+                enforce_sorted=False,
+                bidirectional=bidirectional
+            )
+        ])
+        for _ in range(n_layers - 1):
+            inp_size = (1 + bidirectional) * hidden_size * reduction_factor
+            self.rnns.append(
+                PACKED_RNN_REGISTRY[rnn_type](
+                    input_size=inp_size,
+                    hidden_size=hidden_size,
+                    batch_first=True,
+                    enforce_sorted=False,
+                    bidirectional=bidirectional
+                )
+            )
+        self.dropout = nn.Dropout(p_dropout)
+        self.n_layers = n_layers
 
     def _reduce(self, x: Tensor) -> Tensor:
         # x of shape [B, M, d]
@@ -1012,10 +1034,16 @@ class PyramidRNNLayers(RNNLayers):
         x = x.view(x.shape[0], x.shape[1] // self.reduction_factor, -1)
         return x
 
-    def forward(self, x: Tensor) -> Tuple[Tensor, Tensor]:
+    def forward(
+            self, x: Tensor, mask: Tensor
+            ) -> Tuple[Tensor, Tensor, Tensor]:
         out = x
-        for layer in self.rnns:
-            out, h = layer(out)
-            out = self._reduce(out)
-            out = self.dropout(out)
-        return out, h
+        lengths = mask.sum(dim=-1).cpu()
+        for i, layer in enumerate(self.rnns):
+            out, h, lengths = layer(out, lengths)
+            if (i + 1) != self.n_layers:
+                out = self._reduce(out)
+                lengths = torch.ceil(lengths / self.reduction_factor)
+                out = self.dropout(out)
+        lengths = lengths.long()
+        return out, h, lengths
