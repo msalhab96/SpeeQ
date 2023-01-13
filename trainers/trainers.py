@@ -150,6 +150,10 @@ class BaseTrainer(ITrainer):
         total_loss /= len(self.test_loader)
         return total_loss
 
+    @property
+    def is_master(self):
+        return True
+
 
 class BaseDistTrainer(BaseTrainer):
     """Builds the basic distributed data parallel trainer module
@@ -341,10 +345,6 @@ class CTCTrainer(BaseTrainer):
             preds, text, lengths, text_mask.sum(dim=-1)
             )
         return loss
-
-    @property
-    def is_master(self):
-        return True
 
 
 class DistCTCTrainer(BaseDistTrainer, CTCTrainer):
