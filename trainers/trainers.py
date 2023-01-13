@@ -453,6 +453,65 @@ class Seq2SeqTrainer(BaseTrainer):
         return loss
 
 
+class DistSeq2SeqTrainer(BaseDistTrainer, Seq2SeqTrainer):
+    def __init__(
+            self,
+            optimizer: Union[Optimizer, ISchedular],
+            criterion: Module,
+            model: Module,
+            train_loader: IDataLoader,
+            test_loader: IDataLoader,
+            epochs: int,
+            logger: ILogger,
+            outdir: Union[str, Path],
+            log_steps_frequency: int,
+            rank: int,
+            world_size: int,
+            dist_address: int,
+            dist_port: int,
+            dist_backend: str,
+            grad_clip_thresh: Union[None, float] = None,
+            grad_clip_norm_type: float = 2.0,
+            history: dict = {}
+            ) -> None:
+        Seq2SeqTrainer.__init__(
+            self,
+            optimizer=optimizer,
+            criterion=criterion,
+            model=model,
+            train_loader=train_loader,
+            test_loader=test_loader,
+            epochs=epochs,
+            log_steps_frequency=log_steps_frequency,
+            device=f'cuda:{rank}',
+            logger=logger,
+            outdir=outdir,
+            grad_clip_thresh=grad_clip_thresh,
+            grad_clip_norm_type=grad_clip_norm_type,
+            history=history
+        )
+        BaseDistTrainer.__init__(
+            self,
+            optimizer=optimizer,
+            criterion=criterion,
+            model=model,
+            train_loader=train_loader,
+            test_loader=test_loader,
+            epochs=epochs,
+            log_steps_frequency=log_steps_frequency,
+            logger=logger,
+            outdir=outdir,
+            rank=rank,
+            world_size=world_size,
+            dist_address=dist_address,
+            dist_port=dist_port,
+            dist_backend=dist_backend,
+            grad_clip_thresh=grad_clip_thresh,
+            grad_clip_norm_type=grad_clip_norm_type,
+            history=history
+        )
+
+
 def _run_trainer(
         rank: int,
         world_size: int,
