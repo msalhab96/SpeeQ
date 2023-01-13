@@ -406,6 +406,53 @@ class DistCTCTrainer(BaseDistTrainer, CTCTrainer):
         )
 
 
+class Seq2SeqTrainer(BaseTrainer):
+    def __init__(
+            self,
+            optimizer: Union[Optimizer, ISchedular],
+            criterion: Module,
+            model: Module,
+            train_loader: IDataLoader,
+            test_loader: IDataLoader,
+            epochs: int,
+            log_steps_frequency: int,
+            device: str,
+            logger: ILogger,
+            outdir: Union[str, Path],
+            grad_clip_thresh: Union[None, float] = None,
+            grad_clip_norm_type: float = 2.0,
+            history: dict = {}
+            ) -> None:
+        BaseTrainer.__init__(
+            self,
+            optimizer=optimizer,
+            criterion=criterion,
+            model=model,
+            train_loader=train_loader,
+            test_loader=test_loader,
+            epochs=epochs,
+            log_steps_frequency=log_steps_frequency,
+            logger=logger,
+            outdir=outdir,
+            grad_clip_thresh=grad_clip_thresh,
+            grad_clip_norm_type=grad_clip_norm_type,
+            history=history
+        )
+        self.device = device
+        self.model.to(device)
+
+    def forward_pass(
+            self, batch: Tuple[Tensor]) -> Tensor:
+        batch = [
+            item.to(self.device) for item in batch
+            ]
+        [speech, speech_mask, text, text_mask] = batch
+        preds = self.model(speech, speech_mask, text, text_mask)
+        # preds of shape [T, B, C]
+        loss = self.criterion(preds, text, text_mask)
+        return loss
+
+
 def _run_trainer(
         rank: int,
         world_size: int,
