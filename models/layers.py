@@ -920,7 +920,7 @@ class RNNLayers(nn.Module):
     Args:
         in_features (int): The input features size.
         hidden_size (int): The RNN hidden size.
-        bidirectional (bool): if the RNN is bidirectional or not.
+        bidirectional (bool): If the RNN is bidirectional or not.
         n_layers (int): The number of RNN layers.
         p_dropout (float): The dropout rate.
         rnn_type (str): The rnn type. default 'rnn'.
@@ -951,14 +951,17 @@ class RNNLayers(nn.Module):
             for i in range(n_layers)
         ])
         self.dropout = nn.Dropout(p_dropout)
+        self.n_layers = n_layers
 
     def forward(
             self, x: Tensor, mask: Tensor
             ) -> Tuple[Tensor, Tensor, Tensor]:
         out = x
         lengths = mask.sum(dim=-1).cpu()
-        for layer in self.rnns:
+        for i, layer in enumerate(self.rnns):
             out, h, lengths = layer(out, lengths)
+            if (i + 1) != self.n_layers:
+                out = self.dropout(out)
         return out, h, lengths
 
 
@@ -969,8 +972,8 @@ class PyramidRNNLayers(nn.Module):
     Args:
         in_features (int): The input features size.
         hidden_size (int): The RNN hidden size.
-        reduction_factor (int): The tiem resolution reduction factor.
-        bidirectional (bool): if the RNN is bidirectional or not.
+        reduction_factor (int): The time resolution reduction factor.
+        bidirectional (bool): If the RNN is bidirectional or not.
         n_layers (int): The number of RNN layers.
         p_dropout (float): The dropout rate.
         rnn_type (str): The rnn type. default 'rnn'.
