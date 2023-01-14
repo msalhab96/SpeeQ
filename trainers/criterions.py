@@ -45,3 +45,25 @@ def get_flatten_results(
     target = target.view(-1)
     input = input.view(-1, input.shape[-1])
     return input, target
+
+
+class CrossEntropyLoss(nn.CrossEntropyLoss):
+    def __init__(
+            self,
+            pad_id: int,
+            reduction='mean',
+            label_smoothing=0.0,
+            *args, **kwargs
+            ) -> None:
+        super().__init__(
+            ignore_index=pad_id,
+            reduction=reduction,
+            label_smoothing=label_smoothing
+        )
+
+    def forward(self, input, target, *args, **kwargs):
+        # input of shape [B, M, C]
+        # target of shape [B, M]
+        input, target = remove_positionals(input, target)
+        input, target = get_flatten_results(input, target)
+        return super().forward(input, target)
