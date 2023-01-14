@@ -102,6 +102,58 @@ class BaseTrainer(ITrainer):
             self.history[tag] = [value]
         self.logger.log_step(key, category, value)
 
+    @step_log(
+        key=HistoryKeys.train_loss.value,
+        category=LogCategories.batches.value
+        )
+    def train_step(self, batch: Tuple[Tensor]) -> float:
+        loss = self.forward_pass(batch)
+        self.backward_pass(loss)
+        return loss.item()
+
+    @step_log(
+        key=HistoryKeys.train_loss.value,
+        category=LogCategories.epochs.value
+        )
+    def train(self) -> float:
+        self.model.train()
+        total_loss = 0.0
+        for i, batch in enumerate(tqdm(self.train_loader)):
+            loss = self.train_step(batch)
+            total_loss += loss
+            if self.counter % self.log_steps_frequency == 0:
+                self.test()
+                self.model.train()
+                self.inline_log(
+                    key=HistoryKeys.train_loss.value,
+                    category=LogCategories.steps.value,
+                    value=total_loss / (i + 1)
+                    )
+            self.counter += 1
+        return total_loss / len(self.train_loader)
+
+    @export_ckpt(
+        key=HistoryKeys.test_loss.value,
+        category=LogCategories.steps.value
+        )
+    @step_log(
+        key=HistoryKeys.test_loss.value,
+        category=LogCategories.steps.value
+        )
+    @torch.no_grad()
+    def test(self) -> float:
+        self.model.eval()
+        total_loss = 0.0
+        for batch in self.test_loader:
+            loss = self.forward_pass(batch)
+            total_loss += loss.item()
+        total_loss /= len(self.test_loader)
+        return total_loss
+
+    @property
+    def is_master(self):
+        return True
+
 
 class BaseDistTrainer(BaseTrainer):
     """Builds the basic distributed data parallel trainer module
@@ -202,6 +254,49 @@ class BaseDistTrainer(BaseTrainer):
         all_reduce(total, op=ReduceOp.SUM)
         return total / self.world_size
 
+    @step_log(
+        key=HistoryKeys.train_loss.value,
+        category=LogCategories.epochs.value
+        )
+    def train(self) -> float:
+        self.model.train()
+        total_loss = 0.0
+        for i, batch in enumerate(tqdm(self.train_loader)):
+            loss = self.train_step(batch)
+            total_loss += loss
+            if self.counter % self.log_steps_frequency == 0:
+                total = self._all_reduce_loss(total_loss, i + 1)
+                if self.is_master or self.has_bnorm is True:
+                    """The extra condition to solve a dummy issue caused when
+                    we have DDP with batch norm, it works only if the
+                    evaluation is done on all nodes!, the link below
+                    is similar issue
+                    discuss.pytorch.org/t/validation-hangs-up-when-using-ddp-and-syncbatchnorm/104831
+                    """
+                    self.inline_log(
+                        key=HistoryKeys.train_loss.value,
+                        category=LogCategories.steps.value,
+                        value=total.item()
+                        )
+                    self.test()
+                    self.model.train()
+                if self.has_bnorm is False:
+                    barrier()
+            self.counter += 1
+        return self._all_reduce_loss(total_loss, len(self.train_loader)).item()
+
+    def fit(self):
+        for _ in range(self.epochs):
+            self.train()
+            if self.is_master or self.has_bnorm is True:
+                """The extra condition to solve a dummy issue caused when
+                we have DDP with batch norm, it works only if the evaluation is done on all nodes!
+                the link below is similar issue
+                discuss.pytorch.org/t/validation-hangs-up-when-using-ddp-and-syncbatchnorm/104831
+                """
+                self.logger.log(self.history)
+            barrier()
+
 
 class CTCTrainer(BaseTrainer):
     def __init__(
@@ -250,58 +345,6 @@ class CTCTrainer(BaseTrainer):
             preds, text, lengths, text_mask.sum(dim=-1)
             )
         return loss
-
-    @property
-    def is_master(self):
-        return True
-
-    @step_log(
-        key=HistoryKeys.train_loss.value,
-        category=LogCategories.batches.value
-        )
-    def train_step(self, batch: Tuple[Tensor]) -> float:
-        loss = self.forward_pass(batch)
-        self.backward_pass(loss)
-        return loss.item()
-
-    @step_log(
-        key=HistoryKeys.train_loss.value,
-        category=LogCategories.epochs.value
-        )
-    def train(self) -> float:
-        self.model.train()
-        total_loss = 0.0
-        for i, batch in enumerate(tqdm(self.train_loader)):
-            loss = self.train_step(batch)
-            total_loss += loss
-            if self.counter % self.log_steps_frequency == 0:
-                self.test()
-                self.model.train()
-                self.inline_log(
-                    key=HistoryKeys.train_loss.value,
-                    category=LogCategories.steps.value,
-                    value=total_loss / (i + 1)
-                    )
-            self.counter += 1
-        return total_loss / len(self.train_loader)
-
-    @export_ckpt(
-        key=HistoryKeys.test_loss.value,
-        category=LogCategories.steps.value
-        )
-    @step_log(
-        key=HistoryKeys.test_loss.value,
-        category=LogCategories.steps.value
-        )
-    @torch.no_grad()
-    def test(self) -> float:
-        self.model.eval()
-        total_loss = 0.0
-        for batch in self.test_loader:
-            loss = self.forward_pass(batch)
-            total_loss += loss.item()
-        total_loss /= len(self.test_loader)
-        return total_loss
 
 
 class DistCTCTrainer(BaseDistTrainer, CTCTrainer):
@@ -362,48 +405,112 @@ class DistCTCTrainer(BaseDistTrainer, CTCTrainer):
             history=history
         )
 
-    @step_log(
-        key=HistoryKeys.train_loss.value,
-        category=LogCategories.epochs.value
-        )
-    def train(self) -> float:
-        self.model.train()
-        total_loss = 0.0
-        for i, batch in enumerate(tqdm(self.train_loader)):
-            loss = self.train_step(batch)
-            total_loss += loss
-            if self.counter % self.log_steps_frequency == 0:
-                total = self._all_reduce_loss(total_loss, i + 1)
-                if self.is_master or self.has_bnorm is True:
-                    """The extra condition to solve a dummy issue caused when
-                    we have DDP with batch norm, it works only if the
-                    evaluation is done on all nodes!, the link below
-                    is similar issue
-                    discuss.pytorch.org/t/validation-hangs-up-when-using-ddp-and-syncbatchnorm/104831
-                    """
-                    self.inline_log(
-                        key=HistoryKeys.train_loss.value,
-                        category=LogCategories.steps.value,
-                        value=total.item()
-                        )
-                    self.test()
-                    self.model.train()
-                if self.has_bnorm is False:
-                    barrier()
-            self.counter += 1
-        return self._all_reduce_loss(total_loss, len(self.train_loader)).item()
 
-    def fit(self):
-        for _ in range(self.epochs):
-            self.train()
-            if self.is_master or self.has_bnorm is True:
-                """The extra condition to solve a dummy issue caused when
-                we have DDP with batch norm, it works only if the evaluation is done on all nodes!
-                the link below is similar issue
-                discuss.pytorch.org/t/validation-hangs-up-when-using-ddp-and-syncbatchnorm/104831
-                """
-                self.logger.log(self.history)
-            barrier()
+class Seq2SeqTrainer(BaseTrainer):
+    def __init__(
+            self,
+            optimizer: Union[Optimizer, ISchedular],
+            criterion: Module,
+            model: Module,
+            train_loader: IDataLoader,
+            test_loader: IDataLoader,
+            epochs: int,
+            log_steps_frequency: int,
+            device: str,
+            logger: ILogger,
+            outdir: Union[str, Path],
+            grad_clip_thresh: Union[None, float] = None,
+            grad_clip_norm_type: float = 2.0,
+            history: dict = {}
+            ) -> None:
+        BaseTrainer.__init__(
+            self,
+            optimizer=optimizer,
+            criterion=criterion,
+            model=model,
+            train_loader=train_loader,
+            test_loader=test_loader,
+            epochs=epochs,
+            log_steps_frequency=log_steps_frequency,
+            logger=logger,
+            outdir=outdir,
+            grad_clip_thresh=grad_clip_thresh,
+            grad_clip_norm_type=grad_clip_norm_type,
+            history=history
+        )
+        self.device = device
+        self.model.to(device)
+
+    def forward_pass(
+            self, batch: Tuple[Tensor]) -> Tensor:
+        batch = [
+            item.to(self.device) for item in batch
+            ]
+        [speech, speech_mask, text, text_mask] = batch
+        preds = self.model(speech, speech_mask, text, text_mask)
+        # preds of shape [T, B, C]
+        loss = self.criterion(preds, text, text_mask)
+        return loss
+
+
+class DistSeq2SeqTrainer(BaseDistTrainer, Seq2SeqTrainer):
+    def __init__(
+            self,
+            optimizer: Union[Optimizer, ISchedular],
+            criterion: Module,
+            model: Module,
+            train_loader: IDataLoader,
+            test_loader: IDataLoader,
+            epochs: int,
+            logger: ILogger,
+            outdir: Union[str, Path],
+            log_steps_frequency: int,
+            rank: int,
+            world_size: int,
+            dist_address: int,
+            dist_port: int,
+            dist_backend: str,
+            grad_clip_thresh: Union[None, float] = None,
+            grad_clip_norm_type: float = 2.0,
+            history: dict = {}
+            ) -> None:
+        Seq2SeqTrainer.__init__(
+            self,
+            optimizer=optimizer,
+            criterion=criterion,
+            model=model,
+            train_loader=train_loader,
+            test_loader=test_loader,
+            epochs=epochs,
+            log_steps_frequency=log_steps_frequency,
+            device=f'cuda:{rank}',
+            logger=logger,
+            outdir=outdir,
+            grad_clip_thresh=grad_clip_thresh,
+            grad_clip_norm_type=grad_clip_norm_type,
+            history=history
+        )
+        BaseDistTrainer.__init__(
+            self,
+            optimizer=optimizer,
+            criterion=criterion,
+            model=model,
+            train_loader=train_loader,
+            test_loader=test_loader,
+            epochs=epochs,
+            log_steps_frequency=log_steps_frequency,
+            logger=logger,
+            outdir=outdir,
+            rank=rank,
+            world_size=world_size,
+            dist_address=dist_address,
+            dist_port=dist_port,
+            dist_backend=dist_backend,
+            grad_clip_thresh=grad_clip_thresh,
+            grad_clip_norm_type=grad_clip_norm_type,
+            history=history
+        )
+
 
 def _run_trainer(
         rank: int,

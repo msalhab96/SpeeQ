@@ -199,6 +199,6 @@ def get_mask_from_lens(lengths: Tensor, max_len: int) -> Tensor:
         Tensor: The mask of shape [B, max_len] and True whenever the index
             in the data portion.
     """
-    indices = torch.arange(max_len)
+    indices = torch.arange(max_len).to(lengths.device)
     indices = indices.expand(len(lengths), max_len)
     return indices < lengths.unsqueeze(dim=1)

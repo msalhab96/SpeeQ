@@ -5,13 +5,15 @@ from models.registry import get_model
 from torch.optim import (
     Adam, RMSprop, SGD
 )
-from trainers.criterions import CTCLoss
-from trainers.trainers import CTCTrainer, DistCTCTrainer
+from trainers.criterions import CTCLoss, CrossEntropyLoss, NLLLoss
+from trainers.trainers import CTCTrainer, DistCTCTrainer, Seq2SeqTrainer
 from utils.loggers import get_logger
 from utils.utils import set_state_dict
 
 CRITERIONS = {
-    'ctc': CTCLoss
+    'ctc': CTCLoss,
+    'crossentropy': CrossEntropyLoss,
+    'nllloss': NLLLoss
 }
 
 OPTIMIZERS = {
@@ -21,7 +23,8 @@ OPTIMIZERS = {
 }
 
 TRAINERS = {
-    'ctc': CTCTrainer
+    'ctc': CTCTrainer,
+    'seq2seq': Seq2SeqTrainer
 }
 
 DIST_TRAINERS = {

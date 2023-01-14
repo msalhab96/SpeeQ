@@ -1,3 +1,5 @@
+from models.seq2seq import LAS
+from torch import nn
 from typing import List
 from .layers import (
     PackedGRU,
@@ -8,12 +10,17 @@ from .ctc import (
     BERT, Conformer, DeepSpeechV1, DeepSpeechV2, Jasper, Wav2Letter
     )
 
-RNN_REGISTRY = {
+PACKED_RNN_REGISTRY = {
     'rnn': PackedRNN,
     'lstm': PackedLSTM,
     'gru': PackedGRU
 }
 
+RNN_REGISTRY = {
+    'rnn': nn.RNN,
+    'lstm': nn.LSTM,
+    'gru': nn.GRU
+}
 
 CTC_MODELS = {
     'deep_speech_v1': DeepSpeechV1,
@@ -22,6 +29,10 @@ CTC_MODELS = {
     'conformer': Conformer,
     'jasper': Jasper,
     'wav2letter': Wav2Letter
+}
+
+SEQ2SEQ_MODEL = {
+    'las': LAS
 }
 
 
@@ -35,5 +46,9 @@ def list_ctc_models() -> List[str]:
 def get_model(model_config, n_classes):
     if model_config.template.type == 'ctc':
         return CTC_MODELS[model_config.template.name](
+            **model_config.template.get_dict(), n_classes=n_classes
+        )
+    if model_config.template.type == 'seq2seq':
+        return SEQ2SEQ_MODEL[model_config.template.name](
             **model_config.template.get_dict(), n_classes=n_classes
         )

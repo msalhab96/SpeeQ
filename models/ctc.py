@@ -53,8 +53,8 @@ class DeepSpeechV1(nn.Module):
             )
             for i in range(n_linear_layers)
         ])
-        from .registry import RNN_REGISTRY
-        self.rnn = RNN_REGISTRY[rnn_type](
+        from .registry import PACKED_RNN_REGISTRY
+        self.rnn = PACKED_RNN_REGISTRY[rnn_type](
             input_size=hidden_size,
             hidden_size=hidden_size,
             bidirectional=bidirectional
@@ -218,10 +218,10 @@ class DeepSpeechV2(nn.Module):
             n_layers=n_conv,
             p_dropout=p_dropout
         )
-        from .registry import RNN_REGISTRY
+        from .registry import PACKED_RNN_REGISTRY
         self.rnns = nn.ModuleList(
             [
-                RNN_REGISTRY[rnn_type](
+                PACKED_RNN_REGISTRY[rnn_type](
                     input_size=hidden_size,
                     hidden_size=hidden_size,
                     bidirectional=bidirectional
