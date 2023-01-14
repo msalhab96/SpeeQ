@@ -106,3 +106,18 @@ class Wav2LetterTemp(BaseTemplate):
     wav_stride: Optional[int] = None
     _name = 'wav2letter'
     _type = 'ctc'
+
+
+@dataclass
+class LASTemp(BaseTemplate):
+    in_features: int
+    hidden_size: int
+    enc_num_layers: int
+    reduction_factor: int
+    bidirectional: bool
+    dec_num_layers: int
+    emb_dim: int
+    p_dropout: float
+    rnn_type: str = 'rnn'
+    _name = 'las'
+    _type = 'seq2seq'
