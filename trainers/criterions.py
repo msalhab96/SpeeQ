@@ -67,3 +67,23 @@ class CrossEntropyLoss(nn.CrossEntropyLoss):
         input, target = remove_positionals(input, target)
         input, target = get_flatten_results(input, target)
         return super().forward(input, target)
+
+
+class NLLLoss(nn.NLLLoss):
+    def __init__(
+            self,
+            pad_id: int,
+            reduction='mean',
+            *args, **kwargs
+            ) -> None:
+        super().__init__(
+            ignore_index=pad_id,
+            reduction=reduction
+        )
+
+    def forward(self, input, target, *args, **kwargs):
+        # input of shape [B, M, C]
+        # target of shape [B, M]
+        input, target = remove_positionals(input, target)
+        input, target = get_flatten_results(input, target)
+        return super().forward(input, target)
