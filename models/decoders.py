@@ -2,7 +2,11 @@ import torch
 from torch import nn
 from torch import Tensor
 from typing import Tuple, Union
-from models.layers import GlobalMulAttention, PredModule
+from models.layers import (
+    GlobalMulAttention,
+    LocAwareGlobalAddAttention,
+    PredModule
+    )
 
 
 class GlobAttRNNDecoder(nn.Module):
@@ -76,6 +80,67 @@ class GlobAttRNNDecoder(nn.Module):
                     (h, c) = h
                 h = h.permute(1, 0, 2)
                 h = att(key=enc_h, query=h, mask=enc_mask)
+                h = h.permute(1, 0, 2)
+                if self.is_lstm:
+                    h = (h, c)
+            out = self.pred_net(out)
+            results = out if results is None \
+                else torch.cat([results, out], dim=1)
+        return results
+
+
+class LocationAwareAttDecoder(GlobAttRNNDecoder):
+    def __init__(
+            self,
+            embed_dim: int,
+            hidden_size: int,
+            n_layers: int,
+            n_classes: int,
+            pred_activation: nn.Module,
+            kernel_size: int,
+            activation: str,
+            rnn_type: str = 'rnn'
+            ) -> None:
+        super().__init__(
+            embed_dim=embed_dim,
+            hidden_size=hidden_size,
+            n_layers=n_layers,
+            n_classes=n_classes,
+            pred_activation=pred_activation,
+            rnn_type=rnn_type
+            )
+        self.att_layers = nn.ModuleList([
+            LocAwareGlobalAddAttention(
+                enc_feat_size=hidden_size,
+                dec_feat_size=hidden_size,
+                kernel_size=kernel_size,
+                activation=activation
+                )
+            for _ in range(n_layers)
+            ])
+
+    def forward(
+            self,
+            h: Union[Tensor, Tuple[Tensor, Tensor]],
+            enc_h: Tensor,
+            enc_mask: Tensor,
+            target: Tensor,
+            *args, **kwargs
+            ) -> Tensor:
+        # target of shape [B, M]
+        batch_size, max_len = target.shape
+        results = None
+        alpha = torch.zeros(batch_size, 1, enc_h.shape[1]).to(enc_h.device)
+        for i in range(max_len):
+            out = self.emb(target[:, i:i + 1])
+            for rnn, att in zip(self.rnn_layers, self.att_layers):
+                out, h = rnn(out, h)
+                if self.is_lstm:
+                    (h, c) = h
+                h = h.permute(1, 0, 2)
+                h, alpha = att(
+                    key=enc_h, query=h, alpha=alpha, mask=enc_mask
+                    )
                 h = h.permute(1, 0, 2)
                 if self.is_lstm:
                     h = (h, c)
