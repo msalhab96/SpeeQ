@@ -121,3 +121,34 @@ class LASTemp(BaseTemplate):
     rnn_type: str = 'rnn'
     _name = 'las'
     _type = 'seq2seq'
+
+
+@dataclass
+class BasicAttSeq2SeqRNNTemp(BaseTemplate):
+    in_features: int
+    hidden_size: int
+    enc_num_layers: int
+    bidirectional: bool
+    dec_num_layers: int
+    emb_dim: int
+    p_dropout: float
+    rnn_type: str = 'rnn'
+    _name = 'basic_att_rnn'
+    _type = 'seq2seq'
+
+
+@dataclass
+class RNNWithLocationAwareAttTemp(BaseTemplate):
+    in_features: int
+    hidden_size: int
+    enc_num_layers: int
+    bidirectional: bool
+    dec_num_layers: int
+    emb_dim: int
+    kernel_size: int
+    activation: str
+    p_dropout: float
+    inv_temperature: Union[float, int] = 1
+    rnn_type: str = 'rnn'
+    _name = 'rnn_with_location_att'
+    _type = 'seq2seq'
