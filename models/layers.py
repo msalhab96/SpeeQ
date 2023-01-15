@@ -938,8 +938,6 @@ class RNNLayers(nn.Module):
         from .registry import PACKED_RNN_REGISTRY
         if bidirectional is True:
             assert hidden_size % 2 == 0
-        if bidirectional is True:
-            hidden_size = hidden_size // 2
         self.rnns = nn.ModuleList([
             PACKED_RNN_REGISTRY[rnn_type](
                 input_size=in_features if i == 0 else hidden_size,
