@@ -1,4 +1,4 @@
-from models.seq2seq import LAS
+from models.seq2seq import LAS, BasicAttSeq2SeqRNN, RNNWithLocationAwareAtt
 from torch import nn
 from typing import List
 from .layers import (
@@ -32,7 +32,9 @@ CTC_MODELS = {
 }
 
 SEQ2SEQ_MODEL = {
-    'las': LAS
+    'las': LAS,
+    'rnn_with_location_att': RNNWithLocationAwareAtt,
+    'basic_att_rnn': BasicAttSeq2SeqRNN
 }
 
 
