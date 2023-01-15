@@ -1,4 +1,4 @@
-from models.decoders import GlobAttRNNDecoder
+from models.decoders import GlobAttRNNDecoder, LocationAwareAttDecoder
 from models.layers import PyramidRNNLayers, RNNLayers
 from torch import Tensor
 from torch import nn
@@ -133,5 +133,53 @@ class LAS(BasicAttSeq2SeqRNN):
             bidirectional=bidirectional,
             n_layers=enc_num_layers,
             p_dropout=p_dropout,
+            rnn_type=rnn_type
+        )
+
+
+class RNNWithLocationAwareAtt(BasicAttSeq2SeqRNN):
+    """Implements RNN seq2seq model proposed
+        in https://arxiv.org/abs/1506.07503
+
+    Args:
+        in_features (int): The encoder's input feature speech size.
+        n_classes (int): The number of classes/vocabulary.
+        hidden_size (int): The RNNs' hidden size.
+        enc_num_layers (int): The number of the encoder's layers.
+        bidirectional (bool): If the encoder's RNNs are bidirectional or not.
+        dec_num_layers (int): The number of the decoders' RNN layers.
+        emb_dim (int): The embedding size.
+        p_dropout (float): The dropout rate.
+        rnn_type (str): The rnn type. default 'rnn'.
+    """
+    def __init__(
+            self,
+            in_features: int,
+            n_classes: int,
+            hidden_size: int,
+            enc_num_layers: int,
+            bidirectional: bool,
+            dec_num_layers: int,
+            emb_dim: int,
+            p_dropout: float,
+            rnn_type: str = 'rnn',
+            ) -> None:
+        super().__init__(
+            in_features=in_features,
+            n_classes=n_classes,
+            hidden_size=hidden_size,
+            enc_num_layers=enc_num_layers,
+            bidirectional=bidirectional,
+            dec_num_layers=dec_num_layers,
+            emb_dim=emb_dim,
+            p_dropout=p_dropout,
+            rnn_type=rnn_type
+            )
+        self.decoder = LocationAwareAttDecoder(
+            embed_dim=emb_dim,
+            hidden_size=hidden_size,
+            n_layers=dec_num_layers,
+            n_classes=n_classes,
+            pred_activation=nn.LogSoftmax(dim=-1),
             rnn_type=rnn_type
         )
