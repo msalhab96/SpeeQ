@@ -230,7 +230,7 @@ class MultiHeadSelfAtt(nn.Module):
         # mask of shape [B, M]
         mask = mask.unsqueeze(dim=1)
         mask = mask.unsqueeze(dim=2) | mask.unsqueeze(dim=-1)
-        return att.masked_fill(mask, 1e-15)
+        return att.masked_fill(mask, -1e15)
 
     def perform_attention(
             self,
@@ -421,21 +421,20 @@ class GlobalMulAttention(nn.Module):
     attention mechanism as described in
     https://arxiv.org/abs/1508.04025 with direct
     dot product for scoring.
-
     Args:
         enc_feat_size (int): The encoder feature size.
         dec_feat_size (int): The decoder feature size.
         scaling_factor (Union[float, int]): The scaling factor
             for numerical stability used inside the softmax.
             Default 1.
-        mask_val (float): the masking value. Default 1e-12.
+        mask_val (float): the masking value. Default -1e12.
     """
     def __init__(
             self,
             enc_feat_size: int,
             dec_feat_size: int,
             scaling_factor: Union[float, int] = 1,
-            mask_val: float = 1e-12
+            mask_val: float = -1e12
             ) -> None:
         super().__init__()
         self.fc_query = nn.Linear(
