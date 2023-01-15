@@ -1,3 +1,4 @@
+from models.activations import Sigmax
 import torch
 import torch.nn as nn
 from torch import Tensor
@@ -230,7 +231,7 @@ class MultiHeadSelfAtt(nn.Module):
         # mask of shape [B, M]
         mask = mask.unsqueeze(dim=1)
         mask = mask.unsqueeze(dim=2) | mask.unsqueeze(dim=-1)
-        return att.masked_fill(mask, 1e-15)
+        return att.masked_fill(mask, -1e15)
 
     def perform_attention(
             self,
@@ -421,21 +422,20 @@ class GlobalMulAttention(nn.Module):
     attention mechanism as described in
     https://arxiv.org/abs/1508.04025 with direct
     dot product for scoring.
-
     Args:
         enc_feat_size (int): The encoder feature size.
         dec_feat_size (int): The decoder feature size.
         scaling_factor (Union[float, int]): The scaling factor
             for numerical stability used inside the softmax.
             Default 1.
-        mask_val (float): the masking value. Default 1e-12.
+        mask_val (float): the masking value. Default -1e12.
     """
     def __init__(
             self,
             enc_feat_size: int,
             dec_feat_size: int,
             scaling_factor: Union[float, int] = 1,
-            mask_val: float = 1e-12
+            mask_val: float = -1e12
             ) -> None:
         super().__init__()
         self.fc_query = nn.Linear(
@@ -938,8 +938,6 @@ class RNNLayers(nn.Module):
         from .registry import PACKED_RNN_REGISTRY
         if bidirectional is True:
             assert hidden_size % 2 == 0
-        if bidirectional is True:
-            hidden_size = hidden_size // 2
         self.rnns = nn.ModuleList([
             PACKED_RNN_REGISTRY[rnn_type](
                 input_size=in_features if i == 0 else hidden_size,
@@ -1050,3 +1048,93 @@ class PyramidRNNLayers(nn.Module):
                 out = self.dropout(out)
         lengths = lengths.long()
         return out, h, lengths
+
+
+class LocAwareGlobalAddAttention(nn.Module):
+    """Implements the location-aware global additive attention
+    proposed in https://arxiv.org/abs/1506.07503
+
+    Args:
+        enc_feat_size (int): The encoder feature size.
+        dec_feat_size (int): The decoder feature size.
+        kernel_size (int): The attention kernel size.
+        activation (str): The activation function to use.
+            it can be either softmax or sigmax.
+        inv_temperature (Union[float, int]): The inverse temperature value.
+            Default 1.
+        mask_val (float): The masking value. Default -1e12.
+    """
+    def __init__(
+            self,
+            enc_feat_size: int,
+            dec_feat_size: int,
+            kernel_size: int,
+            activation: str,
+            inv_temperature: Union[float, int] = 1,
+            mask_val: float = -1e12
+            ) -> None:
+        super().__init__()
+        activations = {
+            'softmax': nn.Softmax,
+            'sigmax': Sigmax
+        }
+        assert activation in activations
+        self.activation = activations[activation](dim=-2)
+        self.fc_query = nn.Linear(
+            in_features=dec_feat_size,
+            out_features=dec_feat_size
+            )
+        self.fc_key = nn.Linear(
+            in_features=enc_feat_size,
+            out_features=dec_feat_size
+            )
+        self.fc_value = nn.Linear(
+            in_features=enc_feat_size,
+            out_features=dec_feat_size
+            )
+        self.conv = nn.Conv1d(
+                in_channels=1,
+                out_channels=dec_feat_size,
+                kernel_size=kernel_size,
+                padding='same'
+                )
+        self.pos_fc = nn.Linear(
+            in_features=dec_feat_size,
+            out_features=dec_feat_size
+        )
+        self.w = nn.parameter.Parameter(
+            data=torch.randn(dec_feat_size, 1)
+        )
+        self.mask_val = mask_val
+        self.inv_temperature = inv_temperature
+
+    def forward(
+            self,
+            key: Tensor,
+            query: Tensor,
+            alpha: Tensor,
+            mask=None
+            ) -> Tuple[Tensor, Tensor]:
+        # alpha of shape [B, 1, M_enc]
+        value = self.fc_value(key)
+        key = self.fc_key(key)
+        query = self.fc_query(query)
+        f = self.conv(alpha)  # [B, d, M_enc]
+        f = f.transpose(-1, -2)
+        f = self.pos_fc(f)
+        # [B, 1, d] + [B, M_enc,  d] +  [B, M_enc, d]
+        e = torch.tanh(
+            query + key + f
+        )  # [B, M_dec, d]
+        att_weights = torch.matmul(e, self.w)
+        if mask is not None:
+            mask = mask.unsqueeze(dim=-1)
+            att_weights = att_weights.masked_fill(
+                ~mask, self.mask_val
+                )
+        att_weights = self.activation(
+            att_weights * self.inv_temperature
+            )
+        att_weights = att_weights.transpose(-1, -2)
+        context = torch.matmul(att_weights, value)
+        return context, att_weights
