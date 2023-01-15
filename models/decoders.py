@@ -90,6 +90,21 @@ class GlobAttRNNDecoder(nn.Module):
 
 
 class LocationAwareAttDecoder(GlobAttRNNDecoder):
+    """Implements RNN decoder with location aware attention.
+
+    Args:
+        embed_dim (int): The embedding size.
+        hidden_size (int): The RNN hidden size.
+        n_layers (int): The number of RNN layers.
+        n_classes (int): The number of classes.
+        pred_activation (Module): An activation function instance.
+        kernel_size (int): The attention kernel size.
+        activation (str): The activation function to use.
+            it can be either softmax or sigmax.
+        inv_temperature (Union[float, int]): The inverse temperature value.
+            Default 1.
+        rnn_type (str): The RNN type to use. Default 'rnn'.
+    """
     def __init__(
             self,
             embed_dim: int,
@@ -99,6 +114,7 @@ class LocationAwareAttDecoder(GlobAttRNNDecoder):
             pred_activation: nn.Module,
             kernel_size: int,
             activation: str,
+            inv_temperature: Union[float, int] = 1,
             rnn_type: str = 'rnn'
             ) -> None:
         super().__init__(
@@ -114,7 +130,8 @@ class LocationAwareAttDecoder(GlobAttRNNDecoder):
                 enc_feat_size=hidden_size,
                 dec_feat_size=hidden_size,
                 kernel_size=kernel_size,
-                activation=activation
+                activation=activation,
+                inv_temperature=inv_temperature
                 )
             for _ in range(n_layers)
             ])
