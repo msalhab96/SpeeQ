@@ -1,3 +1,4 @@
+from typing import Union
 from models.decoders import GlobAttRNNDecoder, LocationAwareAttDecoder
 from models.layers import PyramidRNNLayers, RNNLayers
 from torch import Tensor
@@ -149,7 +150,12 @@ class RNNWithLocationAwareAtt(BasicAttSeq2SeqRNN):
         bidirectional (bool): If the encoder's RNNs are bidirectional or not.
         dec_num_layers (int): The number of the decoders' RNN layers.
         emb_dim (int): The embedding size.
+        kernel_size (int): The attention kernel size.
+        activation (str): The activation function to use in the
+            attention layer. it can be either softmax or sigmax.
         p_dropout (float): The dropout rate.
+        inv_temperature (Union[float, int]): The inverse temperature value of
+            the attention. Default 1.
         rnn_type (str): The rnn type. default 'rnn'.
     """
     def __init__(
@@ -161,8 +167,11 @@ class RNNWithLocationAwareAtt(BasicAttSeq2SeqRNN):
             bidirectional: bool,
             dec_num_layers: int,
             emb_dim: int,
+            kernel_size: int,
+            activation: str,
             p_dropout: float,
-            rnn_type: str = 'rnn',
+            inv_temperature: Union[float, int] = 1,
+            rnn_type: str = 'rnn'
             ) -> None:
         super().__init__(
             in_features=in_features,
@@ -181,5 +190,8 @@ class RNNWithLocationAwareAtt(BasicAttSeq2SeqRNN):
             n_layers=dec_num_layers,
             n_classes=n_classes,
             pred_activation=nn.LogSoftmax(dim=-1),
-            rnn_type=rnn_type
+            kernel_size=kernel_size,
+            activation=activation,
+            inv_temperature=inv_temperature,
+            rnn_type=rnn_type,
         )
