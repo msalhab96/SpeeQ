@@ -118,6 +118,7 @@ class LASTemp(BaseTemplate):
     dec_num_layers: int
     emb_dim: int
     p_dropout: float
+    teacher_forcing_rate: float = 0.0
     rnn_type: str = 'rnn'
     _name = 'las'
     _type = 'seq2seq'
@@ -132,6 +133,7 @@ class BasicAttSeq2SeqRNNTemp(BaseTemplate):
     dec_num_layers: int
     emb_dim: int
     p_dropout: float
+    teacher_forcing_rate: float = 0.0
     rnn_type: str = 'rnn'
     _name = 'basic_att_rnn'
     _type = 'seq2seq'
@@ -149,6 +151,7 @@ class RNNWithLocationAwareAttTemp(BaseTemplate):
     activation: str
     p_dropout: float
     inv_temperature: Union[float, int] = 1
+    teacher_forcing_rate: float = 0.0
     rnn_type: str = 'rnn'
     _name = 'rnn_with_location_att'
     _type = 'seq2seq'
