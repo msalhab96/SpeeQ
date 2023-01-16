@@ -112,10 +112,10 @@ def save_state_dict(
 
 def load_state_dict(state_path: Union[str, Path]) -> tuple:
     state = torch.load(state_path)
-    model = state[StateKeys.model]
-    optimizer = state[StateKeys.optimizer]
-    steps = state[StateKeys.steps]
-    history = state[StateKeys.history]
+    model = state[StateKeys.model.value]
+    optimizer = state[StateKeys.optimizer.value]
+    steps = state[StateKeys.step.value]
+    history = state[StateKeys.history.value]
     return model, optimizer, steps, history
 
 
