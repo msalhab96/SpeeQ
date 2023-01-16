@@ -18,6 +18,7 @@ class GlobAttRNNDecoder(nn.Module):
         n_layers (int): The number of RNN layers.
         n_classes (int): The number of classes.
         pred_activation (Module): An activation function instance.
+        teacher_forcing_rate (float): The teacher forcing rate. Default 0.0
         rnn_type (str): The RNN type to use. Default 'rnn'.
     """
     def __init__(
@@ -27,6 +28,7 @@ class GlobAttRNNDecoder(nn.Module):
             n_layers: int,
             n_classes: int,
             pred_activation: nn.Module,
+            teacher_forcing_rate: float = 0.0,
             rnn_type: str = 'rnn'
             ) -> None:
         super().__init__()
@@ -59,6 +61,25 @@ class GlobAttRNNDecoder(nn.Module):
         self.hidden_size = hidden_size
         self.n_classes = n_classes
         self.is_lstm = rnn_type == 'lstm'
+        self.teacher_forcing_rate = teacher_forcing_rate
+
+    def _apply_teacher_forcing(self, y: Tensor, out: Tensor) -> Tensor:
+        # y of shape [B, 1]
+        # out of shape [B, 1, C]
+        """Applies teacher forcing on the decoder's input.
+
+        Args:
+            y (Tensor): The original target labels.
+            out (Tensor): The latest predicted probabilities.
+
+        Returns:
+            Tensor: The new decoder input tensor.
+        """
+        mask = torch.rand(y.shape[0]) <= self.teacher_forcing_rate
+        mask = mask.to(y.device)
+        mask = mask.unsqueeze(dim=-1)
+        out = torch.argmax(out, dim=-1)
+        return (~mask) * y + mask * out
 
     def forward(
             self,
@@ -72,8 +93,8 @@ class GlobAttRNNDecoder(nn.Module):
         # target of shape [B, M]
         max_len = target.shape[-1]
         results = None
+        out = self.emb(target[:, 0: 1])
         for i in range(max_len):
-            out = self.emb(target[:, i:i + 1])
             for rnn, att in zip(self.rnn_layers, self.att_layers):
                 out, h = rnn(out, h)
                 if self.is_lstm:
@@ -86,6 +107,10 @@ class GlobAttRNNDecoder(nn.Module):
             out = self.pred_net(out)
             results = out if results is None \
                 else torch.cat([results, out], dim=1)
+            y = target[:, i: i + 1]
+            if self.teacher_forcing_rate > 0:
+                y = self._apply_teacher_forcing(y=y, out=out)
+            out = self.emb(y)
         return results
 
 
@@ -103,6 +128,7 @@ class LocationAwareAttDecoder(GlobAttRNNDecoder):
             it can be either softmax or sigmax.
         inv_temperature (Union[float, int]): The inverse temperature value.
             Default 1.
+        teacher_forcing_rate (float): The teacher forcing rate. Default 0.0
         rnn_type (str): The RNN type to use. Default 'rnn'.
     """
     def __init__(
@@ -115,6 +141,7 @@ class LocationAwareAttDecoder(GlobAttRNNDecoder):
             kernel_size: int,
             activation: str,
             inv_temperature: Union[float, int] = 1,
+            teacher_forcing_rate: float = 0.0,
             rnn_type: str = 'rnn'
             ) -> None:
         super().__init__(
@@ -123,6 +150,7 @@ class LocationAwareAttDecoder(GlobAttRNNDecoder):
             n_layers=n_layers,
             n_classes=n_classes,
             pred_activation=pred_activation,
+            teacher_forcing_rate=teacher_forcing_rate,
             rnn_type=rnn_type
             )
         self.att_layers = nn.ModuleList([
@@ -148,8 +176,8 @@ class LocationAwareAttDecoder(GlobAttRNNDecoder):
         batch_size, max_len = target.shape
         results = None
         alpha = torch.zeros(batch_size, 1, enc_h.shape[1]).to(enc_h.device)
+        out = self.emb(target[:, 0: 1])
         for i in range(max_len):
-            out = self.emb(target[:, i:i + 1])
             for rnn, att in zip(self.rnn_layers, self.att_layers):
                 out, h = rnn(out, h)
                 if self.is_lstm:
@@ -164,4 +192,8 @@ class LocationAwareAttDecoder(GlobAttRNNDecoder):
             out = self.pred_net(out)
             results = out if results is None \
                 else torch.cat([results, out], dim=1)
+            y = target[:, i: i + 1]
+            if self.teacher_forcing_rate > 0:
+                y = self._apply_teacher_forcing(y=y, out=out)
+            out = self.emb(y)
         return results

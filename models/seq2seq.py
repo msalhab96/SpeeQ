@@ -18,6 +18,7 @@ class BasicAttSeq2SeqRNN(nn.Module):
         dec_num_layers (int): The number of the decoders' RNN layers.
         emb_dim (int): The embedding size.
         p_dropout (float): The dropout rate.
+        teacher_forcing_rate (float): The teacher forcing rate. Default 0.0
         rnn_type (str): The rnn type. default 'rnn'.
     """
     def __init__(
@@ -30,6 +31,7 @@ class BasicAttSeq2SeqRNN(nn.Module):
             dec_num_layers: int,
             emb_dim: int,
             p_dropout: float,
+            teacher_forcing_rate: float = 0.0,
             rnn_type: str = 'rnn',
             ) -> None:
         super().__init__()
@@ -47,6 +49,7 @@ class BasicAttSeq2SeqRNN(nn.Module):
             n_layers=dec_num_layers,
             n_classes=n_classes,
             pred_activation=nn.LogSoftmax(dim=-1),
+            teacher_forcing_rate=teacher_forcing_rate,
             rnn_type=rnn_type
         )
         self.bidirectional = bidirectional
@@ -100,6 +103,7 @@ class LAS(BasicAttSeq2SeqRNN):
         dec_num_layers (int): The number of the decoders' RNN layers.
         emb_dim (int): The embedding size.
         p_dropout (float): The dropout rate.
+        teacher_forcing_rate (float): The teacher forcing rate. Default 0.0
         rnn_type (str): The rnn type. default 'rnn'.
     """
     def __init__(
@@ -113,6 +117,7 @@ class LAS(BasicAttSeq2SeqRNN):
             dec_num_layers: int,
             emb_dim: int,
             p_dropout: float,
+            teacher_forcing_rate: float = 0.0,
             rnn_type: str = 'rnn',
             ) -> None:
         super().__init__(
@@ -124,6 +129,7 @@ class LAS(BasicAttSeq2SeqRNN):
             dec_num_layers=dec_num_layers,
             emb_dim=emb_dim,
             p_dropout=p_dropout,
+            teacher_forcing_rate=teacher_forcing_rate,
             rnn_type=rnn_type
             )
         self.reduction_factor = reduction_factor
@@ -156,6 +162,7 @@ class RNNWithLocationAwareAtt(BasicAttSeq2SeqRNN):
         p_dropout (float): The dropout rate.
         inv_temperature (Union[float, int]): The inverse temperature value of
             the attention. Default 1.
+        teacher_forcing_rate (float): The teacher forcing rate. Default 0.0
         rnn_type (str): The rnn type. default 'rnn'.
     """
     def __init__(
@@ -171,6 +178,7 @@ class RNNWithLocationAwareAtt(BasicAttSeq2SeqRNN):
             activation: str,
             p_dropout: float,
             inv_temperature: Union[float, int] = 1,
+            teacher_forcing_rate: float = 0.0,
             rnn_type: str = 'rnn'
             ) -> None:
         super().__init__(
@@ -193,5 +201,6 @@ class RNNWithLocationAwareAtt(BasicAttSeq2SeqRNN):
             kernel_size=kernel_size,
             activation=activation,
             inv_temperature=inv_temperature,
-            rnn_type=rnn_type,
+            teacher_forcing_rate=teacher_forcing_rate,
+            rnn_type=rnn_type
         )
