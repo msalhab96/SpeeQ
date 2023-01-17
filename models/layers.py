@@ -282,19 +282,20 @@ class MultiHeadAtt(nn.Module):
         )
 
 
-class MaskedMultiHeadAtt(nn.Module):
+class MaskedMultiHeadAtt(MultiHeadAtt):
     """Implements the multi-head attention module
     described in https://arxiv.org/abs/1706.03762
 
     Args:
         d_model (int): The model dimensionality.
         h (int): The number of heads.
+        masking_value (int): The masking value. Default -1e15
     """
     def __init__(
             self,
             d_model: int,
             h: int,
-            masking_value: int = -1e-15
+            masking_value: int = -1e15
             ) -> None:
         super().__init__(
             d_model=d_model, h=h, masking_value=masking_value
@@ -328,19 +329,20 @@ class TransformerEncLayer(nn.Module):
 
     Args:
         d_model (int): The model dimensionality.
-        hidden_size (int): The feed forward inner
-            layer dimensionality..
+        hidden_size (int): The feed forward inner layer dimensionality.
         h (int): The number of heads.
+        masking_value (int): The masking value. Default -1e15
     """
     def __init__(
             self,
             d_model: int,
             hidden_size: int,
-            h: int
+            h: int,
+            masking_value: int = -1e15
             ) -> None:
         super().__init__()
         self.mhsa = MultiHeadAtt(
-            d_model=d_model, h=h
+            d_model=d_model, h=h, masking_value=masking_value
             )
         self.add_and_norm1 = AddAndNorm(
             d_model=d_model
@@ -635,7 +637,7 @@ class ConformerConvModule(nn.Module):
         return out
 
 
-class ConformerRelativeMHSA(MultiHeadSelfAtt):
+class ConformerRelativeMHSA(MultiHeadAtt):
     """Implements the multi-head self attention module with
     relative positional encoding as described in
     https://arxiv.org/abs/2005.08100
@@ -644,15 +646,17 @@ class ConformerRelativeMHSA(MultiHeadSelfAtt):
         d_model (int): The model dimension.
         h (int): The number of heads.
         p_dropout (float): The dropout rate.
+        masking_value (int): The masking value. Default -1e15
     """
     def __init__(
             self,
             d_model: int,
             h: int,
-            p_dropout: float
+            p_dropout: float,
+            masking_value: int = -1e-15
             ) -> None:
         super().__init__(
-            d_model=d_model, h=h
+            d_model=d_model, h=h, masking_value=masking_value
             )
         self.lnrom = nn.LayerNorm(
             normalized_shape=d_model
@@ -675,7 +679,8 @@ class ConformerRelativeMHSA(MultiHeadSelfAtt):
         out = self._add_pos_enc(out)
         out = super().forward(
             key=out, query=out,
-            value=out, mask=mask
+            value=out, query_mask=mask,
+            key_mask=mask
             )
         out = self.dropout(out)
         return out
@@ -1189,7 +1194,7 @@ class LocAwareGlobalAddAttention(nn.Module):
         return context, att_weights
 
 
-class MultiHeadSelfAtt2d(MultiHeadSelfAtt):
+class MultiHeadAtt2d(MultiHeadAtt):
     """Implements the 2-dimensional multi-head self-attention
     proposed in https://ieeexplore.ieee.org/document/8462506
 
@@ -1303,7 +1308,7 @@ class SpeechTransformerEncLayer(TransformerEncLayer):
             kernel_size: int
             ) -> None:
         super().__init__(d_model, hidden_size, h)
-        self.mhsa = MultiHeadSelfAtt2d(
+        self.mhsa = MultiHeadAtt2d(
             d_model=d_model,
             h=h,
             out_channels=out_channels,
