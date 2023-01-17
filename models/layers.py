@@ -226,7 +226,9 @@ class MultiHeadAtt(nn.Module):
             )
         return x
 
-    def _mask(self, att: Tensor, key_mask: Tensor, query_mask: Tensor) -> Tensor:
+    def _mask(
+            self, att: Tensor, key_mask: Tensor, query_mask: Tensor
+            ) -> Tensor:
         key_max_len = key_mask.shape[-1]
         query_max_len = query_mask.shape[-1]
         key_mask = key_mask.repeat(1, query_max_len)
@@ -311,7 +313,8 @@ class MaskedMultiHeadAtt(MultiHeadAtt):
             ) -> Tensor:
         batch_size, max_len = key_mask.shape
         if key_mask is not None:
-            query_mask = torch.tril(torch.ones(batch_size, max_len, max_len)).bool()
+            query_mask = torch.tril(torch.ones(batch_size, max_len, max_len))
+            query_mask = query_mask.bool()
             query_mask = query_mask.to(query_mask.device)
             query_mask &= key_mask.unsqueeze(dim=-1) & query_mask
         return super().forward(
