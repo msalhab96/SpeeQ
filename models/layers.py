@@ -1138,3 +1138,97 @@ class LocAwareGlobalAddAttention(nn.Module):
         att_weights = att_weights.transpose(-1, -2)
         context = torch.matmul(att_weights, value)
         return context, att_weights
+
+
+class MultiHeadSelfAtt2d(MultiHeadSelfAtt):
+    """Implements the 2-dimensional multi-head self-attention
+    proposed in https://ieeexplore.ieee.org/document/8462506
+
+    Args:
+        d_model (int): The model dimensionality.
+        h (int): The number of heads.
+        out_channels (int): The number of output channels of the convolution
+        kernel_size (int): The convolutional layers' kernel size.
+    """
+    def __init__(
+            self,
+            d_model: int,
+            h: int,
+            out_channels: int,
+            kernel_size: int
+            ) -> None:
+        super().__init__(out_channels, h)
+        assert out_channels % h == 0
+        self.query_conv = nn.Conv1d(
+            in_channels=d_model,
+            out_channels=out_channels,
+            kernel_size=kernel_size,
+            padding='same'
+            )
+        self.key_conv = nn.Conv1d(
+            in_channels=d_model,
+            out_channels=out_channels,
+            kernel_size=kernel_size,
+            padding='same'
+            )
+        self.value_conv = nn.Conv1d(
+            in_channels=d_model,
+            out_channels=out_channels,
+            kernel_size=kernel_size,
+            padding='same'
+            )
+        self.fc = nn.Linear(
+            in_features=2 * out_channels,
+            out_features=d_model
+        )
+
+    def perform_frequency_attention(
+            self,
+            key: Tensor,
+            query: Tensor,
+            value: Tensor,
+            ) -> Tensor:
+        key = self._reshape(key)  # B, M, h, dk
+        query = self._reshape(query)  # B, M, h, dk
+        value = self._reshape(value)  # B, M, h, dk
+        key = key.permute(0, 2, 1, 3)  # B, h, M, dk
+        query = query.permute(0, 2, 3, 1)  # B, h, dk, M
+        value = value.permute(0, 2, 3, 1)  # B, h, dk, M
+        att = self.softmax(
+            torch.matmul(query, key) / self.d_model
+            )
+        out = torch.matmul(att, value)
+        out = out.permute(0, 3, 2, 1)
+        out = out.contiguous()
+        out = out.view(
+            out.shape[0], out.shape[1], -1
+            )
+        return out
+
+    def forward(
+            self,
+            key: Tensor,
+            query: Tensor,
+            value: Tensor,
+            mask: Union[Tensor, None]
+            ) -> Tensor:
+        key = key.transpose(-1, -2)
+        query = query.transpose(-1, -2)
+        value = value.transpose(-1, -2)
+        key = self.key_conv(key)
+        query = self.query_conv(query)
+        value = self.value_conv(value)
+        key = key.transpose(-1, -2)
+        query = query.transpose(-1, -2)
+        value = value.transpose(-1, -2)
+        time_att_result = self.perform_attention(
+            key=key, query=query, value=value, mask=mask
+        )
+        freq_att_result = self.perform_frequency_attention(
+            key=key, query=query, value=value
+        )
+        result = torch.cat(
+            [time_att_result, freq_att_result], dim=-1
+        )
+        result = self.fc(result)
+        return result
