@@ -1232,3 +1232,31 @@ class MultiHeadSelfAtt2d(MultiHeadSelfAtt):
         )
         result = self.fc(result)
         return result
+
+
+class SpeechTransformerEncLayer(TransformerEncLayer):
+    """Implements a single encoder layer of the speech transformer
+    as described in https://ieeexplore.ieee.org/document/8462506
+
+    Args:
+        d_model (int): The model dimensionality.
+        hidden_size (int): The feed-forward inner layer dimensionality.
+        h (int): The number of heads.
+        out_channels (int): The number of output channels of the convolution
+        kernel_size (int): The convolutional layers' kernel size.
+    """
+    def __init__(
+            self,
+            d_model: int,
+            hidden_size: int,
+            h: int,
+            out_channels: int,
+            kernel_size: int
+            ) -> None:
+        super().__init__(d_model, hidden_size, h)
+        self.mhsa = MultiHeadSelfAtt2d(
+            d_model=d_model,
+            h=h,
+            out_channels=out_channels,
+            kernel_size=kernel_size
+        )
