@@ -1276,7 +1276,8 @@ class MultiHeadAtt2d(MultiHeadAtt):
         query = query.transpose(-1, -2)
         value = value.transpose(-1, -2)
         time_att_result = self.perform_attention(
-            key=key, query=query, value=value, mask=mask
+            key=key, query=query, value=value,
+            query_mask=mask, key_mask=mask
         )
         freq_att_result = self.perform_frequency_attention(
             key=key, query=query, value=value
