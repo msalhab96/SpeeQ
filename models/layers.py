@@ -184,23 +184,26 @@ class AddAndNorm(nn.Module):
         return self.lnorm(x + sub_x)
 
 
-class MultiHeadSelfAtt(nn.Module):
-    """Implements the multi-head self attention module
+class MultiHeadAtt(nn.Module):
+    """Implements the multi-head attention module
     described in https://arxiv.org/abs/1706.03762
 
     Args:
         d_model (int): The model dimensionality.
         h (int): The number of heads.
+        masking_value (int): The masking value. Default -1e15
     """
     def __init__(
             self,
             d_model: int,
-            h: int
+            h: int,
+            masking_value: int = -1e15
             ) -> None:
         super().__init__()
         self.h = h
         self.dk = d_model // h
         self.d_model = d_model
+        self.masking_value = masking_value
         assert d_model % h == 0, ValueError
         self.query_fc = nn.Linear(
             in_features=d_model,
@@ -223,22 +226,23 @@ class MultiHeadSelfAtt(nn.Module):
             )
         return x
 
-    def _mask(
-            self,
-            att: Tensor,
-            mask: Tensor
-            ):
-        # mask of shape [B, M]
-        mask = mask.unsqueeze(dim=1)
-        mask = mask.unsqueeze(dim=2) | mask.unsqueeze(dim=-1)
-        return att.masked_fill(mask, -1e15)
+    def _mask(self, att: Tensor, key_mask: Tensor, query_mask: Tensor) -> Tensor:
+        key_max_len = key_mask.shape[-1]
+        query_max_len = query_mask.shape[-1]
+        key_mask = key_mask.repeat(1, query_max_len)
+        key_mask = key_mask.view(-1, query_max_len, key_max_len)
+        if query_mask.dim() != key_mask.dim():
+            query_mask = query_mask.unsqueeze(dim=-1)
+        mask = key_mask & query_mask
+        return att.masked_fill(~mask, self.masking_value)
 
     def perform_attention(
             self,
             key: Tensor,
             query: Tensor,
             value: Tensor,
-            mask: Union[Tensor, None]
+            key_mask: Union[Tensor, None],
+            query_mask: Union[Tensor, None]
             ) -> Tensor:
         key = self._reshape(key)  # B, M, h, dk
         query = self._reshape(query)  # B, M, h, dk
@@ -249,8 +253,10 @@ class MultiHeadSelfAtt(nn.Module):
         att = self.softmax(
             torch.matmul(query, key) / self.d_model
             )
-        if mask is not None:
-            att = self._mask(att, mask)
+        if key_mask is not None and query_mask is not None:
+            att = self._mask(
+                att=att, key_mask=key_mask, query_mask=query_mask
+                )
         out = torch.matmul(att, value)
         out = out.permute(0, 2, 1, 3)
         out = out.contiguous()
@@ -264,13 +270,55 @@ class MultiHeadSelfAtt(nn.Module):
             key: Tensor,
             query: Tensor,
             value: Tensor,
-            mask: Union[Tensor, None]
+            key_mask: Union[Tensor, None],
+            query_mask: Union[Tensor, None]
             ) -> Tensor:
         key = self.key_fc(key)
         query = self.query_fc(query)
         value = self.value_fc(value)
         return self.perform_attention(
-            key=key, query=query, value=value, mask=mask
+            key=key, query=query, value=value,
+            key_mask=key_mask, query_mask=query_mask
+        )
+
+
+class MaskedMultiHeadAtt(nn.Module):
+    """Implements the multi-head attention module
+    described in https://arxiv.org/abs/1706.03762
+
+    Args:
+        d_model (int): The model dimensionality.
+        h (int): The number of heads.
+    """
+    def __init__(
+            self,
+            d_model: int,
+            h: int,
+            masking_value: int = -1e-15
+            ) -> None:
+        super().__init__(
+            d_model=d_model, h=h, masking_value=masking_value
+            )
+
+    def forward(
+            self,
+            key: Tensor,
+            query: Tensor,
+            value: Tensor,
+            key_mask: Union[Tensor, None],
+            query_mask: Union[Tensor, None]
+            ) -> Tensor:
+        batch_size, max_len = key_mask.shape
+        if key_mask is not None:
+            query_mask = torch.tril(torch.ones(batch_size, max_len, max_len)).bool()
+            query_mask = query_mask.to(query_mask.device)
+            query_mask &= key_mask.unsqueeze(dim=-1) & query_mask
+        return super().forward(
+            key=key,
+            query=query,
+            value=value,
+            key_mask=key_mask,
+            query_mask=query_mask
         )
 
 
@@ -291,7 +339,7 @@ class TransformerEncLayer(nn.Module):
             h: int
             ) -> None:
         super().__init__()
-        self.mhsa = MultiHeadSelfAtt(
+        self.mhsa = MultiHeadAtt(
             d_model=d_model, h=h
             )
         self.add_and_norm1 = AddAndNorm(
@@ -311,7 +359,8 @@ class TransformerEncLayer(nn.Module):
             ) -> Tensor:
         out = self.mhsa(
             key=x, query=x,
-            value=x, mask=mask
+            value=x, key_mask=mask,
+            query_mask=mask
             )
         out = self.add_and_norm1(x, out)
         result = self.ff(out)
