@@ -236,6 +236,7 @@ class MultiHeadAtt(nn.Module):
         if query_mask.dim() != key_mask.dim():
             query_mask = query_mask.unsqueeze(dim=-1)
         mask = key_mask & query_mask
+        mask = mask.unsqueeze(dim=1)
         return att.masked_fill(~mask, self.masking_value)
 
     def perform_attention(
