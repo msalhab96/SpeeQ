@@ -1320,3 +1320,72 @@ class SpeechTransformerEncLayer(TransformerEncLayer):
             out_channels=out_channels,
             kernel_size=kernel_size
         )
+
+
+class TransformerDecLayer(nn.Module):
+    """Implements a single decoder layer of the transformer
+    as described in https://arxiv.org/abs/1706.03762
+
+    Args:
+        d_model (int): The model dimensionality.
+        hidden_size (int): The feed forward inner layer dimensionality.
+        h (int): The number of heads.
+        masking_value (int): The masking value. Default -1e15
+    """
+    def __init__(
+            self,
+            d_model: int,
+            hidden_size: int,
+            h: int,
+            masking_value: int = -1e15
+            ) -> None:
+        super().__init__()
+        self.mmhsa = MaskedMultiHeadAtt(
+            d_model=d_model,
+            h=h, masking_value=masking_value
+        )
+        self.add_and_norm1 = AddAndNorm(
+            d_model=d_model
+            )
+        self.mha = MultiHeadAtt(
+            d_model=d_model, h=h, masking_value=masking_value
+            )
+        self.add_and_norm2 = AddAndNorm(
+            d_model=d_model
+            )
+        self.ff = FeedForwardModule(
+            d_model=d_model, hidden_size=hidden_size
+            )
+        self.add_and_norm3 = AddAndNorm(
+            d_model=d_model
+            )
+
+    def forward(
+            self,
+            enc_out: Tensor,
+            enc_mask: Union[Tensor, None],
+            dec_inp: Tensor,
+            dec_mask: Union[Tensor, None],
+            ) -> Tensor:
+        out = self.mmhsa(
+            key=dec_inp,
+            query=dec_inp,
+            value=dec_inp,
+            key_mask=dec_mask,
+            query_mask=dec_mask
+        )
+        out = self.add_and_norm1(out, dec_inp)
+        out = self.add_and_norm2(
+            self.mha(
+                key=enc_out,
+                query=out,
+                value=enc_out,
+                key_mask=enc_mask,
+                query_mask=dec_mask
+            ),
+            out
+        )
+        out = self.add_and_norm3(
+            self.ff(out), out
+        )
+        return out
