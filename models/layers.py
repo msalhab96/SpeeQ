@@ -253,13 +253,14 @@ class MultiHeadAtt(nn.Module):
         key = key.permute(0, 2, 3, 1)  # B, h, dk, M
         query = query.permute(0, 2, 1, 3)  # B, h, M, dk
         value = value.permute(0, 2, 1, 3)  # B, h, M, dk
-        att = self.softmax(
-            torch.matmul(query, key) / self.d_model
-            )
+        att = torch.matmul(query, key)
         if key_mask is not None and query_mask is not None:
             att = self._mask(
                 att=att, key_mask=key_mask, query_mask=query_mask
                 )
+        att = self.softmax(
+            att / self.d_model
+            )
         out = torch.matmul(att, value)
         out = out.permute(0, 2, 1, 3)
         out = out.contiguous()
