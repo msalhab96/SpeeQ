@@ -320,7 +320,7 @@ class MaskedMultiHeadAtt(MultiHeadAtt):
         if key_mask is not None:
             query_mask = torch.tril(torch.ones(batch_size, max_len, max_len))
             query_mask = query_mask.bool()
-            query_mask = query_mask.to(query_mask.device)
+            query_mask = query_mask.to(key_mask.device)
             query_mask &= key_mask.unsqueeze(dim=-1) & query_mask
         return super().forward(
             key=key,
@@ -1512,6 +1512,7 @@ class SpeechTransformerEncoder(nn.Module):
         x = self.fc(x)
         x = add_pos_enc(x, self.d_model)
         mask = get_mask_from_lens(lengths=lengths, max_len=x.shape[1])
+        mask = mask.to(x.device)
         return x, mask
 
     def forward(self, x: Tensor, mask: Tensor) -> Tuple[Tensor, Tensor]:
@@ -1563,7 +1564,7 @@ class TransformerDecoder(nn.Module):
         self.pred_net = PredModule(
             in_features=d_model,
             n_classes=n_classes,
-            activation=nn.Softmax(dim=-1)
+            activation=nn.LogSoftmax(dim=-1)
         )
 
     def forward(
