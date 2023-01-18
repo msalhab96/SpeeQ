@@ -1309,13 +1309,29 @@ class SpeechTransformerEncLayer(TransformerEncLayer):
             out_channels: int,
             kernel_size: int
             ) -> None:
-        super().__init__(d_model, hidden_size, h)
+        # TODO: pass masking value
+        # TODO: rename hidden size to ff_size
+        super().__init__(
+            d_model=d_model,
+            hidden_size=hidden_size,
+            h=h
+        )
         self.mhsa = MultiHeadAtt2d(
             d_model=d_model,
             h=h,
             out_channels=out_channels,
             kernel_size=kernel_size
         )
+
+    def forward(self, x: Tensor, mask: Tensor) -> Tensor:
+        out = self.mhsa(
+            key=x, query=x, value=x, mask=mask
+            )
+        out = self.add_and_norm1(x, out)
+        result = self.ff(out)
+        return self.add_and_norm2(
+            out, result
+            )
 
 
 class TransformerDecLayer(nn.Module):
