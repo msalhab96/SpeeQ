@@ -1529,6 +1529,7 @@ class TransformerDecoder(nn.Module):
             h: int,
             masking_value: int = -1e15
             ) -> None:
+        super().__init__()
         self.emb = PositionalEmbedding(
             vocab_size=n_classes,
             embed_dim=d_model
