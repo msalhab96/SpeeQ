@@ -261,7 +261,7 @@ class SpeechTransformer(nn.Module):
             n_classes=n_classes,
             n_layers=n_dec_layers,
             d_model=d_model,
-            hidden_size=ff_size,
+            ff_size=ff_size,
             h=h,
             masking_value=masking_value
         )
