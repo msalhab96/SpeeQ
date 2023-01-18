@@ -6,7 +6,7 @@ from typing import List, Tuple, Union
 from torch.nn.utils.rnn import (
     pack_padded_sequence, pad_packed_sequence
 )
-from utils.utils import calc_data_len, get_positional_encoding
+from utils.utils import add_pos_enc, calc_data_len, get_positional_encoding
 
 
 class PackedRNN(nn.Module):
@@ -668,20 +668,13 @@ class ConformerRelativeMHSA(MultiHeadAtt):
             )
         self.dropout = nn.Dropout(p_dropout)
 
-    def _add_pos_enc(self, x: Tensor) -> Tensor:
-        pe = get_positional_encoding(
-            x.shape[1], self.d_model
-            )
-        pe = pe.to(x.device)
-        return pe + x
-
     def forward(
             self,
             x: Tensor,
             mask: Union[None, Tensor]
             ) -> Tensor:
         out = self.lnrom(x)
-        out = self._add_pos_enc(out)
+        out = add_pos_enc(out, self.d_model)
         out = super().forward(
             key=out, query=out,
             value=out, query_mask=mask,
@@ -1389,3 +1382,32 @@ class TransformerDecLayer(nn.Module):
             self.ff(out), out
         )
         return out
+
+
+class PositionalEmbedding(nn.Module):
+    """Implements the positional embedding proposed in
+    https://arxiv.org/abs/1706.03762
+
+    Args:
+        vocab_size (int): The vocabulary size.
+        embed_dim (int): The embedding size.
+    """
+    def __init__(
+            self,
+            vocab_size: int,
+            embed_dim: int
+            ) -> None:
+        super().__init__()
+        self.emb = nn.Embedding(
+            num_embeddings=vocab_size,
+            embedding_dim=embed_dim
+            )
+        self.d_model = embed_dim
+
+    def forward(self, x: Tensor) -> Tensor:
+        max_len = x.shape[-1]
+        pe = get_positional_encoding(
+            max_length=max_len, d_model=self.d_model
+            )
+        pe = pe.to(x.device)
+        return self.emb(x) + pe
