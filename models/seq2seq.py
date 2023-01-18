@@ -1,6 +1,6 @@
 from typing import Union
 from models.decoders import GlobAttRNNDecoder, LocationAwareAttDecoder
-from models.layers import PyramidRNNLayers, RNNLayers
+from models.layers import PyramidRNNLayers, RNNLayers, SpeechTransformerEncoder, TransformerDecoder
 from torch import Tensor
 from torch import nn
 from utils.utils import get_mask_from_lens
@@ -204,3 +204,81 @@ class RNNWithLocationAwareAtt(BasicAttSeq2SeqRNN):
             teacher_forcing_rate=teacher_forcing_rate,
             rnn_type=rnn_type
         )
+
+
+class SpeechTransformer(nn.Module):
+    """Implements the Speech Transformer model proposed in
+    https://ieeexplore.ieee.org/document/8462506
+
+    Args:
+        in_features (int): The input/speech feature size.
+        n_classes (int): The number of classes.
+        n_conv_layers (int): The number of down-sampling convolutional layers.
+        kernel_size (int): The down-sampling convolutional layers kernel size.
+        stride (int): The down-sampling convolutional layers stride.
+        d_model (int): The model dimensionality.
+        n_enc_layers (int): The number of encoder layers.
+        n_dec_layers (int): The number of decoder layers.
+        ff_size (int): The feed-forward inner layer dimensionality.
+        h (int): The number of attention heads.
+        att_kernel_size (int): The attentional convolutional
+            layers' kernel size.
+        att_out_channels (int): The number of output channels of the
+            attentional convolution
+        masking_value (int): The attentin masking value. Default -1e15
+    """
+
+    def __init__(
+            self,
+            in_features: int,
+            n_classes: int,
+            n_conv_layers: int,
+            kernel_size: int,
+            stride: int,
+            d_model: int,
+            n_enc_layers: int,
+            n_dec_layers: int,
+            ff_size: int,
+            h: int,
+            att_kernel_size: int,
+            att_out_channels: int,
+            masking_value: int = -1e15
+            ) -> None:
+        super().__init__()
+        self.encoder = SpeechTransformerEncoder(
+            in_features=in_features,
+            n_conv_layers=n_conv_layers,
+            kernel_size=kernel_size,
+            stride=stride,
+            d_model=d_model,
+            n_layers=n_enc_layers,
+            ff_size=ff_size,
+            h=h,
+            att_kernel_size=att_kernel_size,
+            att_out_channels=att_out_channels
+        )
+        self.decoder = TransformerDecoder(
+            n_classes=n_classes,
+            n_layers=n_dec_layers,
+            d_model=d_model,
+            hidden_size=ff_size,
+            h=h,
+            masking_value=masking_value
+        )
+
+    def forward(
+            self, speech: Tensor,
+            speech_mask: Tensor, text: Tensor,
+            text_mask: Tensor,
+            *args, **kwargs
+            ) -> Tensor:
+        speech, speech_mask = self.encoder(
+            speech, speech_mask
+        )
+        preds = self.decoder(
+            enc_out=speech,
+            enc_mask=speech_mask,
+            dec_inp=text,
+            dec_mask=text_mask
+        )
+        return preds
