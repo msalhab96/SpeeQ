@@ -1505,3 +1505,64 @@ class SpeechTransformerEncoder(nn.Module):
                 out, mask
             )
         return out, mask
+
+
+class TransformerDecoder(nn.Module):
+    """Implements the transformer decoder as described in
+    https://arxiv.org/abs/1706.03762
+
+    Args:
+        n_classes (int): The number of classes.
+        n_layers (int): The nnumber of decoder layers.
+        d_model (int): The model dimensionality.
+        ff_size (int): The feed-forward inner layer dimensionality.
+        h (int): The number of attentional heads.
+        masking_value (int): The attentin masking value. Default -1e15
+    """
+
+    def __init__(
+            self,
+            n_classes: int,
+            n_layers: int,
+            d_model: int,
+            ff_size: int,
+            h: int,
+            masking_value: int = -1e15
+            ) -> None:
+        self.emb = PositionalEmbedding(
+            vocab_size=n_classes,
+            embed_dim=d_model
+        )
+        self.layers = nn.ModuleList(
+            [
+                TransformerDecLayer(
+                    d_model=d_model,
+                    hidden_size=ff_size,
+                    h=h, masking_value=masking_value
+                )
+                for _ in range(n_layers)
+            ]
+        )
+        self.pred_net = PredModule(
+            in_features=d_model,
+            n_classes=n_classes,
+            activation=nn.Softmax(dim=-1)
+        )
+
+    def forward(
+            self,
+            enc_out: Tensor,
+            enc_mask: Union[Tensor, None],
+            dec_inp: Tensor,
+            dec_mask: Union[Tensor, None],
+            ) -> Tensor:
+        out = self.emb(dec_inp)
+        for layer in self.layers:
+            out = layer(
+                enc_out=enc_out,
+                enc_mask=enc_mask,
+                dec_inp=out,
+                dec_mask=dec_mask
+            )
+        out = self.pred_net(out)
+        return out
