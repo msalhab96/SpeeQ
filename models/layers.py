@@ -6,7 +6,10 @@ from typing import List, Tuple, Union
 from torch.nn.utils.rnn import (
     pack_padded_sequence, pad_packed_sequence
 )
-from utils.utils import add_pos_enc, calc_data_len, get_positional_encoding
+from utils.utils import (
+    add_pos_enc, calc_data_len,
+    get_mask_from_lens, get_positional_encoding
+    )
 
 
 class PackedRNN(nn.Module):
@@ -1411,3 +1414,94 @@ class PositionalEmbedding(nn.Module):
             )
         pe = pe.to(x.device)
         return self.emb(x) + pe
+
+
+class SpeechTransformerEncoder(nn.Module):
+    """Implements the speech transformer encoder
+    described in https://ieeexplore.ieee.org/document/8462506
+
+    Args:
+        in_features (int): The input/speech feature size.
+        n_conv_layers (int): The number of down-sampling convolutional layers.
+        kernel_size (int): The down-sampling convolutional layers kernel size.
+        stride (int): The down-sampling convolutional layers stride.
+        d_model (int): The model dimensionality.
+        n_layers (int): The number of encoder layers.
+        ff_size (int): The feed-forward inner layer dimensionality.
+        h (int): The number of attention heads.
+        att_kernel_size (int): The attentional convolutional
+            layers' kernel size.
+        att_out_channels (int): The number of output channels of the
+            attentional convolution
+    """
+    def __init__(
+            self,
+            in_features: int,
+            n_conv_layers: int,
+            kernel_size: int,
+            stride: int,
+            d_model: int,
+            n_layers: int,
+            ff_size: int,
+            h: int,
+            att_kernel_size: int,
+            att_out_channels: int
+            ) -> None:
+        super().__init__()
+        self.conv_layers = nn.ModuleList(
+            [
+                torch.nn.Conv2d(
+                    in_channels=1,
+                    out_channels=1,
+                    kernel_size=kernel_size,
+                    stride=stride
+                    )
+                for _ in range(n_conv_layers)
+                ]
+            )
+        self.relu = nn.ReLU()
+        for _ in range(n_conv_layers):
+            in_features = (in_features - kernel_size) // stride + 1
+        self.fc = nn.Linear(
+            in_features=in_features, out_features=d_model
+            )
+        self.layers = nn.ModuleList(
+            [
+                SpeechTransformerEncLayer(
+                    d_model=d_model,
+                    hidden_size=ff_size,
+                    h=h, out_channels=att_out_channels,
+                    kernel_size=att_kernel_size
+                )
+                for _ in range(n_layers)
+            ]
+        )
+        self.d_model = d_model
+
+    def _pre_process(self, x: Tensor, mask: Tensor) -> Tuple[Tensor, Tensor]:
+        x = x.unsqueeze(dim=1)  # B, 1, M, d
+        lengths = mask.sum(dim=-1)
+        for layer in self.conv_layers:
+            length = x.shape[-2]
+            x = layer(x)
+            lengths = calc_data_len(
+                result_len=x.shape[-2],
+                pad_len=length - lengths,
+                data_len=lengths,
+                kernel_size=layer.kernel_size[0],
+                stride=layer.stride[0]
+            )
+            x = self.relu(x)
+        x = x.squeeze(dim=1)
+        x = self.fc(x)
+        x = add_pos_enc(x, self.d_model)
+        mask = get_mask_from_lens(lengths=lengths, max_len=x.shape[1])
+        return x, mask
+
+    def forward(self, x: Tensor, mask: Tensor) -> Tuple[Tensor, Tensor]:
+        out, mask = self._pre_process(x, mask)
+        for layer in self.layers:
+            out = layer(
+                out, mask
+            )
+        return out, mask
