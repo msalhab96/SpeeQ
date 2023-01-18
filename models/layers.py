@@ -6,7 +6,10 @@ from typing import List, Tuple, Union
 from torch.nn.utils.rnn import (
     pack_padded_sequence, pad_packed_sequence
 )
-from utils.utils import calc_data_len, get_positional_encoding
+from utils.utils import (
+    add_pos_enc, calc_data_len,
+    get_mask_from_lens, get_positional_encoding
+    )
 
 
 class PackedRNN(nn.Module):
@@ -184,23 +187,26 @@ class AddAndNorm(nn.Module):
         return self.lnorm(x + sub_x)
 
 
-class MultiHeadSelfAtt(nn.Module):
-    """Implements the multi-head self attention module
+class MultiHeadAtt(nn.Module):
+    """Implements the multi-head attention module
     described in https://arxiv.org/abs/1706.03762
 
     Args:
         d_model (int): The model dimensionality.
         h (int): The number of heads.
+        masking_value (int): The masking value. Default -1e15
     """
     def __init__(
             self,
             d_model: int,
-            h: int
+            h: int,
+            masking_value: int = -1e15
             ) -> None:
         super().__init__()
         self.h = h
         self.dk = d_model // h
         self.d_model = d_model
+        self.masking_value = masking_value
         assert d_model % h == 0, ValueError
         self.query_fc = nn.Linear(
             in_features=d_model,
@@ -224,21 +230,25 @@ class MultiHeadSelfAtt(nn.Module):
         return x
 
     def _mask(
-            self,
-            att: Tensor,
-            mask: Tensor
-            ):
-        # mask of shape [B, M]
+            self, att: Tensor, key_mask: Tensor, query_mask: Tensor
+            ) -> Tensor:
+        key_max_len = key_mask.shape[-1]
+        query_max_len = query_mask.shape[-1]
+        key_mask = key_mask.repeat(1, query_max_len)
+        key_mask = key_mask.view(-1, query_max_len, key_max_len)
+        if query_mask.dim() != key_mask.dim():
+            query_mask = query_mask.unsqueeze(dim=-1)
+        mask = key_mask & query_mask
         mask = mask.unsqueeze(dim=1)
-        mask = mask.unsqueeze(dim=2) | mask.unsqueeze(dim=-1)
-        return att.masked_fill(mask, -1e15)
+        return att.masked_fill(~mask, self.masking_value)
 
     def perform_attention(
             self,
             key: Tensor,
             query: Tensor,
             value: Tensor,
-            mask: Union[Tensor, None]
+            key_mask: Union[Tensor, None],
+            query_mask: Union[Tensor, None]
             ) -> Tensor:
         key = self._reshape(key)  # B, M, h, dk
         query = self._reshape(query)  # B, M, h, dk
@@ -246,11 +256,14 @@ class MultiHeadSelfAtt(nn.Module):
         key = key.permute(0, 2, 3, 1)  # B, h, dk, M
         query = query.permute(0, 2, 1, 3)  # B, h, M, dk
         value = value.permute(0, 2, 1, 3)  # B, h, M, dk
+        att = torch.matmul(query, key)
+        if key_mask is not None and query_mask is not None:
+            att = self._mask(
+                att=att, key_mask=key_mask, query_mask=query_mask
+                )
         att = self.softmax(
-            torch.matmul(query, key) / self.d_model
+            att / self.d_model
             )
-        if mask is not None:
-            att = self._mask(att, mask)
         out = torch.matmul(att, value)
         out = out.permute(0, 2, 1, 3)
         out = out.contiguous()
@@ -264,13 +277,57 @@ class MultiHeadSelfAtt(nn.Module):
             key: Tensor,
             query: Tensor,
             value: Tensor,
-            mask: Union[Tensor, None]
+            key_mask: Union[Tensor, None],
+            query_mask: Union[Tensor, None]
             ) -> Tensor:
         key = self.key_fc(key)
         query = self.query_fc(query)
         value = self.value_fc(value)
         return self.perform_attention(
-            key=key, query=query, value=value, mask=mask
+            key=key, query=query, value=value,
+            key_mask=key_mask, query_mask=query_mask
+        )
+
+
+class MaskedMultiHeadAtt(MultiHeadAtt):
+    """Implements the multi-head attention module
+    described in https://arxiv.org/abs/1706.03762
+
+    Args:
+        d_model (int): The model dimensionality.
+        h (int): The number of heads.
+        masking_value (int): The masking value. Default -1e15
+    """
+    def __init__(
+            self,
+            d_model: int,
+            h: int,
+            masking_value: int = -1e15
+            ) -> None:
+        super().__init__(
+            d_model=d_model, h=h, masking_value=masking_value
+            )
+
+    def forward(
+            self,
+            key: Tensor,
+            query: Tensor,
+            value: Tensor,
+            key_mask: Union[Tensor, None],
+            query_mask: Union[Tensor, None]
+            ) -> Tensor:
+        batch_size, max_len = key_mask.shape
+        if key_mask is not None:
+            query_mask = torch.tril(torch.ones(batch_size, max_len, max_len))
+            query_mask = query_mask.bool()
+            query_mask = query_mask.to(key_mask.device)
+            query_mask &= key_mask.unsqueeze(dim=-1) & query_mask
+        return super().forward(
+            key=key,
+            query=query,
+            value=value,
+            key_mask=key_mask,
+            query_mask=query_mask
         )
 
 
@@ -280,19 +337,20 @@ class TransformerEncLayer(nn.Module):
 
     Args:
         d_model (int): The model dimensionality.
-        hidden_size (int): The feed forward inner
-            layer dimensionality..
+        hidden_size (int): The feed forward inner layer dimensionality.
         h (int): The number of heads.
+        masking_value (int): The masking value. Default -1e15
     """
     def __init__(
             self,
             d_model: int,
             hidden_size: int,
-            h: int
+            h: int,
+            masking_value: int = -1e15
             ) -> None:
         super().__init__()
-        self.mhsa = MultiHeadSelfAtt(
-            d_model=d_model, h=h
+        self.mhsa = MultiHeadAtt(
+            d_model=d_model, h=h, masking_value=masking_value
             )
         self.add_and_norm1 = AddAndNorm(
             d_model=d_model
@@ -311,7 +369,8 @@ class TransformerEncLayer(nn.Module):
             ) -> Tensor:
         out = self.mhsa(
             key=x, query=x,
-            value=x, mask=mask
+            value=x, key_mask=mask,
+            query_mask=mask
             )
         out = self.add_and_norm1(x, out)
         result = self.ff(out)
@@ -586,7 +645,7 @@ class ConformerConvModule(nn.Module):
         return out
 
 
-class ConformerRelativeMHSA(MultiHeadSelfAtt):
+class ConformerRelativeMHSA(MultiHeadAtt):
     """Implements the multi-head self attention module with
     relative positional encoding as described in
     https://arxiv.org/abs/2005.08100
@@ -595,27 +654,22 @@ class ConformerRelativeMHSA(MultiHeadSelfAtt):
         d_model (int): The model dimension.
         h (int): The number of heads.
         p_dropout (float): The dropout rate.
+        masking_value (int): The masking value. Default -1e15
     """
     def __init__(
             self,
             d_model: int,
             h: int,
-            p_dropout: float
+            p_dropout: float,
+            masking_value: int = -1e-15
             ) -> None:
         super().__init__(
-            d_model=d_model, h=h
+            d_model=d_model, h=h, masking_value=masking_value
             )
         self.lnrom = nn.LayerNorm(
             normalized_shape=d_model
             )
         self.dropout = nn.Dropout(p_dropout)
-
-    def _add_pos_enc(self, x: Tensor) -> Tensor:
-        pe = get_positional_encoding(
-            x.shape[1], self.d_model
-            )
-        pe = pe.to(x.device)
-        return pe + x
 
     def forward(
             self,
@@ -623,10 +677,11 @@ class ConformerRelativeMHSA(MultiHeadSelfAtt):
             mask: Union[None, Tensor]
             ) -> Tensor:
         out = self.lnrom(x)
-        out = self._add_pos_enc(out)
+        out = add_pos_enc(out, self.d_model)
         out = super().forward(
             key=out, query=out,
-            value=out, mask=mask
+            value=out, query_mask=mask,
+            key_mask=mask
             )
         out = self.dropout(out)
         return out
@@ -1138,3 +1193,394 @@ class LocAwareGlobalAddAttention(nn.Module):
         att_weights = att_weights.transpose(-1, -2)
         context = torch.matmul(att_weights, value)
         return context, att_weights
+
+
+class MultiHeadAtt2d(MultiHeadAtt):
+    """Implements the 2-dimensional multi-head self-attention
+    proposed in https://ieeexplore.ieee.org/document/8462506
+
+    Args:
+        d_model (int): The model dimensionality.
+        h (int): The number of heads.
+        out_channels (int): The number of output channels of the convolution
+        kernel_size (int): The convolutional layers' kernel size.
+    """
+    def __init__(
+            self,
+            d_model: int,
+            h: int,
+            out_channels: int,
+            kernel_size: int
+            ) -> None:
+        super().__init__(out_channels, h)
+        assert out_channels % h == 0
+        self.query_conv = nn.Conv1d(
+            in_channels=d_model,
+            out_channels=out_channels,
+            kernel_size=kernel_size,
+            padding='same'
+            )
+        self.key_conv = nn.Conv1d(
+            in_channels=d_model,
+            out_channels=out_channels,
+            kernel_size=kernel_size,
+            padding='same'
+            )
+        self.value_conv = nn.Conv1d(
+            in_channels=d_model,
+            out_channels=out_channels,
+            kernel_size=kernel_size,
+            padding='same'
+            )
+        self.fc = nn.Linear(
+            in_features=2 * out_channels,
+            out_features=d_model
+        )
+
+    def perform_frequency_attention(
+            self,
+            key: Tensor,
+            query: Tensor,
+            value: Tensor,
+            ) -> Tensor:
+        key = self._reshape(key)  # B, M, h, dk
+        query = self._reshape(query)  # B, M, h, dk
+        value = self._reshape(value)  # B, M, h, dk
+        key = key.permute(0, 2, 1, 3)  # B, h, M, dk
+        query = query.permute(0, 2, 3, 1)  # B, h, dk, M
+        value = value.permute(0, 2, 3, 1)  # B, h, dk, M
+        att = self.softmax(
+            torch.matmul(query, key) / self.d_model
+            )
+        out = torch.matmul(att, value)
+        out = out.permute(0, 3, 2, 1)
+        out = out.contiguous()
+        out = out.view(
+            out.shape[0], out.shape[1], -1
+            )
+        return out
+
+    def forward(
+            self,
+            key: Tensor,
+            query: Tensor,
+            value: Tensor,
+            mask: Union[Tensor, None]
+            ) -> Tensor:
+        key = key.transpose(-1, -2)
+        query = query.transpose(-1, -2)
+        value = value.transpose(-1, -2)
+        key = self.key_conv(key)
+        query = self.query_conv(query)
+        value = self.value_conv(value)
+        key = key.transpose(-1, -2)
+        query = query.transpose(-1, -2)
+        value = value.transpose(-1, -2)
+        time_att_result = self.perform_attention(
+            key=key, query=query, value=value,
+            query_mask=mask, key_mask=mask
+        )
+        freq_att_result = self.perform_frequency_attention(
+            key=key, query=query, value=value
+        )
+        result = torch.cat(
+            [time_att_result, freq_att_result], dim=-1
+        )
+        result = self.fc(result)
+        return result
+
+
+class SpeechTransformerEncLayer(TransformerEncLayer):
+    """Implements a single encoder layer of the speech transformer
+    as described in https://ieeexplore.ieee.org/document/8462506
+
+    Args:
+        d_model (int): The model dimensionality.
+        hidden_size (int): The feed-forward inner layer dimensionality.
+        h (int): The number of heads.
+        out_channels (int): The number of output channels of the convolution
+        kernel_size (int): The convolutional layers' kernel size.
+    """
+    def __init__(
+            self,
+            d_model: int,
+            hidden_size: int,
+            h: int,
+            out_channels: int,
+            kernel_size: int
+            ) -> None:
+        # TODO: pass masking value
+        # TODO: rename hidden size to ff_size
+        super().__init__(
+            d_model=d_model,
+            hidden_size=hidden_size,
+            h=h
+        )
+        self.mhsa = MultiHeadAtt2d(
+            d_model=d_model,
+            h=h,
+            out_channels=out_channels,
+            kernel_size=kernel_size
+        )
+
+    def forward(self, x: Tensor, mask: Tensor) -> Tensor:
+        out = self.mhsa(
+            key=x, query=x, value=x, mask=mask
+            )
+        out = self.add_and_norm1(x, out)
+        result = self.ff(out)
+        return self.add_and_norm2(
+            out, result
+            )
+
+
+class TransformerDecLayer(nn.Module):
+    """Implements a single decoder layer of the transformer
+    as described in https://arxiv.org/abs/1706.03762
+
+    Args:
+        d_model (int): The model dimensionality.
+        hidden_size (int): The feed forward inner layer dimensionality.
+        h (int): The number of heads.
+        masking_value (int): The masking value. Default -1e15
+    """
+    def __init__(
+            self,
+            d_model: int,
+            hidden_size: int,
+            h: int,
+            masking_value: int = -1e15
+            ) -> None:
+        super().__init__()
+        self.mmhsa = MaskedMultiHeadAtt(
+            d_model=d_model,
+            h=h, masking_value=masking_value
+        )
+        self.add_and_norm1 = AddAndNorm(
+            d_model=d_model
+            )
+        self.mha = MultiHeadAtt(
+            d_model=d_model, h=h, masking_value=masking_value
+            )
+        self.add_and_norm2 = AddAndNorm(
+            d_model=d_model
+            )
+        self.ff = FeedForwardModule(
+            d_model=d_model, hidden_size=hidden_size
+            )
+        self.add_and_norm3 = AddAndNorm(
+            d_model=d_model
+            )
+
+    def forward(
+            self,
+            enc_out: Tensor,
+            enc_mask: Union[Tensor, None],
+            dec_inp: Tensor,
+            dec_mask: Union[Tensor, None],
+            ) -> Tensor:
+        out = self.mmhsa(
+            key=dec_inp,
+            query=dec_inp,
+            value=dec_inp,
+            key_mask=dec_mask,
+            query_mask=dec_mask
+        )
+        out = self.add_and_norm1(out, dec_inp)
+        out = self.add_and_norm2(
+            self.mha(
+                key=enc_out,
+                query=out,
+                value=enc_out,
+                key_mask=enc_mask,
+                query_mask=dec_mask
+            ),
+            out
+        )
+        out = self.add_and_norm3(
+            self.ff(out), out
+        )
+        return out
+
+
+class PositionalEmbedding(nn.Module):
+    """Implements the positional embedding proposed in
+    https://arxiv.org/abs/1706.03762
+
+    Args:
+        vocab_size (int): The vocabulary size.
+        embed_dim (int): The embedding size.
+    """
+    def __init__(
+            self,
+            vocab_size: int,
+            embed_dim: int
+            ) -> None:
+        super().__init__()
+        self.emb = nn.Embedding(
+            num_embeddings=vocab_size,
+            embedding_dim=embed_dim
+            )
+        self.d_model = embed_dim
+
+    def forward(self, x: Tensor) -> Tensor:
+        max_len = x.shape[-1]
+        pe = get_positional_encoding(
+            max_length=max_len, d_model=self.d_model
+            )
+        pe = pe.to(x.device)
+        return self.emb(x) + pe
+
+
+class SpeechTransformerEncoder(nn.Module):
+    """Implements the speech transformer encoder
+    described in https://ieeexplore.ieee.org/document/8462506
+
+    Args:
+        in_features (int): The input/speech feature size.
+        n_conv_layers (int): The number of down-sampling convolutional layers.
+        kernel_size (int): The down-sampling convolutional layers kernel size.
+        stride (int): The down-sampling convolutional layers stride.
+        d_model (int): The model dimensionality.
+        n_layers (int): The number of encoder layers.
+        ff_size (int): The feed-forward inner layer dimensionality.
+        h (int): The number of attention heads.
+        att_kernel_size (int): The attentional convolutional
+            layers' kernel size.
+        att_out_channels (int): The number of output channels of the
+            attentional convolution
+    """
+    def __init__(
+            self,
+            in_features: int,
+            n_conv_layers: int,
+            kernel_size: int,
+            stride: int,
+            d_model: int,
+            n_layers: int,
+            ff_size: int,
+            h: int,
+            att_kernel_size: int,
+            att_out_channels: int
+            ) -> None:
+        super().__init__()
+        self.conv_layers = nn.ModuleList(
+            [
+                torch.nn.Conv2d(
+                    in_channels=1,
+                    out_channels=1,
+                    kernel_size=kernel_size,
+                    stride=stride
+                    )
+                for _ in range(n_conv_layers)
+                ]
+            )
+        self.relu = nn.ReLU()
+        for _ in range(n_conv_layers):
+            in_features = (in_features - kernel_size) // stride + 1
+        self.fc = nn.Linear(
+            in_features=in_features, out_features=d_model
+            )
+        self.layers = nn.ModuleList(
+            [
+                SpeechTransformerEncLayer(
+                    d_model=d_model,
+                    hidden_size=ff_size,
+                    h=h, out_channels=att_out_channels,
+                    kernel_size=att_kernel_size
+                )
+                for _ in range(n_layers)
+            ]
+        )
+        self.d_model = d_model
+
+    def _pre_process(self, x: Tensor, mask: Tensor) -> Tuple[Tensor, Tensor]:
+        x = x.unsqueeze(dim=1)  # B, 1, M, d
+        lengths = mask.sum(dim=-1)
+        for layer in self.conv_layers:
+            length = x.shape[-2]
+            x = layer(x)
+            lengths = calc_data_len(
+                result_len=x.shape[-2],
+                pad_len=length - lengths,
+                data_len=lengths,
+                kernel_size=layer.kernel_size[0],
+                stride=layer.stride[0]
+            )
+            x = self.relu(x)
+        x = x.squeeze(dim=1)
+        x = self.fc(x)
+        x = add_pos_enc(x, self.d_model)
+        mask = get_mask_from_lens(lengths=lengths, max_len=x.shape[1])
+        mask = mask.to(x.device)
+        return x, mask
+
+    def forward(self, x: Tensor, mask: Tensor) -> Tuple[Tensor, Tensor]:
+        out, mask = self._pre_process(x, mask)
+        for layer in self.layers:
+            out = layer(
+                out, mask
+            )
+        return out, mask
+
+
+class TransformerDecoder(nn.Module):
+    """Implements the transformer decoder as described in
+    https://arxiv.org/abs/1706.03762
+
+    Args:
+        n_classes (int): The number of classes.
+        n_layers (int): The nnumber of decoder layers.
+        d_model (int): The model dimensionality.
+        ff_size (int): The feed-forward inner layer dimensionality.
+        h (int): The number of attentional heads.
+        masking_value (int): The attentin masking value. Default -1e15
+    """
+
+    def __init__(
+            self,
+            n_classes: int,
+            n_layers: int,
+            d_model: int,
+            ff_size: int,
+            h: int,
+            masking_value: int = -1e15
+            ) -> None:
+        super().__init__()
+        self.emb = PositionalEmbedding(
+            vocab_size=n_classes,
+            embed_dim=d_model
+        )
+        self.layers = nn.ModuleList(
+            [
+                TransformerDecLayer(
+                    d_model=d_model,
+                    hidden_size=ff_size,
+                    h=h, masking_value=masking_value
+                )
+                for _ in range(n_layers)
+            ]
+        )
+        self.pred_net = PredModule(
+            in_features=d_model,
+            n_classes=n_classes,
+            activation=nn.LogSoftmax(dim=-1)
+        )
+
+    def forward(
+            self,
+            enc_out: Tensor,
+            enc_mask: Union[Tensor, None],
+            dec_inp: Tensor,
+            dec_mask: Union[Tensor, None],
+            ) -> Tensor:
+        out = self.emb(dec_inp)
+        for layer in self.layers:
+            out = layer(
+                enc_out=enc_out,
+                enc_mask=enc_mask,
+                dec_inp=out,
+                dec_mask=dec_mask
+            )
+        out = self.pred_net(out)
+        return out

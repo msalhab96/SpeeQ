@@ -155,3 +155,21 @@ class RNNWithLocationAwareAttTemp(BaseTemplate):
     rnn_type: str = 'rnn'
     _name = 'rnn_with_location_att'
     _type = 'seq2seq'
+
+
+@dataclass
+class SpeechTransformerTemp(BaseTemplate):
+    in_features: int
+    n_conv_layers: int
+    kernel_size: int
+    stride: int
+    d_model: int
+    n_enc_layers: int
+    n_dec_layers: int
+    ff_size: int
+    h: int
+    att_kernel_size: int
+    att_out_channels: int
+    masking_value: int = -1e15
+    _name = 'speech_transformer'
+    _type = 'seq2seq'

@@ -202,3 +202,21 @@ def get_mask_from_lens(lengths: Tensor, max_len: int) -> Tensor:
     indices = torch.arange(max_len).to(lengths.device)
     indices = indices.expand(len(lengths), max_len)
     return indices < lengths.unsqueeze(dim=1)
+
+
+def add_pos_enc(x: Tensor, d_model: int) -> Tensor:
+    # TODO: remove d_model paramter
+    """Adds positional encodings to the input tensor x.
+
+    Args:
+        x (Tensor): The input tensor of shape [B, M, d].
+        d_model (int): The model dimensionality.
+
+    Returns:
+        Tensor: The input added to at the positional encoding.
+    """
+    pe = get_positional_encoding(
+        x.shape[1], d_model
+        )
+    pe = pe.to(x.device)
+    return pe + x
