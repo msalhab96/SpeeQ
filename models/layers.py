@@ -1584,3 +1584,189 @@ class TransformerDecoder(nn.Module):
             )
         out = self.pred_net(out)
         return out
+
+
+class GroupsShuffle(nn.Module):
+    """Implements the group shuffle proposed in
+    https://arxiv.org/abs/1707.01083
+
+    Args:
+        groups (int): The groups size.
+    """
+    def __init__(self, groups: int) -> None:
+        super().__init__()
+        self.groups = groups
+
+    def forward(self, x: Tensor) -> Tensor:
+        # x of shape [B, C, ...]
+        batch_size, channels, *_ = x.shape
+        dims = x.shape[2:]
+        x = x.view(
+            batch_size, self.groups, channels // self.groups, *dims
+            )
+        x = x.transpose(1, 2)
+        x = x.contiguous()
+        x = x.view(batch_size, channels, *dims)
+        return x
+
+
+class QuartzSubBlock(JasperSubBlock):
+    """Implements Quartznet's subblock module
+    described in https://arxiv.org/abs/1910.10261
+
+    Args:
+        in_channels (int): The number of the input's channels.
+        out_channels (int): The number of the output's channels.
+        kernel_size (int): The convolution layer's kernel size.
+        p_dropout (float): The dropout rate.
+        groups (int): The groups size.
+        stride (int): The convolution layer's stride. Default 1.
+        padding (Union[str, int]): The padding mood/size. Default 'same'.
+    """
+
+    def __init__(
+            self,
+            in_channels: int,
+            out_channels: int,
+            kernel_size: int,
+            p_dropout: float,
+            groups: int,
+            stride: int = 1,
+            padding: Union[str, int] = 'same'
+            ) -> None:
+        super().__init__(
+            in_channels,
+            out_channels,
+            kernel_size,
+            p_dropout,
+            stride,
+            padding
+            )
+        self.conv = nn.Sequential(
+            nn.Conv1d(
+                in_channels=out_channels,
+                out_channels=out_channels,
+                kernel_size=1,
+                groups=groups
+                ),
+            GroupsShuffle(
+                groups=groups
+            )
+        )
+        self.dwise_conv = nn.Conv1d(
+            in_channels=in_channels,
+            out_channels=out_channels,
+            kernel_size=kernel_size,
+            groups=groups,
+            padding='same'
+        )
+
+    def forward(
+            self, x: Tensor,
+            residual: Union[Tensor, None] = None
+            ) -> Tensor:
+        # x and residual of shape [B, d, M]
+        x = self.dwise_conv(x)
+        return super().forward(x=x, residual=residual)
+
+
+class QuartzBlock(JasperBlock):
+    """Implements the main quartznet block of the quartznet
+    model as described in https://arxiv.org/abs/1904.03288
+
+    Args:
+        num_sub_blocks (int): The number of subblocks, which is
+            denoted as 'R' in the paper.
+        in_channels (int): The number of the input's channels.
+        out_channels (int): The number of the output's channels.
+        kernel_size (int): The convolution layer's kernel size.
+        groups (int): The groups size.
+        p_dropout (float): The dropout rate.
+    """
+    def __init__(
+            self,
+            num_sub_blocks: int,
+            in_channels: int,
+            out_channels: int,
+            kernel_size: int,
+            groups: int,
+            p_dropout: float
+            ) -> None:
+        super().__init__(
+            num_sub_blocks,
+            in_channels,
+            out_channels,
+            kernel_size,
+            p_dropout
+            )
+        self.blocks = nn.ModuleList([
+            QuartzSubBlock(
+                in_channels=in_channels if i == 1 else out_channels,
+                out_channels=out_channels,
+                kernel_size=kernel_size,
+                groups=groups,
+                p_dropout=p_dropout
+            )
+            for i in range(1, 1 + num_sub_blocks)
+        ])
+
+
+class QuartzBlocks(JasperBlocks):
+    """Implements the quartznet's series of blocks
+    as described in https://arxiv.org/abs/1910.10261
+
+    Args:
+        num_blocks (int): The number of QuartzNet blocks, denoted
+            as 'B' in the paper.
+        block_repetition (int): The nubmer of times to repeat each block.
+            denoted as S in the paper.
+        num_sub_blocks (int): The number of QuartzNet subblocks, denoted
+            as 'R' in the paper.
+        in_channels (int): The number of the input's channels.
+        channels_size (List[int]): The channel size of each block.
+        kernel_size (Union[int, List[int]]): The convolution layer's
+            kernel size of each block.
+        groups (int): The groups size.
+        p_dropout (float): The dropout rate.
+    """
+    def __init__(
+            self,
+            num_blocks: int,
+            block_repetition: int,
+            num_sub_blocks: int,
+            in_channels: int,
+            channels_size: List[int],
+            kernel_size: Union[int, List[int]],
+            groups: int,
+            p_dropout: float
+            ) -> None:
+        super().__init__(
+            num_blocks=num_blocks,
+            num_sub_blocks=num_sub_blocks,
+            in_channels=in_channels,
+            channel_inc=0,
+            kernel_size=kernel_size,
+            p_dropout=p_dropout
+            )
+        assert len(channels_size) == num_blocks
+        self.blocks = nn.ModuleList([])
+        for i in range(num_blocks):
+            channel_size = channels_size[i - 1] if i != 0 else in_channels
+            self.blocks.append(
+                torch.nn.Sequential(
+                    *[
+                        QuartzBlock(
+                            num_sub_blocks=num_sub_blocks,
+                            in_channels=channel_size if j == 0
+                            else channels_size[i],
+                            out_channels=channels_size[i],
+                            kernel_size=kernel_size if isinstance(
+                                kernel_size, int
+                            ) else kernel_size[i],
+                            groups=groups,
+                            p_dropout=p_dropout
+                        )
+                        for j in range(block_repetition)
+                    ]
+                )
+            )
