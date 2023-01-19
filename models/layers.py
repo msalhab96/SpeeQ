@@ -1608,3 +1608,63 @@ class GroupsShuffle(nn.Module):
         x = x.contiguous()
         x = x.view(batch_size, channels, *dims)
         return x
+
+
+class QuartzSubBlock(JasperSubBlock):
+    """Implements Quartznet's subblock module
+    described in https://arxiv.org/abs/1910.10261
+
+    Args:
+        in_channels (int): The number of the input's channels.
+        out_channels (int): The number of the output's channels.
+        kernel_size (int): The convolution layer's kernel size.
+        p_dropout (float): The dropout rate.
+        groups (int): The groups size.
+        stride (int): The convolution layer's stride. Default 1.
+        padding (Union[str, int]): The padding mood/size. Default 'same'.
+    """
+
+    def __init__(
+            self,
+            in_channels: int,
+            out_channels: int,
+            kernel_size: int,
+            p_dropout: float,
+            groups: int,
+            stride: int = 1,
+            padding: Union[str, int] = 'same'
+            ) -> None:
+        super().__init__(
+            in_channels,
+            out_channels,
+            kernel_size,
+            p_dropout,
+            stride,
+            padding
+            )
+        self.conv = nn.Sequential(
+            nn.Conv1d(
+                in_channels=out_channels,
+                out_channels=out_channels,
+                kernel_size=1,
+                groups=groups
+                ),
+            GroupsShuffle(
+                groups=groups
+            )
+        )
+        self.dwise_conv = nn.Conv1d(
+            in_channels=in_channels,
+            out_channels=out_channels,
+            kernel_size=kernel_size,
+            groups=groups,
+            padding='same'
+        )
+
+    def forward(
+            self, x: Tensor,
+            residual: Union[Tensor, None] = None
+            ) -> Tensor:
+        # x and residual of shape [B, d, M]
+        x = self.dwise_conv(x)
+        return super().forward(x=x, residual=residual)
