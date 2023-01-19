@@ -1668,3 +1668,44 @@ class QuartzSubBlock(JasperSubBlock):
         # x and residual of shape [B, d, M]
         x = self.dwise_conv(x)
         return super().forward(x=x, residual=residual)
+
+
+class QuartzBlock(JasperBlock):
+    """Implements the main quartznet block of the quartznet
+    model as described in https://arxiv.org/abs/1904.03288
+
+    Args:
+        num_sub_blocks (int): The number of subblocks, which is
+            denoted as 'R' in the paper.
+        in_channels (int): The number of the input's channels.
+        out_channels (int): The number of the output's channels.
+        kernel_size (int): The convolution layer's kernel size.
+        groups (int): The groups size.
+        p_dropout (float): The dropout rate.
+    """
+    def __init__(
+            self,
+            num_sub_blocks: int,
+            in_channels: int,
+            out_channels: int,
+            kernel_size: int,
+            groups: int,
+            p_dropout: float
+            ) -> None:
+        super().__init__(
+            num_sub_blocks,
+            in_channels,
+            out_channels,
+            kernel_size,
+            p_dropout
+            )
+        self.blocks = nn.ModuleList([
+            QuartzSubBlock(
+                in_channels=in_channels if i == 1 else out_channels,
+                out_channels=out_channels,
+                kernel_size=kernel_size,
+                groups=groups,
+                p_dropout=p_dropout
+            )
+            for i in range(1, 1 + num_sub_blocks)
+        ])
