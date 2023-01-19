@@ -1716,13 +1716,14 @@ class QuartzBlocks(JasperBlocks):
     as described in https://arxiv.org/abs/1910.10261
 
     Args:
-        num_blocks (int): The number of jasper blocks, denoted
+        num_blocks (int): The number of QuartzNet blocks, denoted
             as 'B' in the paper.
-        num_sub_blocks (int): The number of jasper subblocks, denoted
+        block_repetition (int): The nubmer of times to repeat each block.
+            denoted as S in the paper.
+        num_sub_blocks (int): The number of QuartzNet subblocks, denoted
             as 'R' in the paper.
         in_channels (int): The number of the input's channels.
-        channel_inc (int): The rate to increase the number of channels
-            across the blocks.
+        channels_size (List[int]): The channel size of each block.
         kernel_size (Union[int, List[int]]): The convolution layer's
             kernel size of each block.
         groups (int): The groups size.
@@ -1731,28 +1732,41 @@ class QuartzBlocks(JasperBlocks):
     def __init__(
             self,
             num_blocks: int,
+            block_repetition: int,
             num_sub_blocks: int,
             in_channels: int,
-            channel_inc: int,
+            channels_size: List[int],
             kernel_size: Union[int, List[int]],
             groups: int,
             p_dropout: float
             ) -> None:
         super().__init__(
-            num_blocks, num_sub_blocks,
-            in_channels, channel_inc,
-            kernel_size, p_dropout
+            num_blocks=num_blocks,
+            num_sub_blocks=num_sub_blocks,
+            in_channels=in_channels,
+            channel_inc=0,
+            kernel_size=kernel_size,
+            p_dropout=p_dropout
             )
-        self.blocks = nn.ModuleList([
-            QuartzBlock(
-                num_sub_blocks=num_sub_blocks,
-                in_channels=in_channels + channel_inc * i,
-                out_channels=in_channels + channel_inc * (1 + i),
-                kernel_size=kernel_size if isinstance(
-                    kernel_size, int
-                    ) else kernel_size[i],
-                groups=groups,
-                p_dropout=p_dropout
+        assert len(channels_size) == num_blocks
+        self.blocks = nn.ModuleList([])
+        for i in range(num_blocks):
+            channel_size = channels_size[i - 1] if i != 0 else in_channels
+            self.blocks.append(
+                torch.nn.Sequential(
+                    *[
+                        QuartzBlock(
+                            num_sub_blocks=num_sub_blocks,
+                            in_channels=channel_size if j == 0
+                            else channels_size[i],
+                            out_channels=channels_size[i],
+                            kernel_size=kernel_size if isinstance(
+                                kernel_size, int
+                            ) else kernel_size[i],
+                            groups=groups,
+                            p_dropout=p_dropout
+                        )
+                        for j in range(block_repetition)
+                    ]
+                )
             )
-            for i in range(num_blocks)
-        ])
