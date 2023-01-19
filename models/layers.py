@@ -1584,3 +1584,27 @@ class TransformerDecoder(nn.Module):
             )
         out = self.pred_net(out)
         return out
+
+
+class GroupsShuffle(nn.Module):
+    """Implements the group shuffle proposed in
+    https://arxiv.org/abs/1707.01083
+
+    Args:
+        groups (int): The groups size.
+    """
+    def __init__(self, groups: int) -> None:
+        super().__init__()
+        self.groups = groups
+
+    def forward(self, x: Tensor) -> Tensor:
+        # x of shape [B, C, ...]
+        batch_size, channels, *_ = x.shape
+        dims = x.shape[2:]
+        x = x.view(
+            batch_size, self.groups, channels // self.groups, *dims
+            )
+        x = x.transpose(1, 2)
+        x = x.contiguous()
+        x = x.view(batch_size, channels, *dims)
+        return x
