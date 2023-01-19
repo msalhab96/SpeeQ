@@ -1,5 +1,5 @@
 from dataclasses import asdict, dataclass
-from typing import List, Optional, Union
+from typing import List, Optional, Tuple, Union
 from interfaces import ITemplate
 
 
@@ -173,3 +173,22 @@ class SpeechTransformerTemp(BaseTemplate):
     masking_value: int = -1e15
     _name = 'speech_transformer'
     _type = 'seq2seq'
+
+
+@dataclass
+class QuartzNetTemp(BaseTemplate):
+    in_features: int
+    num_blocks: int
+    block_repetition: int
+    num_sub_blocks: int
+    channels_size: List[int]
+    epilog_kernel_size: int
+    epilog_channel_size: Tuple[int, int]
+    prelog_kernel_size: int
+    prelog_stride: int
+    prelog_n_channels: int
+    groups: int
+    blocks_kernel_size: Union[int, List[int]]
+    p_dropout: float
+    _name = 'quartz_net'
+    _type = 'ctc'
