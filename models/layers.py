@@ -1709,3 +1709,50 @@ class QuartzBlock(JasperBlock):
             )
             for i in range(1, 1 + num_sub_blocks)
         ])
+
+
+class QuartzBlocks(JasperBlocks):
+    """Implements the jasper's series of blocks
+    as described in https://arxiv.org/abs/1904.03288
+
+    Args:
+        num_blocks (int): The number of jasper blocks, denoted
+            as 'B' in the paper.
+        num_sub_blocks (int): The number of jasper subblocks, denoted
+            as 'R' in the paper.
+        in_channels (int): The number of the input's channels.
+        channel_inc (int): The rate to increase the number of channels
+            across the blocks.
+        kernel_size (Union[int, List[int]]): The convolution layer's
+            kernel size of each block.
+        groups (int): The groups size.
+        p_dropout (float): The dropout rate.
+    """
+    def __init__(
+            self,
+            num_blocks: int,
+            num_sub_blocks: int,
+            in_channels: int,
+            channel_inc: int,
+            kernel_size: Union[int, List[int]],
+            groups: int,
+            p_dropout: float
+            ) -> None:
+        super().__init__(
+            num_blocks, num_sub_blocks,
+            in_channels, channel_inc,
+            kernel_size, p_dropout
+            )
+        self.blocks = nn.ModuleList([
+            QuartzBlock(
+                num_sub_blocks=num_sub_blocks,
+                in_channels=in_channels + channel_inc * i,
+                out_channels=in_channels + channel_inc * (1 + i),
+                kernel_size=kernel_size if isinstance(
+                    kernel_size, int
+                    ) else kernel_size[i],
+                groups=groups,
+                p_dropout=p_dropout
+            )
+            for i in range(num_blocks)
+        ])
