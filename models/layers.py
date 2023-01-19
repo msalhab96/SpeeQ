@@ -1712,8 +1712,8 @@ class QuartzBlock(JasperBlock):
 
 
 class QuartzBlocks(JasperBlocks):
-    """Implements the jasper's series of blocks
-    as described in https://arxiv.org/abs/1904.03288
+    """Implements the quartznet's series of blocks
+    as described in https://arxiv.org/abs/1910.10261
 
     Args:
         num_blocks (int): The number of jasper blocks, denoted
