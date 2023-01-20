@@ -1770,3 +1770,23 @@ class QuartzBlocks(JasperBlocks):
                     ]
                 )
             )
+
+
+class Scaling1d(nn.Module):
+    """Implements the scaling layer proposed in
+    https://arxiv.org/abs/2206.00888
+
+    Args:
+        d_model (int): The model dimension.
+    """
+    def __init__(self, d_model: int) -> None:
+        super().__init__()
+        self.gamma = nn.Parameter(
+            torch.randn(1, 1, d_model)
+        )
+        self.beta = nn.Parameter(
+            torch.randn(1, 1, d_model)
+        )
+
+    def forward(self, x: Tensor) -> Tensor:
+        return self.gamma * x + self.beta
