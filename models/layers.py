@@ -1904,3 +1904,53 @@ class SqueezeformerFeedForward(ConformerFeedForward):
         out = self.fc2(out)
         out = self.dropout(out)
         return out
+
+
+class SqueezeformerBlock(nn.Module):
+    """Implements the Squeezeformer block
+    described in https://arxiv.org/abs/2206.00888
+
+    Args:
+        d_model (int): The model dimension.
+        ff_expansion_factor (int): The linear layer's expansion factor.
+        h (int): The number of heads.
+        kernel_size (int): The depth-wise convolution kernel size.
+        p_dropout (float): The dropout rate.
+        masking_value (int): The masking value. Default -1e15
+    """
+
+    def __init__(
+            self, d_model: int, ff_expansion_factor: int,
+            h: int, kernel_size: int, p_dropout: float,
+            masking_value: int = -1e15
+            ) -> None:
+        self.mhsa = SqueezeformerRelativeMHSA(
+            d_model=d_model, h=h, p_dropout=p_dropout,
+            masking_value=masking_value
+        )
+        self.add_and_norm1 = AddAndNorm(d_model=d_model)
+        self.ff1 = SqueezeformerFeedForward(
+            d_model=d_model,
+            expansion_factor=ff_expansion_factor,
+            p_dropout=p_dropout
+        )
+        self.add_and_norm2 = AddAndNorm(d_model=d_model)
+        self.conv = SqueezeformerConvModule(
+            d_model=d_model,
+            kernel_size=kernel_size,
+            p_dropout=p_dropout
+            )
+        self.add_and_norm3 = AddAndNorm(d_model=d_model)
+        self.ff2 = SqueezeformerFeedForward(
+            d_model=d_model,
+            expansion_factor=ff_expansion_factor,
+            p_dropout=p_dropout
+        )
+        self.add_and_norm4 = AddAndNorm(d_model=d_model)
+
+    def forward(self, x: Tensor, mask: Tensor) -> Tensor:
+        out = self.add_and_norm1(self.mhsa(x, mask), x)
+        out = self.add_and_norm2(self.ff1(out), out)
+        out = self.add_and_norm3(self.conv(out), out)
+        out = self.add_and_norm4(self.ff2(out), out)
+        return out
