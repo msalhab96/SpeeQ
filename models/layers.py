@@ -749,28 +749,33 @@ class ConformerPreNet(nn.Module):
 
     Args:
         in_features (int): The input/speech feature size.
-        kernel_size (int): The kernel size of the subsampling layer.
-        stride (int): The stride of the subsampling layer.
+        kernel_size (Union[int, List[int]]): The kernel size of the
+            subsampling layer.
+        stride (Union[int, List[int]]): The stride of the subsampling layer.
         n_conv_layers (int): The number of convolutional layers.
         d_model (int): The model dimension.
         p_dropout (float): The dropout rate.
+        groups (Union[int, List[int]]): The convolution groups size.
     """
     def __init__(
             self,
             in_features: int,
-            kernel_size: int,
-            stride: int,
+            kernel_size: Union[int, List[int]],
+            stride: Union[int, List[int]],
             n_conv_layers: int,
             d_model: int,
-            p_dropout: float
+            p_dropout: float,
+            groups: Union[int, List[int]] = 1
             ) -> None:
         super().__init__()
         self.layers = nn.ModuleList([
             nn.Conv1d(
                 in_channels=in_features if i == 0 else d_model,
                 out_channels=d_model,
-                kernel_size=kernel_size,
-                stride=stride
+                kernel_size=kernel_size if isinstance(kernel_size, int)
+                else kernel_size[i],
+                stride=stride if isinstance(stride, int) else stride[i],
+                groups=groups if isinstance(groups, int) else groups[i]
                 )
             for i in range(n_conv_layers)
             ])
