@@ -2054,8 +2054,8 @@ class SqueezeformerEncoder(nn.Module):
         self.upsampling_conv = nn.ConvTranspose1d(
             in_channels=d_model,
             out_channels=d_model,
-            kernel_size=ss_kernel_size,
-            stride=ss_stride
+            kernel_size=pooling_kernel_size,
+            stride=pooling_stride
             )
         self.sf_layer = SqueezeformerBlock(
             d_model=d_model,
