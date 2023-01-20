@@ -1868,3 +1868,39 @@ class SqueezeformerRelativeMHSA(MultiHeadAtt):
             )
         out = self.dropout(out)
         return out
+
+
+class SqueezeformerFeedForward(ConformerFeedForward):
+    """Implements the conformer feed-forward module
+    with the modifications presented in
+    https://arxiv.org/abs/2206.00888
+
+    Args:
+        d_model (int): The model dimension.
+        expansion_factor (int): The linear layer's expansion
+            factor.
+        p_dropout (float): The dropout rate.
+    """
+
+    def __init__(
+            self,
+            d_model: int,
+            expansion_factor: int,
+            p_dropout: float
+            ) -> None:
+        super().__init__(
+            d_model=d_model,
+            expansion_factor=expansion_factor,
+            p_dropout=p_dropout
+        )
+        del self.lnrom
+        self.scaler = Scaling1d(d_model=d_model)
+
+    def forward(self, x: Tensor) -> Tensor:
+        out = self.scaler(x)
+        out = self.fc1(out)
+        out = self.swish(out)
+        out = self.dropout(out)
+        out = self.fc2(out)
+        out = self.dropout(out)
+        return out
