@@ -1829,3 +1829,42 @@ class SqueezeformerConvModule(ConformerConvModule):
         out = self.dropout(out)
         out = out.transpose(-1, -2)  # [B, M, d]
         return out
+
+
+class SqueezeformerRelativeMHSA(MultiHeadAtt):
+    """Implements the multi-head self attention module with
+    relative positional encoding and pre-scaling module.
+
+    Args:
+        d_model (int): The model dimension.
+        h (int): The number of heads.
+        p_dropout (float): The dropout rate.
+        masking_value (int): The masking value. Default -1e15
+    """
+    def __init__(
+            self,
+            d_model: int,
+            h: int,
+            p_dropout: float,
+            masking_value: int = -1e15
+            ) -> None:
+        super().__init__(
+            d_model=d_model, h=h, masking_value=masking_value
+            )
+        self.dropout = nn.Dropout(p_dropout)
+        self.scaler = Scaling1d(d_model=d_model)
+
+    def forward(
+            self,
+            x: Tensor,
+            mask: Union[None, Tensor]
+            ) -> Tensor:
+        out = self.scaler(x)
+        out = add_pos_enc(out, self.d_model)
+        out = super().forward(
+            key=out, query=out,
+            value=out, query_mask=mask,
+            key_mask=mask
+            )
+        out = self.dropout(out)
+        return out
