@@ -1790,3 +1790,42 @@ class Scaling1d(nn.Module):
 
     def forward(self, x: Tensor) -> Tensor:
         return self.gamma * x + self.beta
+
+
+class SqueezeformerConvModule(ConformerConvModule):
+    """Implements the conformer convolution module
+    with the modification as described in
+    https://arxiv.org/abs/2206.00888
+
+    Args:
+        d_model (int): The model dimension.
+        kernel_size (int): The depth-wise convolution kernel size.
+        p_dropout (float): The dropout rate.
+    """
+
+    def __init__(
+            self, d_model: int, kernel_size: int, p_dropout: float
+            ) -> None:
+        super().__init__(d_model, kernel_size, p_dropout)
+        self.pwise_conv1 = nn.Conv1d(
+            in_channels=d_model,
+            out_channels=d_model,
+            kernel_size=1
+        )
+        self.act1 = nn.SiLU()
+        self.scaler = Scaling1d(d_model=d_model)
+        del self.lnorm
+
+    def forward(self, x: Tensor) -> Tensor:
+        # x of shape [B, M, d]
+        out = self.scaler(x)
+        out = out.transpose(-1, -2)
+        out = self.pwise_conv1(out)
+        out = self.act1(out)
+        out = self.dwise_conv(out)
+        out = self.bnorm(out)
+        out = self.act2(out)
+        out = self.pwise_conv2(out)
+        out = self.dropout(out)
+        out = out.transpose(-1, -2)  # [B, M, d]
+        return out
