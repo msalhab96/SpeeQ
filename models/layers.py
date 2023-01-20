@@ -1939,6 +1939,7 @@ class SqueezeformerBlock(nn.Module):
             h: int, kernel_size: int, p_dropout: float,
             masking_value: int = -1e15
             ) -> None:
+        super().__init__()
         self.mhsa = SqueezeformerRelativeMHSA(
             d_model=d_model, h=h, p_dropout=p_dropout,
             masking_value=masking_value
@@ -1969,3 +1970,145 @@ class SqueezeformerBlock(nn.Module):
         out = self.add_and_norm3(self.conv(out), out)
         out = self.add_and_norm4(self.ff2(out), out)
         return out
+
+
+class SqueezeformerEncoder(nn.Module):
+    """Implements the Squeezeformer encoder
+    as described in https://arxiv.org/abs/2206.00888
+
+    Args:
+        in_features (int): The input/speech feature size.
+        n (int): The number of layers per block, denoted as N in the paper.
+        d_model (int): The model dimension.
+        ff_expansion_factor (int): The linear layer's expansion factor.
+        h (int): The number of heads.
+        kernel_size (int): The depth-wise convolution kernel size.
+        pooling_kernel_size (int): The pooling convolution kernel size.
+        pooling_stride (int): The pooling convolution stride size.
+        ss_kernel_size (Union[int, List[int]]): The kernel size of the
+            subsampling layer.
+        ss_stride (Union[int, List[int]]): The stride of the subsampling layer.
+        ss_n_conv_layers (int): The number of subsampling convolutional layers.
+        p_dropout (float): The dropout rate.
+        ss_groups (Union[int, List[int]]): The subsampling convolution groups
+            size.
+        masking_value (int): The masking value. Default -1e15
+    """
+
+    def __init__(
+            self,
+            in_features: int,
+            n: int,
+            d_model: int,
+            ff_expansion_factor: int,
+            h: int,
+            kernel_size: int,
+            pooling_kernel_size: int,
+            pooling_stride: int,
+            ss_kernel_size: Union[int, List[int]],
+            ss_stride: Union[int, List[int]],
+            ss_n_conv_layers: int,
+            p_dropout: float,
+            ss_groups: Union[int, List[int]] = 1,
+            masking_value: int = -1e15
+            ) -> None:
+        super().__init__()
+        self.subsampling = ConformerPreNet(
+            in_features=in_features,
+            kernel_size=ss_kernel_size,
+            stride=ss_stride,
+            n_conv_layers=ss_n_conv_layers,
+            d_model=d_model,
+            p_dropout=p_dropout,
+            groups=ss_groups
+        )
+        self.layers1 = nn.ModuleList([
+            SqueezeformerBlock(
+                d_model=d_model,
+                ff_expansion_factor=ff_expansion_factor,
+                h=h,
+                kernel_size=kernel_size,
+                p_dropout=p_dropout,
+                masking_value=masking_value
+            )
+            for _ in range(n - 1)
+        ])
+        self.pooling = nn.Conv1d(
+            in_channels=d_model,
+            out_channels=d_model,
+            kernel_size=pooling_kernel_size,
+            stride=pooling_stride,
+            groups=d_model
+        )
+        self.layers2 = nn.ModuleList([
+            SqueezeformerBlock(
+                d_model=d_model,
+                ff_expansion_factor=ff_expansion_factor,
+                h=h,
+                kernel_size=kernel_size,
+                p_dropout=p_dropout,
+                masking_value=masking_value
+            )
+            for _ in range(n)
+        ])
+        self.upsampling_conv = nn.ConvTranspose1d(
+            in_channels=d_model,
+            out_channels=d_model,
+            kernel_size=ss_kernel_size,
+            stride=ss_stride
+            )
+        self.sf_layer = SqueezeformerBlock(
+            d_model=d_model,
+            ff_expansion_factor=ff_expansion_factor,
+            h=h,
+            kernel_size=kernel_size,
+            p_dropout=p_dropout,
+            masking_value=masking_value
+            )
+
+    def _pass_through_layers(
+            self, x: Tensor, mask: Tensor, layers: nn.ModuleList
+            ) -> Tensor:
+        for layer in layers:
+            x = layer(x, mask)
+        return x
+
+    def _upsample(self, x: Tensor, target_len: int):
+        # x of shape [B, M, d]
+        x = x.transpose(-1, -2)
+        out = self.upsampling_conv(x)
+        res_len = target_len - x.shape[-1]
+        out = torch.cat(
+            [x, torch.zeros(*x.shape[:2], res_len)],
+            dim=-1
+            )
+        out = out.transpose(-1, -2)
+        return out
+
+    def _time_pooling(self, x: Tensor):
+        x = x.transpose(-1, -2)
+        out = self.pooling(x)
+        out = out.transpose(-1, -2)
+        return out
+
+    def forward(self, x: Tensor, mask: Tensor) -> Tuple[Tensor, Tensor]:
+        lengths = mask.sum(dim=-1)
+        out, lengths = self.subsampling(x, lengths)
+        mask = get_mask_from_lens(lengths=lengths, max_len=out.shape[1])
+        out = self._pass_through_layers(out, mask, self.layers1)
+        result = self._time_pooling(out)
+        pooled_len = calc_data_len(
+            result_len=result.shape[1],
+            pad_len=out.shape[1] - lengths,
+            data_len=lengths,
+            kernel_size=self.pooling.kernel_size[0],
+            stride=self.pooling.stride[0],
+        )
+        pooled_mask = get_mask_from_lens(
+            lengths=pooled_len, max_len=result.shape[1]
+            )
+        result = self._pass_through_layers(result, pooled_mask, self.layers2)
+        result = self._upsample(result, out.shape[1])
+        out = result + out
+        out = self.sf_layer(out, mask)
+        return out, lengths
