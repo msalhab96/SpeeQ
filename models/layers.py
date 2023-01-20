@@ -603,7 +603,7 @@ class ConformerConvModule(nn.Module):
             p_dropout: float
             ) -> None:
         super().__init__()
-        self.lnrom = nn.LayerNorm(
+        self.lnorm = nn.LayerNorm(
             normalized_shape=d_model
             )
         self.pwise_conv1 = nn.Conv1d(
@@ -611,7 +611,7 @@ class ConformerConvModule(nn.Module):
             out_channels=2 * d_model,
             kernel_size=1
         )
-        self.glu = nn.GLU(dim=1)
+        self.act1 = nn.GLU(dim=1)
         self.dwise_conv = nn.Conv1d(
             in_channels=d_model,
             out_channels=d_model,
@@ -622,7 +622,7 @@ class ConformerConvModule(nn.Module):
         self.bnorm = nn.BatchNorm1d(
             num_features=d_model
         )
-        self.swish = nn.SiLU()
+        self.act2 = nn.SiLU()
         self.pwise_conv2 = nn.Conv1d(
             in_channels=d_model,
             out_channels=d_model,
@@ -632,13 +632,13 @@ class ConformerConvModule(nn.Module):
 
     def forward(self, x: Tensor) -> Tensor:
         # x of shape [B, M, d]
-        out = self.lnrom(x)
+        out = self.lnorm(x)
         out = out.transpose(-1, -2)  # [B, d, M]
         out = self.pwise_conv1(out)  # [B, 2d, M]
-        out = self.glu(out)  # [B, d, M]
+        out = self.act1(out)  # [B, d, M]
         out = self.dwise_conv(out)
         out = self.bnorm(out)
-        out = self.swish(out)
+        out = self.act2(out)
         out = self.pwise_conv2(out)
         out = self.dropout(out)
         out = out.transpose(-1, -2)  # [B, M, d]
@@ -661,7 +661,7 @@ class ConformerRelativeMHSA(MultiHeadAtt):
             d_model: int,
             h: int,
             p_dropout: float,
-            masking_value: int = -1e-15
+            masking_value: int = -1e15
             ) -> None:
         super().__init__(
             d_model=d_model, h=h, masking_value=masking_value
