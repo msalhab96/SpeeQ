@@ -5,7 +5,8 @@ from utils.utils import calc_data_len, get_mask_from_lens
 from .layers import (
     CReLu, ConformerBlock, ConformerPreNet,
     Conv1DLayers, JasperBlocks, JasperSubBlock,
-    PredModule, QuartzBlocks, RowConv1D, TransformerEncLayer
+    PredModule, QuartzBlocks, RowConv1D,
+    SqueezeformerEncoder, TransformerEncLayer
     )
 from torch import nn
 from torch import Tensor
@@ -286,6 +287,8 @@ class Conformer(nn.Module):
         h (int): The number of heads.
         kernel_size (int): The kernel size of conv module.
         ss_kernel_size (int): The kernel size of the subsampling layer.
+        ss_stride (int): The stride of the subsampling layer.
+        ss_num_conv_layers (int): The number of subsampling layer.
         in_features (int): The input/speech feature size.
         res_scaling (float): The residual connection multiplier.
         p_dropout (float): The dropout rate.
@@ -299,6 +302,8 @@ class Conformer(nn.Module):
             h: int,
             kernel_size: int,
             ss_kernel_size: int,
+            ss_stride: int,
+            ss_num_conv_layers: int,
             in_features: int,
             res_scaling: float,
             p_dropout: float
@@ -307,6 +312,8 @@ class Conformer(nn.Module):
         self.sub_sampling = ConformerPreNet(
             in_features=in_features,
             kernel_size=ss_kernel_size,
+            stride=ss_stride,
+            n_conv_layers=ss_num_conv_layers,
             d_model=d_model,
             p_dropout=p_dropout
         )
@@ -656,3 +663,76 @@ class QuartzNet(Jasper):
             out_channels=n_classes,
             kernel_size=1
         )
+
+
+class Squeezeformer(nn.Module):
+    """Implements the Squeezeformer encoder
+    as described in https://arxiv.org/abs/2206.00888
+
+    Args:
+        n_classes (int): The number of classes.
+        in_features (int): The input/speech feature size.
+        n (int): The number of layers per block, denoted as N in the paper.
+        d_model (int): The model dimension.
+        ff_expansion_factor (int): The linear layer's expansion factor.
+        h (int): The number of heads.
+        kernel_size (int): The depth-wise convolution kernel size.
+        pooling_kernel_size (int): The pooling convolution kernel size.
+        pooling_stride (int): The pooling convolution stride size.
+        ss_kernel_size (Union[int, List[int]]): The kernel size of the
+            subsampling layer.
+        ss_stride (Union[int, List[int]]): The stride of the subsampling layer.
+        ss_n_conv_layers (int): The number of subsampling convolutional layers.
+        p_dropout (float): The dropout rate.
+        ss_groups (Union[int, List[int]]): The subsampling convolution groups
+            size.
+        masking_value (int): The masking value. Default -1e15
+    """
+
+    def __init__(
+            self,
+            n_classes: int,
+            in_features: int,
+            n: int,
+            d_model: int,
+            ff_expansion_factor: int,
+            h: int,
+            kernel_size: int,
+            pooling_kernel_size: int,
+            pooling_stride: int,
+            ss_kernel_size: Union[int, List[int]],
+            ss_stride: Union[int, List[int]],
+            ss_n_conv_layers: int,
+            p_dropout: float,
+            ss_groups: Union[int, List[int]] = 1,
+            masking_value: int = -1e15
+            ) -> None:
+        super().__init__()
+        self.encoder = SqueezeformerEncoder(
+            in_features=in_features,
+            n=n,
+            d_model=d_model,
+            ff_expansion_factor=ff_expansion_factor,
+            h=h,
+            kernel_size=kernel_size,
+            pooling_kernel_size=pooling_kernel_size,
+            pooling_stride=pooling_stride,
+            ss_kernel_size=ss_kernel_size,
+            ss_stride=ss_stride,
+            ss_n_conv_layers=ss_n_conv_layers,
+            p_dropout=p_dropout,
+            ss_groups=ss_groups,
+            masking_value=masking_value
+            )
+        self.pred_net = PredModule(
+            in_features=d_model,
+            n_classes=n_classes,
+            activation=nn.LogSoftmax(dim=-1)
+        )
+        self.has_bnorm = True
+
+    def forward(self, x: Tensor, mask: Tensor) -> Tuple[Tensor, Tensor]:
+        out, lengths = self.encoder(x, mask)
+        preds = self.pred_net(out)
+        preds = preds.permute(1, 0, 2)
+        return preds, lengths

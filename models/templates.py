@@ -68,6 +68,8 @@ class ConformerCTCTemp(BaseTemplate):
     h: int
     kernel_size: int
     ss_kernel_size: int
+    ss_stride: int
+    ss_num_conv_layers: int
     in_features: int
     res_scaling: float
     p_dropout: float
@@ -191,4 +193,24 @@ class QuartzNetTemp(BaseTemplate):
     blocks_kernel_size: Union[int, List[int]]
     p_dropout: float
     _name = 'quartz_net'
+    _type = 'ctc'
+
+
+@dataclass
+class SqueezeformerCTCTemp(BaseTemplate):
+    in_features: int
+    n: int
+    d_model: int
+    ff_expansion_factor: int
+    h: int
+    kernel_size: int
+    pooling_kernel_size: int
+    pooling_stride: int
+    ss_kernel_size: Union[int, List[int]]
+    ss_stride: Union[int, List[int]]
+    ss_n_conv_layers: int
+    p_dropout: float
+    ss_groups: Union[int, List[int]] = 1
+    masking_value: int = -1e15
+    _name = 'squeezeformer'
     _type = 'ctc'

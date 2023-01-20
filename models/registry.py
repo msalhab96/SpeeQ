@@ -10,7 +10,8 @@ from .layers import (
     PackedRNN
     )
 from .ctc import (
-    BERT, Conformer, DeepSpeechV1, DeepSpeechV2, Jasper, QuartzNet, Wav2Letter
+    BERT, Conformer, DeepSpeechV1, DeepSpeechV2,
+    Jasper, QuartzNet, Squeezeformer, Wav2Letter
     )
 
 PACKED_RNN_REGISTRY = {
@@ -32,7 +33,8 @@ CTC_MODELS = {
     'conformer': Conformer,
     'jasper': Jasper,
     'wav2letter': Wav2Letter,
-    'quartz_net': QuartzNet
+    'quartz_net': QuartzNet,
+    'squeezeformer': Squeezeformer
 }
 
 SEQ2SEQ_MODEL = {
