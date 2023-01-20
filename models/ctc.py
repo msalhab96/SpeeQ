@@ -286,6 +286,8 @@ class Conformer(nn.Module):
         h (int): The number of heads.
         kernel_size (int): The kernel size of conv module.
         ss_kernel_size (int): The kernel size of the subsampling layer.
+        ss_stride (int): The stride of the subsampling layer.
+        ss_num_conv_layers (int): The number of subsampling layer.
         in_features (int): The input/speech feature size.
         res_scaling (float): The residual connection multiplier.
         p_dropout (float): The dropout rate.
@@ -299,6 +301,8 @@ class Conformer(nn.Module):
             h: int,
             kernel_size: int,
             ss_kernel_size: int,
+            ss_stride: int,
+            ss_num_conv_layers: int,
             in_features: int,
             res_scaling: float,
             p_dropout: float
@@ -307,6 +311,8 @@ class Conformer(nn.Module):
         self.sub_sampling = ConformerPreNet(
             in_features=in_features,
             kernel_size=ss_kernel_size,
+            stride=ss_stride,
+            n_conv_layers=ss_num_conv_layers,
             d_model=d_model,
             p_dropout=p_dropout
         )

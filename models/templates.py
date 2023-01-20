@@ -68,6 +68,8 @@ class ConformerCTCTemp(BaseTemplate):
     h: int
     kernel_size: int
     ss_kernel_size: int
+    ss_stride: int
+    ss_num_conv_layers: int
     in_features: int
     res_scaling: float
     p_dropout: float

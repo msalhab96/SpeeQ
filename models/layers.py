@@ -750,6 +750,8 @@ class ConformerPreNet(nn.Module):
     Args:
         in_features (int): The input/speech feature size.
         kernel_size (int): The kernel size of the subsampling layer.
+        stride (int): The stride of the subsampling layer.
+        n_conv_layers (int): The number of convolutional layers.
         d_model (int): The model dimension.
         p_dropout (float): The dropout rate.
     """
@@ -757,16 +759,22 @@ class ConformerPreNet(nn.Module):
             self,
             in_features: int,
             kernel_size: int,
+            stride: int,
+            n_conv_layers: int,
             d_model: int,
             p_dropout: float
             ) -> None:
         super().__init__()
-        self.conv = nn.Conv1d(
-            in_channels=in_features,
-            out_channels=d_model,
-            kernel_size=kernel_size,
-            stride=1
-            )
+        self.layers = nn.ModuleList([
+            nn.Conv1d(
+                in_channels=in_features if i == 0 else d_model,
+                out_channels=d_model,
+                kernel_size=kernel_size,
+                stride=stride
+                )
+            for i in range(n_conv_layers)
+            ])
+
         self.fc = nn.Linear(
             in_features=d_model,
             out_features=d_model
@@ -777,15 +785,17 @@ class ConformerPreNet(nn.Module):
             self, x: Tensor, lengths: Tensor
             ) -> Tuple[Tensor, Tensor]:
         # x of shape [B, M, d]
-        x = x.transpose(-1, -2)  # [B, d, M]
-        out = self.conv(x)
-        lengths = calc_data_len(
-            result_len=out.shape[-1],
-            pad_len=x.shape[-1] - lengths,
-            data_len=lengths,
-            kernel_size=self.conv.kernel_size[0],
-            stride=self.conv.stride[0]
-        )
+        out = x.transpose(-1, -2)  # [B, d, M]
+        for conv in self.layers:
+            length = out.shape[-1]
+            out = conv(out)
+            lengths = calc_data_len(
+                result_len=out.shape[-1],
+                pad_len=length - lengths,
+                data_len=lengths,
+                kernel_size=conv.kernel_size[0],
+                stride=conv.stride[0]
+            )
         out = out.transpose(-1, -2)
         out = self.fc(out)
         out = self.drpout(out)
