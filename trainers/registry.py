@@ -3,7 +3,7 @@ from data.registry import get_asr_loaders, get_tokenizer
 from interfaces import ITrainer
 from models.registry import get_model
 from torch.optim import (
-    Adam, RMSprop, SGD
+    Adam, RMSprop, SGD, AdamW
 )
 from trainers.criterions import CTCLoss, CrossEntropyLoss, NLLLoss
 from trainers.trainers import CTCTrainer, DistCTCTrainer, Seq2SeqTrainer
@@ -18,6 +18,7 @@ CRITERIONS = {
 
 OPTIMIZERS = {
     'adam': Adam,
+    'adamw': AdamW,
     'rmsprop': RMSprop,
     'sgd': SGD
 }
