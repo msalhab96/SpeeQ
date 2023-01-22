@@ -126,7 +126,7 @@ class ITrainer(ABC):
         pass
 
 
-class ISchedular(ABC):
+class IScheduler(ABC):
 
     @abstractmethod
     def state_dict(self):

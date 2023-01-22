@@ -9,7 +9,7 @@ from typing import Tuple, Union
 from trainers.decorators import export_ckpt, step_log
 from utils.loggers import ILogger
 from interfaces import (
-    ISchedular, ITrainer, IDataLoader
+    IScheduler, ITrainer, IDataLoader
     )
 from constants import HistoryKeys, LogCategories
 from torch.optim import Optimizer
@@ -28,7 +28,7 @@ class BaseTrainer(ITrainer):
     """Builds the basic trainer module
 
     Args:
-        optimizer (Union[Optimizer, ISchedular]): The optimizer or the wrapped
+        optimizer (Union[Optimizer, IScheduler]): The optimizer or the wrapped
         optimizer that will be used during the training.
         criterion (Module): The loss fucntion that will be used
         during the training process.
@@ -49,7 +49,7 @@ class BaseTrainer(ITrainer):
     """
     def __init__(
             self,
-            optimizer: Union[Optimizer, ISchedular],
+            optimizer: Union[Optimizer, IScheduler],
             criterion: Module,
             model: Module,
             train_loader: IDataLoader,
@@ -159,7 +159,7 @@ class BaseDistTrainer(BaseTrainer):
     """Builds the basic distributed data parallel trainer module
 
     Args:
-        optimizer (Union[Optimizer, ISchedular]): The optimizer or the wrapped
+        optimizer (Union[Optimizer, IScheduler]): The optimizer or the wrapped
         optimizer that will be used during the training.
         criterion (Module): The loss fucntion that will be used
         during the training process.
@@ -185,7 +185,7 @@ class BaseDistTrainer(BaseTrainer):
     """
     def __init__(
             self,
-            optimizer: Union[Optimizer, ISchedular],
+            optimizer: Union[Optimizer, IScheduler],
             criterion: Module,
             model: Module,
             train_loader: IDataLoader,
@@ -301,7 +301,7 @@ class BaseDistTrainer(BaseTrainer):
 class CTCTrainer(BaseTrainer):
     def __init__(
             self,
-            optimizer: Union[Optimizer, ISchedular],
+            optimizer: Union[Optimizer, IScheduler],
             criterion: Module,
             model: Module,
             train_loader: IDataLoader,
@@ -350,7 +350,7 @@ class CTCTrainer(BaseTrainer):
 class DistCTCTrainer(BaseDistTrainer, CTCTrainer):
     def __init__(
             self,
-            optimizer: Union[Optimizer, ISchedular],
+            optimizer: Union[Optimizer, IScheduler],
             criterion: Module,
             model: Module,
             train_loader: IDataLoader,
@@ -409,7 +409,7 @@ class DistCTCTrainer(BaseDistTrainer, CTCTrainer):
 class Seq2SeqTrainer(BaseTrainer):
     def __init__(
             self,
-            optimizer: Union[Optimizer, ISchedular],
+            optimizer: Union[Optimizer, IScheduler],
             criterion: Module,
             model: Module,
             train_loader: IDataLoader,
@@ -456,7 +456,7 @@ class Seq2SeqTrainer(BaseTrainer):
 class DistSeq2SeqTrainer(BaseDistTrainer, Seq2SeqTrainer):
     def __init__(
             self,
-            optimizer: Union[Optimizer, ISchedular],
+            optimizer: Union[Optimizer, IScheduler],
             criterion: Module,
             model: Module,
             train_loader: IDataLoader,

@@ -2,10 +2,10 @@ from math import sqrt
 from numbers import Number
 from typing import Iterable
 from constants import OPTIMIZER_STATE_KEY
-from interfaces import ISchedular
+from interfaces import IScheduler
 
 
-class Schedular(ISchedular):
+class Scheduler(IScheduler):
     """Implements the base scheduler class.
 
     Args:
@@ -48,7 +48,7 @@ class Schedular(ISchedular):
         self.__dict__.update(state_dict)
 
 
-class NoamSchedular(Schedular):
+class NoamScheduler(Scheduler):
     """Implements the noam scheduler  proposed in
     https://arxiv.org/abs/1706.03762
 
@@ -94,7 +94,7 @@ class NoamSchedular(Schedular):
         }
 
 
-class SqueezeformerNoamSchedular(NoamSchedular):
+class SqueezeformerNoamScheduler(NoamScheduler):
     def __init__(
             self,
             params: Iterable,
