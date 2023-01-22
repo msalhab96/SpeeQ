@@ -6,6 +6,7 @@ from torch.optim import (
     Adam, RMSprop, SGD, AdamW
 )
 from trainers.criterions import CTCLoss, CrossEntropyLoss, NLLLoss
+from trainers.schedulers import NoamScheduler, SqueezeformerNoamScheduler
 from trainers.trainers import CTCTrainer, DistCTCTrainer, Seq2SeqTrainer
 from utils.loggers import get_logger
 from utils.utils import set_state_dict
@@ -32,6 +33,11 @@ DIST_TRAINERS = {
     'ctc': DistCTCTrainer
 }
 
+SCHEDULERS = {
+    'noam': NoamScheduler,
+    'squeezeformer_noam': SqueezeformerNoamScheduler
+}
+
 
 def get_criterion(
         name: str,
@@ -50,6 +56,13 @@ def get_criterion(
 
 
 def get_optimizer(model, trainer_config):
+    if trainer_config.scheduler is not None:
+        return SCHEDULERS[trainer_config.scheduler](
+            params=model.parameters(),
+            optimizer=trainer_config.optimizer,
+            optimizer_args=trainer_config.optim_args,
+            **trainer_config.scheduler_args
+        )
     return OPTIMIZERS[trainer_config.optimizer](
         model.parameters(), **trainer_config.optim_args
         )
