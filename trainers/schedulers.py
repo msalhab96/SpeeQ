@@ -4,6 +4,14 @@ from interfaces import ISchedular
 
 
 class Schedular(ISchedular):
+    """Implements the base scheduler class.
+
+    Args:
+        params (Iterable): The mdoel's parameters.
+        optimizer (str): The optimizer's name.
+        optimizer_args (dict): The optimizer's arguments.
+    """
+
     def __init__(
             self,
             params: Iterable,
