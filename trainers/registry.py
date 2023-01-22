@@ -7,7 +7,9 @@ from torch.optim import (
 )
 from trainers.criterions import CTCLoss, CrossEntropyLoss, NLLLoss
 from trainers.schedulers import NoamScheduler, SqueezeformerNoamScheduler
-from trainers.trainers import CTCTrainer, DistCTCTrainer, Seq2SeqTrainer
+from trainers.trainers import (
+    CTCTrainer, DistCTCTrainer, DistSeq2SeqTrainer, Seq2SeqTrainer
+    )
 from utils.loggers import get_logger
 from utils.utils import set_state_dict
 
@@ -30,7 +32,8 @@ TRAINERS = {
 }
 
 DIST_TRAINERS = {
-    'ctc': DistCTCTrainer
+    'ctc': DistCTCTrainer,
+    'seq2seq': DistSeq2SeqTrainer
 }
 
 SCHEDULERS = {
