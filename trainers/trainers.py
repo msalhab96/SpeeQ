@@ -344,11 +344,6 @@ class CTCTrainer(BaseTrainer):
         loss = self.criterion(
             preds, text, lengths, text_mask.sum(dim=-1)
             )
-        import random
-        if random.random() > 0.98:
-            print(torch.argmax(preds[:, 0, :], dim=-1))
-            print(text[0])
-            print('-' * 10)
         return loss
 
 
