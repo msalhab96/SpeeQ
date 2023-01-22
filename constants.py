@@ -1,5 +1,7 @@
 from enum import Enum
 
+OPTIMIZER_STATE_KEY = 'optimizer'
+
 
 class FileKeys(Enum):
     text_key = 'text'
