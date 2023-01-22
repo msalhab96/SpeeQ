@@ -1,4 +1,5 @@
 from math import sqrt
+from numbers import Number
 from typing import Iterable
 from constants import OPTIMIZER_STATE_KEY
 from interfaces import ISchedular
@@ -91,3 +92,46 @@ class NoamSchedular(Schedular):
             'counter': self.counter,
             OPTIMIZER_STATE_KEY: self.optimizer.state_dict()
         }
+
+
+class SqueezeformerNoamSchedular(NoamSchedular):
+    def __init__(
+            self,
+            params: Iterable,
+            optimizer: str,
+            optimizer_args: dict,
+            warmup_staps: int,
+            lr_peak: Number,
+            decay_rate: Number,
+            t_peak: int,
+            *args, **kwargs
+            ) -> None:
+        super().__init__(
+            params=params,
+            optimizer=optimizer,
+            optimizer_args=optimizer_args,
+            warmup_staps=warmup_staps,
+            d_model=1  # not used
+            )
+        self.lr_peak = lr_peak
+        self.decay_rate = decay_rate
+        self.t_peak = t_peak
+        self.plateau_region = t_peak + warmup_staps
+
+    def get_lr(self) -> float:
+        if self.step < self.warmup_staps:
+            return self.lr_peak * self.counter / self.warmup_staps
+        if self.step < self.plateau_region:
+            return self.lr_peak
+        numerator = self.lr_peak * pow(self.warmup_staps, self.decay_rate)
+        denominator = self.step / pow(self.step - self.t_peak)
+        return numerator / denominator
+
+    def state_dict(self) -> dict:
+        args = {
+            'lr_peak': self.lr_peak,
+            'decay_rate': self.decay_rate,
+            't_peak': self.t_peak,
+            'plateau_region': self.plateau_region
+        }
+        return dict(**super().get_lr(), **args)
