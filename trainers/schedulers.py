@@ -34,7 +34,7 @@ class Scheduler(IScheduler):
 
     def _update_lr(self) -> None:
         self.counter += 1
-        lr = self.get_lr()
+        lr = self.get_lr(self.counter)
         for param_group in self.optimizer.param_groups:
             param_group['lr'] = lr
 
@@ -49,7 +49,7 @@ class Scheduler(IScheduler):
 
 
 class NoamScheduler(Scheduler):
-    """Implements the noam scheduler proposed in
+    """Implements the noam scheduler  proposed in
     https://arxiv.org/abs/1706.03762
 
     Args:
@@ -106,10 +106,6 @@ class SqueezeformerNoamScheduler(NoamScheduler):
             t_peak: int,
             *args, **kwargs
             ) -> None:
-        self.lr_peak = lr_peak
-        self.decay_rate = decay_rate
-        self.t_peak = t_peak
-        self.plateau_region = t_peak + warmup_staps
         super().__init__(
             params=params,
             optimizer=optimizer,
@@ -117,14 +113,18 @@ class SqueezeformerNoamScheduler(NoamScheduler):
             warmup_staps=warmup_staps,
             d_model=1  # not used
             )
+        self.lr_peak = lr_peak
+        self.decay_rate = decay_rate
+        self.t_peak = t_peak
+        self.plateau_region = t_peak + warmup_staps
 
     def get_lr(self) -> float:
-        if self.counter < self.warmup_staps:
+        if self.step < self.warmup_staps:
             return self.lr_peak * self.counter / self.warmup_staps
-        if self.counter < self.plateau_region:
+        if self.step < self.plateau_region:
             return self.lr_peak
         numerator = self.lr_peak * pow(self.warmup_staps, self.decay_rate)
-        denominator = self.counter / pow(self.counter - self.t_peak)
+        denominator = self.step / pow(self.step - self.t_peak)
         return numerator / denominator
 
     def state_dict(self) -> dict:
@@ -134,4 +134,4 @@ class SqueezeformerNoamScheduler(NoamScheduler):
             't_peak': self.t_peak,
             'plateau_region': self.plateau_region
         }
-        return dict(**super().state_dict(), **args)
+        return dict(**super().get_lr(), **args)
