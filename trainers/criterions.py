@@ -1,6 +1,7 @@
 from typing import Tuple
 from torch import Tensor
 from torch import nn
+from torchaudio import transforms
 
 
 class CTCLoss(nn.CTCLoss):
@@ -87,3 +88,29 @@ class NLLLoss(nn.NLLLoss):
         input, target = remove_positionals(input, target)
         input, target = get_flatten_results(input, target)
         return super().forward(input, target)
+
+
+class RNNTLoss(transforms.RNNTLoss):
+    def __init__(
+            self, blank_id: int, reduction='mean', *args, **kwargs
+            ) -> None:
+        super().__init__(blank=blank_id, reduction=reduction)
+
+    def forward(
+            self,
+            logits: Tensor,
+            logits_len: Tensor,
+            targets: Tensor,
+            target_len: Tensor
+            ) -> Tensor:
+        # logits of shape [B, Ts, Tt, C]
+        # target of shape [B, Tt] and start with SOS
+        targets = targets[:, 1:]
+        targets = targets.contiguous()
+        target_len = target_len - 1
+        return super().forward(
+            logits=logits,
+            logit_lengths=logits_len,
+            targets=targets,
+            target_lengths=target_len
+        )
