@@ -197,3 +197,42 @@ class LocationAwareAttDecoder(GlobAttRNNDecoder):
                 y = self._apply_teacher_forcing(y=y, out=out)
             out = self.emb(y)
         return results
+
+
+class RNNDecoder(nn.Module):
+    """Builds a simple RNN-decoder that contains embedding layer
+    and a single RNN layer
+
+    Args:
+        vocab_size (int): The vocabulary size.
+        emb_dim (int): The embedding dimension.
+        hidden_size (int): The RNN's hidden size.
+        rnn_type (str): The RNN type.
+    """
+    def __init__(
+            self,
+            vocab_size: int,
+            emb_dim: int,
+            hidden_size: int,
+            rnn_type: str
+            ) -> None:
+        super().__init__()
+        self.emb = nn.Embedding(
+            num_embeddings=vocab_size, embedding_dim=emb_dim
+        )
+        from .registry import PACKED_RNN_REGISTRY
+        self.rnn = PACKED_RNN_REGISTRY[rnn_type](
+                input_size=emb_dim,
+                hidden_size=hidden_size,
+                batch_first=True,
+                enforce_sorted=False,
+                bidirectional=False
+            )
+
+    def forward(
+            self, x: Tensor, mask: Tensor,
+            ) -> Tuple[Tensor, Tensor]:
+        lengths = mask.sum(dim=-1).cpu()
+        out = self.emb(x)
+        out, _, lens = self.rnn(out, lengths)
+        return out, lens
