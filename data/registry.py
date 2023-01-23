@@ -58,8 +58,8 @@ def get_asr_datasets(
         speech_processor=data_config.speech_processor,
         text_processor=data_config.text_processor,
         sep=data_config.sep,
-        add_eos=data_config.add_pos_tokens,
-        add_sos=data_config.add_pos_tokens
+        add_eos=data_config.add_eos_token,
+        add_sos=data_config.add_sos_token
     )
     test_dataset = SpeechTextDataset(
         data_path=data_config.testing_path,
@@ -67,8 +67,8 @@ def get_asr_datasets(
         speech_processor=data_config.speech_processor,
         text_processor=data_config.text_processor,
         sep=data_config.sep,
-        add_eos=data_config.add_pos_tokens,
-        add_sos=data_config.add_pos_tokens
+        add_eos=data_config.add_eos_token,
+        add_sos=data_config.add_sos_token
     )
     return train_dataset, test_dataset
 
@@ -117,9 +117,11 @@ def get_asr_loaders(
         data_config=data_config,
         tokenizer=tokenizer
     )
-    text_padder = get_text_padder(
-            data_config, tokenizer.special_tokens.pad_id
-            )
+    if data_config.use_blank_as_pad is True:
+        pad_id = tokenizer.special_tokens.blank_id
+    else:
+        pad_id = tokenizer.special_tokens.pad_id
+    text_padder = get_text_padder(data_config, pad_id)
     speech_padder = get_speech_padder(data_config)
     train_loader = SpeechTextLoader(
         dataset=train_dataset,
