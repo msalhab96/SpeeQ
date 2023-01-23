@@ -52,7 +52,7 @@ def list_ctc_models() -> List[str]:
     return list(CTC_MODELS.values())
 
 
-def list_ctc_models() -> List[str]:
+def list_seq2seq_models() -> List[str]:
     """Lists all pre-implemented seq2seq based
     models.
     """
