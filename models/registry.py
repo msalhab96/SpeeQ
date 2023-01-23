@@ -2,6 +2,7 @@ from models.seq2seq import (
     LAS, BasicAttSeq2SeqRNN,
     RNNWithLocationAwareAtt, SpeechTransformer
     )
+from models.transducers import RNNTransducer
 from torch import nn
 from typing import List
 from .layers import (
@@ -37,11 +38,15 @@ CTC_MODELS = {
     'squeezeformer': Squeezeformer
 }
 
-SEQ2SEQ_MODEL = {
+SEQ2SEQ_MODELS = {
     'las': LAS,
     'rnn_with_location_att': RNNWithLocationAwareAtt,
     'basic_att_rnn': BasicAttSeq2SeqRNN,
     'speech_transformer': SpeechTransformer
+}
+
+TRANSDUCER_MODELS = {
+    'rnn-t': RNNTransducer
 }
 
 
@@ -58,6 +63,10 @@ def get_model(model_config, n_classes):
             **model_config.template.get_dict(), n_classes=n_classes
         )
     if model_config.template.type == 'seq2seq':
-        return SEQ2SEQ_MODEL[model_config.template.name](
+        return SEQ2SEQ_MODELS[model_config.template.name](
+            **model_config.template.get_dict(), n_classes=n_classes
+        )
+    if model_config.template.type == 'transducer':
+        return TRANSDUCER_MODELS[model_config.template.name](
             **model_config.template.get_dict(), n_classes=n_classes
         )
