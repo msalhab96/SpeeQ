@@ -52,6 +52,13 @@ def list_ctc_models() -> List[str]:
     return list(CTC_MODELS.values())
 
 
+def list_ctc_models() -> List[str]:
+    """Lists all pre-implemented seq2seq based
+    models.
+    """
+    return list(SEQ2SEQ_MODELS.values())
+
+
 def get_model(model_config, n_classes):
     if model_config.template.type == 'ctc':
         return CTC_MODELS[model_config.template.name](
