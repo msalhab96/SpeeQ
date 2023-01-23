@@ -37,7 +37,7 @@ CTC_MODELS = {
     'squeezeformer': Squeezeformer
 }
 
-SEQ2SEQ_MODEL = {
+SEQ2SEQ_MODELS = {
     'las': LAS,
     'rnn_with_location_att': RNNWithLocationAwareAtt,
     'basic_att_rnn': BasicAttSeq2SeqRNN,
@@ -58,6 +58,6 @@ def get_model(model_config, n_classes):
             **model_config.template.get_dict(), n_classes=n_classes
         )
     if model_config.template.type == 'seq2seq':
-        return SEQ2SEQ_MODEL[model_config.template.name](
+        return SEQ2SEQ_MODELS[model_config.template.name](
             **model_config.template.get_dict(), n_classes=n_classes
         )
