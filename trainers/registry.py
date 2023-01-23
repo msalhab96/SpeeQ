@@ -5,10 +5,11 @@ from models.registry import get_model
 from torch.optim import (
     Adam, RMSprop, SGD, AdamW
 )
-from trainers.criterions import CTCLoss, CrossEntropyLoss, NLLLoss
+from trainers.criterions import CTCLoss, CrossEntropyLoss, NLLLoss, RNNTLoss
 from trainers.schedulers import NoamScheduler, SqueezeformerNoamScheduler
 from trainers.trainers import (
-    CTCTrainer, DistCTCTrainer, DistSeq2SeqTrainer, Seq2SeqTrainer
+    CTCTrainer, DistCTCTrainer, DistSeq2SeqTrainer,
+    Seq2SeqTrainer, TransducerTrainer
     )
 from utils.loggers import get_logger
 from utils.utils import set_state_dict
@@ -16,7 +17,8 @@ from utils.utils import set_state_dict
 CRITERIONS = {
     'ctc': CTCLoss,
     'crossentropy': CrossEntropyLoss,
-    'nllloss': NLLLoss
+    'nllloss': NLLLoss,
+    'rnnt': RNNTLoss
 }
 
 OPTIMIZERS = {
@@ -28,7 +30,8 @@ OPTIMIZERS = {
 
 TRAINERS = {
     'ctc': CTCTrainer,
-    'seq2seq': Seq2SeqTrainer
+    'seq2seq': Seq2SeqTrainer,
+    'transducer': TransducerTrainer
 }
 
 DIST_TRAINERS = {

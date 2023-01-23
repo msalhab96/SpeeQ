@@ -214,3 +214,16 @@ class SqueezeformerCTCTemp(BaseTemplate):
     masking_value: int = -1e15
     _name = 'squeezeformer'
     _type = 'ctc'
+
+
+@dataclass
+class RNNTTemp(BaseTemplate):
+    in_features: int
+    emb_dim: int
+    n_layers: int
+    hidden_size: int
+    bidirectional: bool
+    rnn_type: str
+    p_dropout: float
+    _name = 'rnn-t'
+    _type = 'transducer'
