@@ -1,7 +1,7 @@
 from typing import Union
 from models.decoders import (
     GlobAttRNNDecoder, LocationAwareAttDecoder, TransformerDecoder
-    )
+)
 from models.encoders import (
     PyramidRNNEncoder, RNNEncoder, SpeechTransformerEncoder
 )

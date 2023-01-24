@@ -7,6 +7,7 @@ class Sigmax(nn.Module):
     """Implements the custom activation function for attention
     proposed in https://arxiv.org/abs/1506.07503
     """
+
     def __init__(self, dim: int = -1) -> None:
         super().__init__()
         self.dim = dim
