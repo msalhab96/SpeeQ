@@ -1,10 +1,11 @@
-from models.encoders import DeepSpeechV1Encoder, DeepSpeechV2Encoder
+from models.encoders import (
+    ConformerEncoder, DeepSpeechV1Encoder, DeepSpeechV2Encoder
+    )
 import torch
 from typing import List, Optional, Tuple, Union
 
-from utils.utils import calc_data_len, get_mask_from_lens
+from utils.utils import calc_data_len
 from .layers import (
-    ConformerBlock, ConformerPreNet,
     JasperBlocks, JasperSubBlock,
     PredModule, QuartzBlocks,
     SqueezeformerEncoder, TransformerEncLayer
@@ -210,7 +211,7 @@ class DeepSpeechV2(CTCModel):
             )
 
 
-class Conformer(nn.Module):
+class Conformer(CTCModel):
     """Implements the conformer model proposed in
     https://arxiv.org/abs/2005.08100, this model used
     with CTC, while in the paper used RNN-T.
@@ -224,7 +225,7 @@ class Conformer(nn.Module):
         kernel_size (int): The kernel size of conv module.
         ss_kernel_size (int): The kernel size of the subsampling layer.
         ss_stride (int): The stride of the subsampling layer.
-        ss_num_conv_layers (int): The number of subsampling layer.
+        ss_num_conv_layers (int): The number of subsampling layers.
         in_features (int): The input/speech feature size.
         res_scaling (float): The residual connection multiplier.
         p_dropout (float): The dropout rate.
@@ -244,46 +245,24 @@ class Conformer(nn.Module):
             res_scaling: float,
             p_dropout: float
             ) -> None:
-        super().__init__()
-        self.sub_sampling = ConformerPreNet(
-            in_features=in_features,
-            kernel_size=ss_kernel_size,
-            stride=ss_stride,
-            n_conv_layers=ss_num_conv_layers,
+        super().__init__(
+            pred_in_size=d_model,
+            n_classes=n_classes
+        )
+        self.encoder = ConformerEncoder(
             d_model=d_model,
+            n_conf_layers=n_conf_layers,
+            ff_expansion_factor=ff_expansion_factor,
+            h=h,
+            kernel_size=kernel_size,
+            ss_kernel_size=ss_kernel_size,
+            ss_stride=ss_stride,
+            ss_num_conv_layers=ss_num_conv_layers,
+            in_features=in_features,
+            res_scaling=res_scaling,
             p_dropout=p_dropout
-        )
-        self.blocks = nn.ModuleList([
-            ConformerBlock(
-                d_model=d_model,
-                ff_expansion_factor=ff_expansion_factor,
-                h=h, kernel_size=kernel_size,
-                p_dropout=p_dropout, res_scaling=res_scaling
             )
-            for _ in range(n_conf_layers)
-        ])
-        self.pred_net = PredModule(
-            in_features=d_model,
-            n_classes=n_classes,
-            activation=nn.LogSoftmax(dim=-1)
-        )
         self.has_bnorm = True
-
-    def forward(
-            self, x: Tensor, mask: Tensor
-            ) -> Tuple[Tensor, Tensor]:
-        lengths = mask.sum(dim=-1)
-        lengths = lengths.cpu()
-        out, lengths = self.sub_sampling(x, lengths)
-        mask = get_mask_from_lens(
-            lengths, lengths.max().item()
-            )
-        mask = mask.to(x.device)
-        for layer in self.blocks:
-            out = layer(out, mask)
-        preds = self.pred_net(out)
-        preds = preds.permute(1, 0, 2)
-        return preds, lengths
 
 
 class Jasper(nn.Module):
