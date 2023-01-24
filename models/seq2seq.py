@@ -72,7 +72,7 @@ class BasicAttSeq2SeqRNN(nn.Module):
             dec_inp: Tensor,
             *args, **kwargs
     ) -> Tensor:
-        out, h, lengths = self.encoder(enc_inp, enc_mask)
+        out, h, lengths = self.encoder(enc_inp, enc_mask, return_h=True)
         if self.bidirectional is True:
             if isinstance(h, tuple):
                 # if LSTM is used
