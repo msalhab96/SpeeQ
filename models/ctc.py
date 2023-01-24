@@ -1,12 +1,12 @@
-from models.encoders import DeepSpeechV1Encoder
+from models.encoders import DeepSpeechV1Encoder, DeepSpeechV2Encoder
 import torch
 from typing import List, Optional, Tuple, Union
 
 from utils.utils import calc_data_len, get_mask_from_lens
 from .layers import (
-    CReLu, ConformerBlock, ConformerPreNet,
-    Conv1DLayers, JasperBlocks, JasperSubBlock,
-    PredModule, QuartzBlocks, RowConv1D,
+    ConformerBlock, ConformerPreNet,
+    JasperBlocks, JasperSubBlock,
+    PredModule, QuartzBlocks,
     SqueezeformerEncoder, TransformerEncLayer
     )
 from torch import nn
@@ -32,7 +32,7 @@ class CTCModel(nn.Module):
         return preds, lengths
 
 
-class DeepSpeechV1(nn.Module):
+class DeepSpeechV1(CTCModel):
     """Builds the DeepSpeech model described in
     https://arxiv.org/abs/1412.5567
 
@@ -155,7 +155,7 @@ class BERT(nn.Module):
         return preds, lengths
 
 
-class DeepSpeechV2(nn.Module):
+class DeepSpeechV2(CTCModel):
     """Implements the deep speech model
     proposed in https://arxiv.org/abs/1512.02595
 
@@ -190,68 +190,24 @@ class DeepSpeechV2(nn.Module):
             tau: int,
             p_dropout: float
             ) -> None:
-        super().__init__()
-        self.conv = Conv1DLayers(
-            in_size=in_features,
-            out_size=hidden_size,
+        super().__init__(
+            pred_in_size=hidden_size,
+            n_classes=n_classes
+        )
+        self.encoder = DeepSpeechV2Encoder(
+            n_conv=n_conv,
             kernel_size=kernel_size,
             stride=stride,
-            n_layers=n_conv,
+            in_features=in_features,
+            hidden_size=hidden_size,
+            bidirectional=bidirectional,
+            n_rnn=n_rnn,
+            n_linear_layers=n_linear_layers,
+            max_clip_value=max_clip_value,
+            rnn_type=rnn_type,
+            tau=tau,
             p_dropout=p_dropout
-        )
-        from .registry import PACKED_RNN_REGISTRY
-        self.rnns = nn.ModuleList(
-            [
-                PACKED_RNN_REGISTRY[rnn_type](
-                    input_size=hidden_size,
-                    hidden_size=hidden_size,
-                    bidirectional=bidirectional
-                    )
-                for _ in range(n_rnn)
-                ]
             )
-        self.linear_layers = nn.ModuleList(
-            [
-                nn.Linear(
-                    in_features=hidden_size,
-                    out_features=hidden_size
-                    )
-                for _ in range(n_linear_layers)
-                ]
-            )
-        self.crelu = CReLu(max_val=max_clip_value)
-        self.context_conv = RowConv1D(
-            tau=tau, hidden_size=hidden_size
-        )
-        self.pred_net = PredModule(
-            in_features=hidden_size,
-            n_classes=n_classes,
-            activation=nn.LogSoftmax(dim=-1)
-        )
-        self.hidden_size = hidden_size
-        self.bidirectional = bidirectional
-        self.has_bnorm = False
-
-    def forward(self, x: Tensor, mask: Tensor):
-        lengths = mask.sum(dim=-1)
-        lengths = lengths.cpu()
-        out, lengths = self.conv(x, lengths)
-        out = self.crelu(out)
-        for layer in self.rnns:
-            out, _, lengths = layer(
-                out, lengths
-                )
-            if self.bidirectional is True:
-                out = out[..., :self.hidden_size] +\
-                    out[..., self.hidden_size:]
-            out = self.crelu(out)
-        out = self.context_conv(out)
-        for layer in self.linear_layers:
-            out = layer(out)
-            out = self.crelu(out)
-        preds = self.pred_net(out)
-        preds = preds.permute(1, 0, 2)
-        return preds, lengths
 
 
 class Conformer(nn.Module):
