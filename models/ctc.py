@@ -14,13 +14,18 @@ from torch import Tensor
 
 
 class CTCModel(nn.Module):
-    def __init__(self) -> None:
+    def __init__(self, pred_in_size: int, n_classes: int) -> None:
         super().__init__()
         self.has_bnorm = False
+        self.pred_net = PredModule(
+            in_features=pred_in_size,
+            n_classes=n_classes,
+            activation=nn.LogSoftmax(dim=-1)
+        )
 
     def forward(
-        self, x: Tensor, mask: Tensor, *args, **kwargs
-        ):
+            self, x: Tensor, mask: Tensor, *args, **kwargs
+            ):
         out, lengths = self.encoder(x, mask, *args, **kwargs)  # B, M, d
         preds = self.pred_net(out)  # B, M, C
         preds = preds.permute(1, 0, 2)  # M, B, C
@@ -52,7 +57,10 @@ class DeepSpeechV1(nn.Module):
             rnn_type: str,
             p_dropout: float
             ) -> None:
-        super().__init__()
+        super().__init__(
+            pred_in_size=hidden_size,
+            n_classes=n_classes
+        )
         self.encoder = DeepSpeechV1Encoder(
             in_features=in_features,
             hidden_size=hidden_size,
@@ -62,11 +70,6 @@ class DeepSpeechV1(nn.Module):
             rnn_type=rnn_type,
             p_dropout=p_dropout
             )
-        self.pred_net = PredModule(
-            in_features=hidden_size,
-            n_classes=n_classes,
-            activation=nn.LogSoftmax(dim=-1)
-        )
 
     @torch.no_grad()
     def predict(self, x: Tensor) -> Tensor:
