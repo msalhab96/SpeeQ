@@ -95,6 +95,19 @@ class NoamScheduler(Scheduler):
 
 
 class SqueezeformerNoamScheduler(NoamScheduler):
+    """Implements The Noam scheduler with the modifications
+    presented in https://arxiv.org/abs/2206.00888
+
+    Args:
+        params (Iterable): The mdoel's parameters.
+        optimizer (str): The optimizer's name.
+        optimizer_args (dict): The optimizer's arguments.
+        warmup_staps (int): The warmup steps.
+        lr_peak (Number): The peak value of the learning rate.
+        decay_rate (Number): The decay rate of the learning rate.
+        t_peak (Number): The number of steps to keep the peak learning rate for.
+    """
+
     def __init__(
             self,
             params: Iterable,
