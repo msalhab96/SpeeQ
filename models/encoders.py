@@ -236,7 +236,7 @@ class ConformerEncoder(nn.Module):
 
 
 class JasperEncoder(nn.Module):
-    """Implements Jasper model architecture proposed
+    """Implements Jasper model architecture's encoder proposed
     in https://arxiv.org/abs/1904.03288
 
     Args:
