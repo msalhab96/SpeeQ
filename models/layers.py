@@ -9,7 +9,7 @@ from torch.nn.utils.rnn import (
 from utils.utils import (
     add_pos_enc, calc_data_len,
     get_positional_encoding
-    )
+)
 
 
 class PackedRNN(nn.Module):
@@ -26,6 +26,7 @@ class PackedRNN(nn.Module):
         bidirectional (bool): If the RNN is bidirectional or not.
         Default to False.
     """
+
     def __init__(
             self,
             input_size: int,
@@ -33,7 +34,7 @@ class PackedRNN(nn.Module):
             batch_first=True,
             enforce_sorted=False,
             bidirectional=False
-            ) -> None:
+    ) -> None:
         super().__init__()
         self.rnn = nn.RNN(
             input_size=input_size,
@@ -49,7 +50,7 @@ class PackedRNN(nn.Module):
             x, lens,
             batch_first=self.batch_first,
             enforce_sorted=self.enforce_sorted
-            )
+        )
         out, h = self.rnn(packed)
         out, lens = pad_packed_sequence(out, batch_first=self.batch_first)
         return out, h, lens
@@ -63,10 +64,10 @@ class PackedLSTM(PackedRNN):
             batch_first=True,
             enforce_sorted=False,
             bidirectional=False
-            ) -> None:
+    ) -> None:
         super().__init__(
             input_size, hidden_size, batch_first, enforce_sorted
-            )
+        )
         self.rnn = nn.LSTM(
             input_size=input_size,
             hidden_size=hidden_size,
@@ -83,10 +84,10 @@ class PackedGRU(PackedRNN):
             batch_first=True,
             enforce_sorted=False,
             bidirectional=False
-            ) -> None:
+    ) -> None:
         super().__init__(
             input_size, hidden_size, batch_first, enforce_sorted, bidirectional
-            )
+        )
         self.rnn = nn.GRU(
             input_size=input_size,
             hidden_size=hidden_size,
@@ -105,12 +106,13 @@ class PredModule(nn.Module):
         n_classes (int): The number of classes to produce.
         activation (Module): The activation function to be used.
     """
+
     def __init__(
             self,
             in_features: int,
             n_classes: int,
             activation: nn.Module
-            ) -> None:
+    ) -> None:
         super().__init__()
         self.fc = nn.Linear(
             in_features=in_features,
@@ -132,12 +134,13 @@ class ConvPredModule(nn.Module):
         n_classes (int): The number of classes to produce.
         activation (Module): The activation function to be used.
     """
+
     def __init__(
             self,
             in_features: int,
             n_classes: int,
             activation: nn.Module
-            ) -> None:
+    ) -> None:
         super().__init__()
         self.activation = activation
         self.conv = nn.Conv1d(
@@ -163,6 +166,7 @@ class CReLu(nn.Module):
     Args:
         max_val (int): the maximum clipping value.
     """
+
     def __init__(self, max_val: int) -> None:
         super().__init__()
         self.max_val = max_val
@@ -170,7 +174,7 @@ class CReLu(nn.Module):
     def forward(self, x: Tensor) -> Tensor:
         return torch.clamp(
             x, min=0, max=self.max_val
-            )
+        )
 
 
 class FeedForwardModule(nn.Module):
@@ -181,11 +185,12 @@ class FeedForwardModule(nn.Module):
         d_model (int): The model dimensionality.
         hidden_size (int): The inner layer's dimensionality.
     """
+
     def __init__(
             self,
             d_model: int,
             hidden_size: int
-            ) -> None:
+    ) -> None:
         super().__init__()
         self.fc1 = nn.Linear(
             in_features=d_model,
@@ -211,6 +216,7 @@ class AddAndNorm(nn.Module):
     Args:
         d_model (int): The model dimensionality.
     """
+
     def __init__(self, d_model: int) -> None:
         super().__init__()
         self.lnorm = nn.LayerNorm(normalized_shape=d_model)
@@ -228,12 +234,13 @@ class MultiHeadAtt(nn.Module):
         h (int): The number of heads.
         masking_value (int): The masking value. Default -1e15
     """
+
     def __init__(
             self,
             d_model: int,
             h: int,
             masking_value: int = -1e15
-            ) -> None:
+    ) -> None:
         super().__init__()
         self.h = h
         self.dk = d_model // h
@@ -258,12 +265,12 @@ class MultiHeadAtt(nn.Module):
         batch_size, max_len, _ = x.shape
         x = x.view(
             batch_size, max_len, self.h, self.dk
-            )
+        )
         return x
 
     def _mask(
             self, att: Tensor, key_mask: Tensor, query_mask: Tensor
-            ) -> Tensor:
+    ) -> Tensor:
         key_max_len = key_mask.shape[-1]
         query_max_len = query_mask.shape[-1]
         key_mask = key_mask.repeat(1, query_max_len)
@@ -281,7 +288,7 @@ class MultiHeadAtt(nn.Module):
             value: Tensor,
             key_mask: Union[Tensor, None],
             query_mask: Union[Tensor, None]
-            ) -> Tensor:
+    ) -> Tensor:
         key = self._reshape(key)  # B, M, h, dk
         query = self._reshape(query)  # B, M, h, dk
         value = self._reshape(value)  # B, M, h, dk
@@ -292,16 +299,16 @@ class MultiHeadAtt(nn.Module):
         if key_mask is not None and query_mask is not None:
             att = self._mask(
                 att=att, key_mask=key_mask, query_mask=query_mask
-                )
+            )
         att = self.softmax(
             att / self.d_model
-            )
+        )
         out = torch.matmul(att, value)
         out = out.permute(0, 2, 1, 3)
         out = out.contiguous()
         out = out.view(
             out.shape[0], out.shape[1], -1
-            )
+        )
         return out
 
     def forward(
@@ -311,7 +318,7 @@ class MultiHeadAtt(nn.Module):
             value: Tensor,
             key_mask: Union[Tensor, None],
             query_mask: Union[Tensor, None]
-            ) -> Tensor:
+    ) -> Tensor:
         key = self.key_fc(key)
         query = self.query_fc(query)
         value = self.value_fc(value)
@@ -330,15 +337,16 @@ class MaskedMultiHeadAtt(MultiHeadAtt):
         h (int): The number of heads.
         masking_value (int): The masking value. Default -1e15
     """
+
     def __init__(
             self,
             d_model: int,
             h: int,
             masking_value: int = -1e15
-            ) -> None:
+    ) -> None:
         super().__init__(
             d_model=d_model, h=h, masking_value=masking_value
-            )
+        )
 
     def forward(
             self,
@@ -347,7 +355,7 @@ class MaskedMultiHeadAtt(MultiHeadAtt):
             value: Tensor,
             key_mask: Union[Tensor, None],
             query_mask: Union[Tensor, None]
-            ) -> Tensor:
+    ) -> Tensor:
         batch_size, max_len = key_mask.shape
         if key_mask is not None:
             query_mask = torch.tril(torch.ones(batch_size, max_len, max_len))
@@ -373,42 +381,43 @@ class TransformerEncLayer(nn.Module):
         h (int): The number of heads.
         masking_value (int): The masking value. Default -1e15
     """
+
     def __init__(
             self,
             d_model: int,
             hidden_size: int,
             h: int,
             masking_value: int = -1e15
-            ) -> None:
+    ) -> None:
         super().__init__()
         self.mhsa = MultiHeadAtt(
             d_model=d_model, h=h, masking_value=masking_value
-            )
+        )
         self.add_and_norm1 = AddAndNorm(
             d_model=d_model
-            )
+        )
         self.ff = FeedForwardModule(
             d_model=d_model, hidden_size=hidden_size
-            )
+        )
         self.add_and_norm2 = AddAndNorm(
             d_model=d_model
-            )
+        )
 
     def forward(
             self,
             x: Tensor,
             mask: Tensor
-            ) -> Tensor:
+    ) -> Tensor:
         out = self.mhsa(
             key=x, query=x,
             value=x, key_mask=mask,
             query_mask=mask
-            )
+        )
         out = self.add_and_norm1(x, out)
         result = self.ff(out)
         return self.add_and_norm2(
             out, result
-            )
+        )
 
 
 class RowConv1D(nn.Module):
@@ -419,11 +428,12 @@ class RowConv1D(nn.Module):
         tau (int): The size of future context.
         hidden_size (int): The input feature size.
     """
+
     def __init__(
             self,
             tau: int,
             hidden_size: int
-            ) -> None:
+    ) -> None:
         super().__init__()
         self.tau = tau
         self.conv = nn.Conv1d(
@@ -445,7 +455,7 @@ class RowConv1D(nn.Module):
         """
         zeros = torch.zeros(
             *x.shape[:-1], self.tau
-            )
+        )
         zeros = zeros.to(x.device)
         return torch.cat(
             [x, zeros], dim=-1
@@ -472,7 +482,7 @@ class Conv1DLayers(nn.Module):
             stride: int,
             n_layers: int,
             p_dropout: float
-            ) -> None:
+    ) -> None:
         super().__init__()
         self.layers = nn.ModuleList([
             nn.Conv1d(
@@ -487,7 +497,7 @@ class Conv1DLayers(nn.Module):
 
     def forward(
             self, x: Tensor, data_len: Tensor
-            ) -> Tuple[Tensor, Tensor]:
+    ) -> Tuple[Tensor, Tensor]:
         # x of shape [B, M, d]
         x = x.transpose(1, 2)
         out = x
@@ -521,26 +531,27 @@ class GlobalMulAttention(nn.Module):
             Default 1.
         mask_val (float): the masking value. Default -1e12.
     """
+
     def __init__(
             self,
             enc_feat_size: int,
             dec_feat_size: int,
             scaling_factor: Union[float, int] = 1,
             mask_val: float = -1e12
-            ) -> None:
+    ) -> None:
         super().__init__()
         self.fc_query = nn.Linear(
             in_features=dec_feat_size,
             out_features=dec_feat_size
-            )
+        )
         self.fc_key = nn.Linear(
             in_features=enc_feat_size,
             out_features=dec_feat_size
-            )
+        )
         self.fc_value = nn.Linear(
             in_features=enc_feat_size,
             out_features=dec_feat_size
-            )
+        )
         self.fc = nn.Linear(
             in_features=2 * dec_feat_size,
             out_features=dec_feat_size
@@ -553,7 +564,7 @@ class GlobalMulAttention(nn.Module):
             key: Tensor,
             query: Tensor,
             mask=None
-            ) -> Tensor:
+    ) -> Tensor:
         # key of shape [B, M, feat_size]
         # query of shape [B, 1, feat_size]
         # mask of shape [B, M], False for padding
@@ -562,15 +573,15 @@ class GlobalMulAttention(nn.Module):
         query = self.fc_query(query)
         att_weights = torch.matmul(
             query, key.transpose(-1, -2)
-            )
+        )
         if mask is not None:
             mask = mask.unsqueeze(dim=-2)
             att_weights = att_weights.masked_fill(
                 ~mask, self.mask_val
-                )
+            )
         att_weights = torch.softmax(
             att_weights / self.scaling_factor, dim=-1
-            )
+        )
         context = torch.matmul(att_weights, value)
         results = torch.cat([context, query], dim=-1)
         results = self.fc(results)
@@ -588,16 +599,17 @@ class ConformerFeedForward(nn.Module):
             factor.
         p_dropout (float): The dropout rate.
     """
+
     def __init__(
             self,
             d_model: int,
             expansion_factor: int,
             p_dropout: float
-            ) -> None:
+    ) -> None:
         super().__init__()
         self.lnrom = nn.LayerNorm(
             normalized_shape=d_model
-            )
+        )
         self.fc1 = nn.Linear(
             in_features=d_model,
             out_features=expansion_factor * d_model
@@ -628,16 +640,17 @@ class ConformerConvModule(nn.Module):
         kernel_size (int): The depth-wise convolution kernel size.
         p_dropout (float): The dropout rate.
     """
+
     def __init__(
             self,
             d_model: int,
             kernel_size: int,
             p_dropout: float
-            ) -> None:
+    ) -> None:
         super().__init__()
         self.lnorm = nn.LayerNorm(
             normalized_shape=d_model
-            )
+        )
         self.pwise_conv1 = nn.Conv1d(
             in_channels=d_model,
             out_channels=2 * d_model,
@@ -688,33 +701,34 @@ class ConformerRelativeMHSA(MultiHeadAtt):
         p_dropout (float): The dropout rate.
         masking_value (int): The masking value. Default -1e15
     """
+
     def __init__(
             self,
             d_model: int,
             h: int,
             p_dropout: float,
             masking_value: int = -1e15
-            ) -> None:
+    ) -> None:
         super().__init__(
             d_model=d_model, h=h, masking_value=masking_value
-            )
+        )
         self.lnrom = nn.LayerNorm(
             normalized_shape=d_model
-            )
+        )
         self.dropout = nn.Dropout(p_dropout)
 
     def forward(
             self,
             x: Tensor,
             mask: Union[None, Tensor]
-            ) -> Tensor:
+    ) -> Tensor:
         out = self.lnrom(x)
         out = add_pos_enc(out, self.d_model)
         out = super().forward(
             key=out, query=out,
             value=out, query_mask=mask,
             key_mask=mask
-            )
+        )
         out = self.dropout(out)
         return out
 
@@ -731,6 +745,7 @@ class ConformerBlock(nn.Module):
         p_dropout (float): The dropout rate.
         res_scaling (float): The residual connection multiplier.
     """
+
     def __init__(
             self,
             d_model: int,
@@ -739,7 +754,7 @@ class ConformerBlock(nn.Module):
             kernel_size: int,
             p_dropout: float,
             res_scaling: float = 0.5
-            ) -> None:
+    ) -> None:
         super().__init__()
         self.ff1 = ConformerFeedForward(
             d_model=d_model,
@@ -762,7 +777,7 @@ class ConformerBlock(nn.Module):
         )
         self.lnrom = nn.LayerNorm(
             normalized_shape=d_model
-            )
+        )
         self.res_scaling = res_scaling
 
     def forward(self, x: Tensor, mask: Union[None, Tensor]) -> Tensor:
@@ -789,6 +804,7 @@ class ConformerPreNet(nn.Module):
         p_dropout (float): The dropout rate.
         groups (Union[int, List[int]]): The convolution groups size.
     """
+
     def __init__(
             self,
             in_features: int,
@@ -798,7 +814,7 @@ class ConformerPreNet(nn.Module):
             d_model: int,
             p_dropout: float,
             groups: Union[int, List[int]] = 1
-            ) -> None:
+    ) -> None:
         super().__init__()
         self.layers = nn.ModuleList([
             nn.Conv1d(
@@ -808,9 +824,9 @@ class ConformerPreNet(nn.Module):
                 else kernel_size[i],
                 stride=stride if isinstance(stride, int) else stride[i],
                 groups=groups if isinstance(groups, int) else groups[i]
-                )
+            )
             for i in range(n_conv_layers)
-            ])
+        ])
 
         self.fc = nn.Linear(
             in_features=d_model,
@@ -820,7 +836,7 @@ class ConformerPreNet(nn.Module):
 
     def forward(
             self, x: Tensor, lengths: Tensor
-            ) -> Tuple[Tensor, Tensor]:
+    ) -> Tuple[Tensor, Tensor]:
         # x of shape [B, M, d]
         out = x.transpose(-1, -2)  # [B, d, M]
         for conv in self.layers:
@@ -852,6 +868,7 @@ class JasperSubBlock(nn.Module):
         stride (int): The convolution layer's stride. Default 1.
         padding (Union[str, int]): The padding mood/size. Default 'same'.
     """
+
     def __init__(
             self,
             in_channels: int,
@@ -860,7 +877,7 @@ class JasperSubBlock(nn.Module):
             p_dropout: float,
             stride: int = 1,
             padding: Union[str, int] = 'same'
-            ) -> None:
+    ) -> None:
         super().__init__()
         self.conv = nn.Conv1d(
             in_channels=in_channels,
@@ -878,7 +895,7 @@ class JasperSubBlock(nn.Module):
     def forward(
             self, x: Tensor,
             residual: Union[Tensor, None] = None
-            ) -> Tensor:
+    ) -> Tensor:
         # x and residual of shape [B, d, M]
         out = self.conv(x)
         out = self.bnorm(out)
@@ -897,11 +914,12 @@ class JasperResidual(nn.Module):
         in_channels (int): The number of the input's channels.
         out_channels (int): The number of the output's channels.
     """
+
     def __init__(
             self,
             in_channels: int,
             out_channels: int
-            ) -> None:
+    ) -> None:
         super().__init__()
         self.conv = nn.Conv1d(
             in_channels=in_channels,
@@ -932,6 +950,7 @@ class JasperBlock(nn.Module):
         kernel_size (int): The convolution layer's kernel size.
         p_dropout (float): The dropout rate.
     """
+
     def __init__(
             self,
             num_sub_blocks: int,
@@ -939,7 +958,7 @@ class JasperBlock(nn.Module):
             out_channels: int,
             kernel_size: int,
             p_dropout: float
-            ) -> None:
+    ) -> None:
         super().__init__()
         self.blocks = nn.ModuleList([
             JasperSubBlock(
@@ -951,9 +970,9 @@ class JasperBlock(nn.Module):
             for i in range(1, 1 + num_sub_blocks)
         ])
         self.residual_layer = JasperResidual(
-                in_channels=in_channels,
-                out_channels=out_channels
-            )
+            in_channels=in_channels,
+            out_channels=out_channels
+        )
         self.num_sub_blocks = num_sub_blocks
 
     def forward(self, x: Tensor) -> Tensor:
@@ -963,7 +982,7 @@ class JasperBlock(nn.Module):
             if (i + 1) == self.num_sub_blocks:
                 out = block(
                     out, residual=self.residual_layer(x)
-                    )
+                )
             else:
                 out = block(out)
         return out
@@ -985,6 +1004,7 @@ class JasperBlocks(nn.Module):
             kernel size of each block.
         p_dropout (float): The dropout rate.
     """
+
     def __init__(
             self,
             num_blocks: int,
@@ -993,7 +1013,7 @@ class JasperBlocks(nn.Module):
             channel_inc: int,
             kernel_size: Union[int, List[int]],
             p_dropout: float
-            ) -> None:
+    ) -> None:
         super().__init__()
         self.blocks = nn.ModuleList([
             JasperBlock(
@@ -1002,7 +1022,7 @@ class JasperBlocks(nn.Module):
                 out_channels=in_channels + channel_inc * (1 + i),
                 kernel_size=kernel_size if isinstance(
                     kernel_size, int
-                    ) else kernel_size[i],
+                ) else kernel_size[i],
                 p_dropout=p_dropout
             )
             for i in range(num_blocks)
@@ -1030,6 +1050,7 @@ class LocAwareGlobalAddAttention(nn.Module):
             Default 1.
         mask_val (float): The masking value. Default -1e12.
     """
+
     def __init__(
             self,
             enc_feat_size: int,
@@ -1038,7 +1059,7 @@ class LocAwareGlobalAddAttention(nn.Module):
             activation: str,
             inv_temperature: Union[float, int] = 1,
             mask_val: float = -1e12
-            ) -> None:
+    ) -> None:
         super().__init__()
         activations = {
             'softmax': nn.Softmax,
@@ -1049,21 +1070,21 @@ class LocAwareGlobalAddAttention(nn.Module):
         self.fc_query = nn.Linear(
             in_features=dec_feat_size,
             out_features=dec_feat_size
-            )
+        )
         self.fc_key = nn.Linear(
             in_features=enc_feat_size,
             out_features=dec_feat_size
-            )
+        )
         self.fc_value = nn.Linear(
             in_features=enc_feat_size,
             out_features=dec_feat_size
-            )
+        )
         self.conv = nn.Conv1d(
-                in_channels=1,
-                out_channels=dec_feat_size,
-                kernel_size=kernel_size,
-                padding='same'
-                )
+            in_channels=1,
+            out_channels=dec_feat_size,
+            kernel_size=kernel_size,
+            padding='same'
+        )
         self.pos_fc = nn.Linear(
             in_features=dec_feat_size,
             out_features=dec_feat_size
@@ -1080,7 +1101,7 @@ class LocAwareGlobalAddAttention(nn.Module):
             query: Tensor,
             alpha: Tensor,
             mask=None
-            ) -> Tuple[Tensor, Tensor]:
+    ) -> Tuple[Tensor, Tensor]:
         # alpha of shape [B, 1, M_enc]
         value = self.fc_value(key)
         key = self.fc_key(key)
@@ -1097,10 +1118,10 @@ class LocAwareGlobalAddAttention(nn.Module):
             mask = mask.unsqueeze(dim=-1)
             att_weights = att_weights.masked_fill(
                 ~mask, self.mask_val
-                )
+            )
         att_weights = self.activation(
             att_weights * self.inv_temperature
-            )
+        )
         att_weights = att_weights.transpose(-1, -2)
         context = torch.matmul(att_weights, value)
         return context, att_weights
@@ -1116,13 +1137,14 @@ class MultiHeadAtt2d(MultiHeadAtt):
         out_channels (int): The number of output channels of the convolution
         kernel_size (int): The convolutional layers' kernel size.
     """
+
     def __init__(
             self,
             d_model: int,
             h: int,
             out_channels: int,
             kernel_size: int
-            ) -> None:
+    ) -> None:
         super().__init__(out_channels, h)
         assert out_channels % h == 0
         self.query_conv = nn.Conv1d(
@@ -1130,19 +1152,19 @@ class MultiHeadAtt2d(MultiHeadAtt):
             out_channels=out_channels,
             kernel_size=kernel_size,
             padding='same'
-            )
+        )
         self.key_conv = nn.Conv1d(
             in_channels=d_model,
             out_channels=out_channels,
             kernel_size=kernel_size,
             padding='same'
-            )
+        )
         self.value_conv = nn.Conv1d(
             in_channels=d_model,
             out_channels=out_channels,
             kernel_size=kernel_size,
             padding='same'
-            )
+        )
         self.fc = nn.Linear(
             in_features=2 * out_channels,
             out_features=d_model
@@ -1153,7 +1175,7 @@ class MultiHeadAtt2d(MultiHeadAtt):
             key: Tensor,
             query: Tensor,
             value: Tensor,
-            ) -> Tensor:
+    ) -> Tensor:
         key = self._reshape(key)  # B, M, h, dk
         query = self._reshape(query)  # B, M, h, dk
         value = self._reshape(value)  # B, M, h, dk
@@ -1162,13 +1184,13 @@ class MultiHeadAtt2d(MultiHeadAtt):
         value = value.permute(0, 2, 3, 1)  # B, h, dk, M
         att = self.softmax(
             torch.matmul(query, key) / self.d_model
-            )
+        )
         out = torch.matmul(att, value)
         out = out.permute(0, 3, 2, 1)
         out = out.contiguous()
         out = out.view(
             out.shape[0], out.shape[1], -1
-            )
+        )
         return out
 
     def forward(
@@ -1177,7 +1199,7 @@ class MultiHeadAtt2d(MultiHeadAtt):
             query: Tensor,
             value: Tensor,
             mask: Union[Tensor, None]
-            ) -> Tensor:
+    ) -> Tensor:
         key = key.transpose(-1, -2)
         query = query.transpose(-1, -2)
         value = value.transpose(-1, -2)
@@ -1212,6 +1234,7 @@ class SpeechTransformerEncLayer(TransformerEncLayer):
         out_channels (int): The number of output channels of the convolution
         kernel_size (int): The convolutional layers' kernel size.
     """
+
     def __init__(
             self,
             d_model: int,
@@ -1219,7 +1242,7 @@ class SpeechTransformerEncLayer(TransformerEncLayer):
             h: int,
             out_channels: int,
             kernel_size: int
-            ) -> None:
+    ) -> None:
         # TODO: pass masking value
         # TODO: rename hidden size to ff_size
         super().__init__(
@@ -1237,12 +1260,12 @@ class SpeechTransformerEncLayer(TransformerEncLayer):
     def forward(self, x: Tensor, mask: Tensor) -> Tensor:
         out = self.mhsa(
             key=x, query=x, value=x, mask=mask
-            )
+        )
         out = self.add_and_norm1(x, out)
         result = self.ff(out)
         return self.add_and_norm2(
             out, result
-            )
+        )
 
 
 class TransformerDecLayer(nn.Module):
@@ -1255,13 +1278,14 @@ class TransformerDecLayer(nn.Module):
         h (int): The number of heads.
         masking_value (int): The masking value. Default -1e15
     """
+
     def __init__(
             self,
             d_model: int,
             hidden_size: int,
             h: int,
             masking_value: int = -1e15
-            ) -> None:
+    ) -> None:
         super().__init__()
         self.mmhsa = MaskedMultiHeadAtt(
             d_model=d_model,
@@ -1269,19 +1293,19 @@ class TransformerDecLayer(nn.Module):
         )
         self.add_and_norm1 = AddAndNorm(
             d_model=d_model
-            )
+        )
         self.mha = MultiHeadAtt(
             d_model=d_model, h=h, masking_value=masking_value
-            )
+        )
         self.add_and_norm2 = AddAndNorm(
             d_model=d_model
-            )
+        )
         self.ff = FeedForwardModule(
             d_model=d_model, hidden_size=hidden_size
-            )
+        )
         self.add_and_norm3 = AddAndNorm(
             d_model=d_model
-            )
+        )
 
     def forward(
             self,
@@ -1289,7 +1313,7 @@ class TransformerDecLayer(nn.Module):
             enc_mask: Union[Tensor, None],
             dec_inp: Tensor,
             dec_mask: Union[Tensor, None],
-            ) -> Tensor:
+    ) -> Tensor:
         out = self.mmhsa(
             key=dec_inp,
             query=dec_inp,
@@ -1322,23 +1346,24 @@ class PositionalEmbedding(nn.Module):
         vocab_size (int): The vocabulary size.
         embed_dim (int): The embedding size.
     """
+
     def __init__(
             self,
             vocab_size: int,
             embed_dim: int
-            ) -> None:
+    ) -> None:
         super().__init__()
         self.emb = nn.Embedding(
             num_embeddings=vocab_size,
             embedding_dim=embed_dim
-            )
+        )
         self.d_model = embed_dim
 
     def forward(self, x: Tensor) -> Tensor:
         max_len = x.shape[-1]
         pe = get_positional_encoding(
             max_length=max_len, d_model=self.d_model
-            )
+        )
         pe = pe.to(x.device)
         return self.emb(x) + pe
 
@@ -1364,7 +1389,7 @@ class TransformerDecoder(nn.Module):
             ff_size: int,
             h: int,
             masking_value: int = -1e15
-            ) -> None:
+    ) -> None:
         super().__init__()
         self.emb = PositionalEmbedding(
             vocab_size=n_classes,
@@ -1392,7 +1417,7 @@ class TransformerDecoder(nn.Module):
             enc_mask: Union[Tensor, None],
             dec_inp: Tensor,
             dec_mask: Union[Tensor, None],
-            ) -> Tensor:
+    ) -> Tensor:
         out = self.emb(dec_inp)
         for layer in self.layers:
             out = layer(
@@ -1412,6 +1437,7 @@ class GroupsShuffle(nn.Module):
     Args:
         groups (int): The groups size.
     """
+
     def __init__(self, groups: int) -> None:
         super().__init__()
         self.groups = groups
@@ -1422,7 +1448,7 @@ class GroupsShuffle(nn.Module):
         dims = x.shape[2:]
         x = x.view(
             batch_size, self.groups, channels // self.groups, *dims
-            )
+        )
         x = x.transpose(1, 2)
         x = x.contiguous()
         x = x.view(batch_size, channels, *dims)
@@ -1452,7 +1478,7 @@ class QuartzSubBlock(JasperSubBlock):
             groups: int,
             stride: int = 1,
             padding: Union[str, int] = 'same'
-            ) -> None:
+    ) -> None:
         super().__init__(
             in_channels,
             out_channels,
@@ -1460,14 +1486,14 @@ class QuartzSubBlock(JasperSubBlock):
             p_dropout,
             stride,
             padding
-            )
+        )
         self.conv = nn.Sequential(
             nn.Conv1d(
                 in_channels=out_channels,
                 out_channels=out_channels,
                 kernel_size=1,
                 groups=groups
-                ),
+            ),
             GroupsShuffle(
                 groups=groups
             )
@@ -1483,7 +1509,7 @@ class QuartzSubBlock(JasperSubBlock):
     def forward(
             self, x: Tensor,
             residual: Union[Tensor, None] = None
-            ) -> Tensor:
+    ) -> Tensor:
         # x and residual of shape [B, d, M]
         x = self.dwise_conv(x)
         return super().forward(x=x, residual=residual)
@@ -1502,6 +1528,7 @@ class QuartzBlock(JasperBlock):
         groups (int): The groups size.
         p_dropout (float): The dropout rate.
     """
+
     def __init__(
             self,
             num_sub_blocks: int,
@@ -1510,14 +1537,14 @@ class QuartzBlock(JasperBlock):
             kernel_size: int,
             groups: int,
             p_dropout: float
-            ) -> None:
+    ) -> None:
         super().__init__(
             num_sub_blocks,
             in_channels,
             out_channels,
             kernel_size,
             p_dropout
-            )
+        )
         self.blocks = nn.ModuleList([
             QuartzSubBlock(
                 in_channels=in_channels if i == 1 else out_channels,
@@ -1548,6 +1575,7 @@ class QuartzBlocks(JasperBlocks):
         groups (int): The groups size.
         p_dropout (float): The dropout rate.
     """
+
     def __init__(
             self,
             num_blocks: int,
@@ -1558,7 +1586,7 @@ class QuartzBlocks(JasperBlocks):
             kernel_size: Union[int, List[int]],
             groups: int,
             p_dropout: float
-            ) -> None:
+    ) -> None:
         super().__init__(
             num_blocks=num_blocks,
             num_sub_blocks=num_sub_blocks,
@@ -1566,7 +1594,7 @@ class QuartzBlocks(JasperBlocks):
             channel_inc=0,
             kernel_size=kernel_size,
             p_dropout=p_dropout
-            )
+        )
         assert len(channels_size) == num_blocks
         self.blocks = nn.ModuleList([])
         for i in range(num_blocks):
@@ -1598,6 +1626,7 @@ class Scaling1d(nn.Module):
     Args:
         d_model (int): The model dimension.
     """
+
     def __init__(self, d_model: int) -> None:
         super().__init__()
         self.gamma = nn.Parameter(
@@ -1624,7 +1653,7 @@ class SqueezeformerConvModule(ConformerConvModule):
 
     def __init__(
             self, d_model: int, kernel_size: int, p_dropout: float
-            ) -> None:
+    ) -> None:
         super().__init__(d_model, kernel_size, p_dropout)
         self.pwise_conv1 = nn.Conv1d(
             in_channels=d_model,
@@ -1660,16 +1689,17 @@ class SqueezeformerRelativeMHSA(MultiHeadAtt):
         p_dropout (float): The dropout rate.
         masking_value (int): The masking value. Default -1e15
     """
+
     def __init__(
             self,
             d_model: int,
             h: int,
             p_dropout: float,
             masking_value: int = -1e15
-            ) -> None:
+    ) -> None:
         super().__init__(
             d_model=d_model, h=h, masking_value=masking_value
-            )
+        )
         self.dropout = nn.Dropout(p_dropout)
         self.scaler = Scaling1d(d_model=d_model)
 
@@ -1677,14 +1707,14 @@ class SqueezeformerRelativeMHSA(MultiHeadAtt):
             self,
             x: Tensor,
             mask: Union[None, Tensor]
-            ) -> Tensor:
+    ) -> Tensor:
         out = self.scaler(x)
         out = add_pos_enc(out, self.d_model)
         out = super().forward(
             key=out, query=out,
             value=out, query_mask=mask,
             key_mask=mask
-            )
+        )
         out = self.dropout(out)
         return out
 
@@ -1706,7 +1736,7 @@ class SqueezeformerFeedForward(ConformerFeedForward):
             d_model: int,
             expansion_factor: int,
             p_dropout: float
-            ) -> None:
+    ) -> None:
         super().__init__(
             d_model=d_model,
             expansion_factor=expansion_factor,
@@ -1742,7 +1772,7 @@ class SqueezeformerBlock(nn.Module):
             self, d_model: int, ff_expansion_factor: int,
             h: int, kernel_size: int, p_dropout: float,
             masking_value: int = -1e15
-            ) -> None:
+    ) -> None:
         super().__init__()
         self.mhsa = SqueezeformerRelativeMHSA(
             d_model=d_model, h=h, p_dropout=p_dropout,
@@ -1759,7 +1789,7 @@ class SqueezeformerBlock(nn.Module):
             d_model=d_model,
             kernel_size=kernel_size,
             p_dropout=p_dropout
-            )
+        )
         self.add_and_norm3 = AddAndNorm(d_model=d_model)
         self.ff2 = SqueezeformerFeedForward(
             d_model=d_model,
