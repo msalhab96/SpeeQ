@@ -10,7 +10,7 @@ from trainers.schedulers import NoamScheduler, SqueezeformerNoamScheduler
 from trainers.trainers import (
     CTCTrainer, DistCTCTrainer, DistSeq2SeqTrainer, DistTransducerTrainer,
     Seq2SeqTrainer, TransducerTrainer
-    )
+)
 from utils.loggers import get_logger
 from utils.utils import set_state_dict
 
@@ -52,7 +52,7 @@ def get_criterion(
         pad_id: int,
         *args,
         **kwargs
-        ):
+):
     assert name in CRITERIONS
     return CRITERIONS[name](
         blank_id=blank_id,
@@ -72,7 +72,7 @@ def get_optimizer(model, trainer_config):
         )
     return OPTIMIZERS[trainer_config.optimizer](
         model.parameters(), **trainer_config.optim_args
-        )
+    )
 
 
 def _get_asr_trainer_args(
@@ -81,20 +81,20 @@ def _get_asr_trainer_args(
         trainer_config,
         data_config,
         model_config
-        ) -> dict:
+) -> dict:
     logger = get_logger(
         name=trainer_config.logger,
         log_dir=trainer_config.logdir,
         n_logs=trainer_config.n_logs,
         clear_screen=trainer_config.clear_screen
-        )
+    )
     tokenizer = get_tokenizer(
         data_config=data_config
-        )
+    )
     model = get_model(
         model_config=model_config,
         n_classes=tokenizer.vocab_size
-        )
+    )
     optimizer = get_optimizer(
         model=model, trainer_config=trainer_config
     )
@@ -109,7 +109,7 @@ def _get_asr_trainer_args(
             model=model,
             optimizer=optimizer,
             state_path=model_config.model_path
-            )
+        )
     else:
         history = {}
     train_loader, test_loader = get_asr_loaders(
@@ -140,7 +140,7 @@ def _get_dist_args(
         trainer_config,
         rank: int,
         world_size: int
-        ) -> dict:
+) -> dict:
     return {
         'rank': rank,
         'world_size': world_size,
@@ -156,7 +156,7 @@ def get_asr_trainer(
         trainer_config,
         data_config,
         model_config
-        ) -> ITrainer:
+) -> ITrainer:
     name = trainer_config.name
     base_args = _get_asr_trainer_args(
         rank=rank, world_size=world_size,
@@ -169,9 +169,9 @@ def get_asr_trainer(
             **base_args, **_get_dist_args(
                 rank=rank, world_size=world_size,
                 trainer_config=trainer_config
-                )
             )
         )
+    )
     if world_size == 1:
         return TRAINERS[name](**args)
     return DIST_TRAINERS[name](**args)

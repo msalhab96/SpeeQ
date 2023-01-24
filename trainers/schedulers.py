@@ -19,7 +19,7 @@ class Scheduler(IScheduler):
             params: Iterable,
             optimizer: str,
             optimizer_args: dict
-            ) -> None:
+    ) -> None:
         super().__init__()
         from .registry import OPTIMIZERS
         self.optimizer = OPTIMIZERS[optimizer](
@@ -68,12 +68,12 @@ class NoamScheduler(Scheduler):
             warmup_staps: int,
             d_model: int,
             *args, **kwargs
-            ) -> None:
+    ) -> None:
         super().__init__(
             params=params,
             optimizer=optimizer,
             optimizer_args=optimizer_args
-            )
+        )
         self.peak = 1 / sqrt(d_model)
         self.counter = 0
         self.warmup_staps = warmup_staps
@@ -118,7 +118,7 @@ class SqueezeformerNoamScheduler(NoamScheduler):
             decay_rate: Number,
             t_peak: int,
             *args, **kwargs
-            ) -> None:
+    ) -> None:
         self.lr_peak = lr_peak
         self.decay_rate = decay_rate
         self.t_peak = t_peak
@@ -129,7 +129,7 @@ class SqueezeformerNoamScheduler(NoamScheduler):
             optimizer_args=optimizer_args,
             warmup_staps=warmup_staps,
             d_model=1  # not used
-            )
+        )
 
     def get_lr(self) -> float:
         if self.counter < self.warmup_staps:

@@ -10,13 +10,13 @@ from trainers.decorators import export_ckpt, step_log
 from utils.loggers import ILogger
 from interfaces import (
     IScheduler, ITrainer, IDataLoader
-    )
+)
 from constants import HistoryKeys, LogCategories
 from torch.optim import Optimizer
 from torch.nn import Module
 from torch.distributed import (
     init_process_group, barrier, ReduceOp, all_reduce
-    )
+)
 from torch.nn.parallel import DistributedDataParallel
 from torch.multiprocessing import spawn
 from tqdm import tqdm
@@ -47,6 +47,7 @@ class BaseTrainer(ITrainer):
         history (dict): The history of the training if there is
         any. Default {}.
     """
+
     def __init__(
             self,
             optimizer: Union[Optimizer, IScheduler],
@@ -61,7 +62,7 @@ class BaseTrainer(ITrainer):
             grad_clip_thresh: Union[None, float] = None,
             grad_clip_norm_type: float = 2.0,
             history: dict = {}
-            ) -> None:
+    ) -> None:
         super().__init__()
         self.optimizer = optimizer
         self.criterion = criterion
@@ -84,7 +85,7 @@ class BaseTrainer(ITrainer):
                 self.model,
                 max_norm=self.grad_clip_thresh,
                 norm_type=self.grad_clip_norm_type
-                )
+            )
         loss.backward()
         self.optimizer.step()
         self.optimizer.zero_grad()
@@ -105,7 +106,7 @@ class BaseTrainer(ITrainer):
     @step_log(
         key=HistoryKeys.train_loss.value,
         category=LogCategories.batches.value
-        )
+    )
     def train_step(self, batch: Tuple[Tensor]) -> float:
         loss = self.forward_pass(batch)
         self.backward_pass(loss)
@@ -114,7 +115,7 @@ class BaseTrainer(ITrainer):
     @step_log(
         key=HistoryKeys.train_loss.value,
         category=LogCategories.epochs.value
-        )
+    )
     def train(self) -> float:
         self.model.train()
         total_loss = 0.0
@@ -128,18 +129,18 @@ class BaseTrainer(ITrainer):
                     key=HistoryKeys.train_loss.value,
                     category=LogCategories.steps.value,
                     value=total_loss / (i + 1)
-                    )
+                )
             self.counter += 1
         return total_loss / len(self.train_loader)
 
     @export_ckpt(
         key=HistoryKeys.test_loss.value,
         category=LogCategories.steps.value
-        )
+    )
     @step_log(
         key=HistoryKeys.test_loss.value,
         category=LogCategories.steps.value
-        )
+    )
     @torch.no_grad()
     def test(self) -> float:
         self.model.eval()
@@ -183,6 +184,7 @@ class BaseDistTrainer(BaseTrainer):
         history (dict): The history of the training if there is
         any. Default {}.
     """
+
     def __init__(
             self,
             optimizer: Union[Optimizer, IScheduler],
@@ -202,7 +204,7 @@ class BaseDistTrainer(BaseTrainer):
             grad_clip_thresh: Union[None, float] = None,
             grad_clip_norm_type: float = 2.0,
             history={}
-            ) -> None:
+    ) -> None:
         BaseTrainer.__init__(
             self,
             optimizer=optimizer,
@@ -249,7 +251,7 @@ class BaseDistTrainer(BaseTrainer):
 
     def _all_reduce_loss(
             self, total_loss: float, counter: int
-            ) -> Tensor:
+    ) -> Tensor:
         total = torch.tensor([total_loss/counter]).cuda(self.rank)
         all_reduce(total, op=ReduceOp.SUM)
         return total / self.world_size
@@ -257,7 +259,7 @@ class BaseDistTrainer(BaseTrainer):
     @step_log(
         key=HistoryKeys.train_loss.value,
         category=LogCategories.epochs.value
-        )
+    )
     def train(self) -> float:
         self.model.train()
         total_loss = 0.0
@@ -277,7 +279,7 @@ class BaseDistTrainer(BaseTrainer):
                         key=HistoryKeys.train_loss.value,
                         category=LogCategories.steps.value,
                         value=total.item()
-                        )
+                    )
                     self.test()
                     self.model.train()
                 if self.has_bnorm is False:
@@ -314,7 +316,7 @@ class CTCTrainer(BaseTrainer):
             grad_clip_thresh: Union[None, float] = None,
             grad_clip_norm_type: float = 2.0,
             history: dict = {}
-            ) -> None:
+    ) -> None:
         BaseTrainer.__init__(
             self,
             optimizer=optimizer,
@@ -337,13 +339,13 @@ class CTCTrainer(BaseTrainer):
             self, batch: Tuple[Tensor]) -> Tensor:
         batch = [
             item.to(self.device) for item in batch
-            ]
+        ]
         [speech, speech_mask, text, text_mask] = batch
         preds, lengths = self.model(speech, speech_mask)
         # preds of shape [T, B, C]
         loss = self.criterion(
             preds, text, lengths, text_mask.sum(dim=-1)
-            )
+        )
         return loss
 
 
@@ -367,7 +369,7 @@ class DistCTCTrainer(BaseDistTrainer, CTCTrainer):
             grad_clip_thresh: Union[None, float] = None,
             grad_clip_norm_type: float = 2.0,
             history: dict = {}
-            ) -> None:
+    ) -> None:
         CTCTrainer.__init__(
             self,
             optimizer=optimizer,
@@ -422,7 +424,7 @@ class Seq2SeqTrainer(BaseTrainer):
             grad_clip_thresh: Union[None, float] = None,
             grad_clip_norm_type: float = 2.0,
             history: dict = {}
-            ) -> None:
+    ) -> None:
         BaseTrainer.__init__(
             self,
             optimizer=optimizer,
@@ -445,7 +447,7 @@ class Seq2SeqTrainer(BaseTrainer):
             self, batch: Tuple[Tensor]) -> Tensor:
         batch = [
             item.to(self.device) for item in batch
-            ]
+        ]
         [speech, speech_mask, text, text_mask] = batch
         preds = self.model(speech, speech_mask, text, text_mask)
         # preds of shape [T, B, C]
@@ -473,7 +475,7 @@ class DistSeq2SeqTrainer(BaseDistTrainer, Seq2SeqTrainer):
             grad_clip_thresh: Union[None, float] = None,
             grad_clip_norm_type: float = 2.0,
             history: dict = {}
-            ) -> None:
+    ) -> None:
         Seq2SeqTrainer.__init__(
             self,
             optimizer=optimizer,
@@ -528,7 +530,7 @@ class TransducerTrainer(BaseTrainer):
             grad_clip_thresh: Union[None, float] = None,
             grad_clip_norm_type: float = 2.0,
             history: dict = {}
-            ) -> None:
+    ) -> None:
         BaseTrainer.__init__(
             self,
             optimizer=optimizer,
@@ -551,17 +553,16 @@ class TransducerTrainer(BaseTrainer):
             self, batch: Tuple[Tensor]) -> Tensor:
         batch = [
             item.to(self.device) for item in batch
-            ]
+        ]
         [speech, speech_mask, text, text_mask] = batch
         preds, speech_len, text_len = self.model(
             speech, speech_mask, text, text_mask
-            )
+        )
         text, speech_len, text_len = (
             text.int(), speech_len.int(), text_len.int()
-            )
+        )
         loss = self.criterion(preds, speech_len, text, text_len)
         return loss
-
 
 
 class DistTransducerTrainer(BaseDistTrainer, TransducerTrainer):
@@ -584,7 +585,7 @@ class DistTransducerTrainer(BaseDistTrainer, TransducerTrainer):
             grad_clip_thresh: Union[None, float] = None,
             grad_clip_norm_type: float = 2.0,
             history: dict = {}
-            ) -> None:
+    ) -> None:
         Seq2SeqTrainer.__init__(
             self,
             optimizer=optimizer,
@@ -629,7 +630,7 @@ def _run_trainer(
         trainer_config,
         data_config,
         model_config
-        ) -> None:
+) -> None:
     if rank != 0:
         # To make sure the master node created any dependancies
         # This can be replaced if we pass the rank to the
@@ -649,7 +650,7 @@ def launch_training_job(
         trainer_config: object,
         data_config: object,
         model_config: object
-        ) -> None:
+) -> None:
     """Launches ASR training job by constructing
     a trainer from the passed configuration and run it
     on single or multiple GPUS.
@@ -664,16 +665,16 @@ def launch_training_job(
         trainer_config=trainer_config,
         data_config=data_config,
         model_config=model_config
-        )
+    )
     if trainer_config.dist_config is None:
         trainer_launcher(
             rank=0,
             world_size=1
-            )
+        )
     else:
         world_size = trainer_config.dist_config.n_gpus
         spawn(
             trainer_launcher,
             nprocs=trainer_config.dist_config.n_gpus,
             args=(world_size,)
-            )
+        )

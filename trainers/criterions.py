@@ -12,17 +12,17 @@ class CTCLoss(nn.CTCLoss):
             zero_infinity=False,
             *args,
             **kwargs
-            ):
+    ):
         super().__init__(
             blank=blank_id,
             reduction=reduction,
             zero_infinity=zero_infinity
-            )
+        )
 
 
 def remove_positionals(
         input: Tensor, target: Tensor
-        ) -> Tuple[Tensor, Tensor]:
+) -> Tuple[Tensor, Tensor]:
     """Removes the SOS from the target and EOS
     prediction from the input
 
@@ -42,7 +42,7 @@ def remove_positionals(
 
 def get_flatten_results(
         input: Tensor, target: Tensor
-        ) -> Tuple[Tensor, Tensor]:
+) -> Tuple[Tensor, Tensor]:
     target = target.view(-1)
     input = input.view(-1, input.shape[-1])
     return input, target
@@ -55,7 +55,7 @@ class CrossEntropyLoss(nn.CrossEntropyLoss):
             reduction='mean',
             label_smoothing=0.0,
             *args, **kwargs
-            ) -> None:
+    ) -> None:
         super().__init__(
             ignore_index=pad_id,
             reduction=reduction,
@@ -76,7 +76,7 @@ class NLLLoss(nn.NLLLoss):
             pad_id: int,
             reduction='mean',
             *args, **kwargs
-            ) -> None:
+    ) -> None:
         super().__init__(
             ignore_index=pad_id,
             reduction=reduction
@@ -93,7 +93,7 @@ class NLLLoss(nn.NLLLoss):
 class RNNTLoss(transforms.RNNTLoss):
     def __init__(
             self, blank_id: int, reduction='mean', *args, **kwargs
-            ) -> None:
+    ) -> None:
         super().__init__(blank=blank_id, reduction=reduction)
 
     def forward(
@@ -102,7 +102,7 @@ class RNNTLoss(transforms.RNNTLoss):
             logits_len: Tensor,
             targets: Tensor,
             target_len: Tensor
-            ) -> Tensor:
+    ) -> Tensor:
         # logits of shape [B, Ts, Tt, C]
         # target of shape [B, Tt] and start with SOS
         targets = targets[:, 1:]
