@@ -8,7 +8,7 @@ from torch.optim import (
 from trainers.criterions import CTCLoss, CrossEntropyLoss, NLLLoss, RNNTLoss
 from trainers.schedulers import NoamScheduler, SqueezeformerNoamScheduler
 from trainers.trainers import (
-    CTCTrainer, DistCTCTrainer, DistSeq2SeqTrainer,
+    CTCTrainer, DistCTCTrainer, DistSeq2SeqTrainer, DistTransducerTrainer,
     Seq2SeqTrainer, TransducerTrainer
     )
 from utils.loggers import get_logger
@@ -36,7 +36,8 @@ TRAINERS = {
 
 DIST_TRAINERS = {
     'ctc': DistCTCTrainer,
-    'seq2seq': DistSeq2SeqTrainer
+    'seq2seq': DistSeq2SeqTrainer,
+    'transducer': DistTransducerTrainer
 }
 
 SCHEDULERS = {
