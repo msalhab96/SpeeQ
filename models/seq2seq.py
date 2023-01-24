@@ -40,6 +40,7 @@ class BasicAttSeq2SeqRNN(nn.Module):
             rnn_type: str = 'rnn',
     ) -> None:
         super().__init__()
+        self.has_bnorm = False
         self.encoder = RNNEncoder(
             in_features=in_features,
             hidden_size=hidden_size,
@@ -252,6 +253,7 @@ class SpeechTransformer(nn.Module):
             masking_value: int = -1e15
     ) -> None:
         super().__init__()
+        self.has_bnorm = False
         self.encoder = SpeechTransformerEncoder(
             in_features=in_features,
             n_conv_layers=n_conv_layers,

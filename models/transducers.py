@@ -12,6 +12,7 @@ class BaseTransducer(nn.Module):
             n_classes: int
     ) -> None:
         super().__init__()
+        self.has_bnorm = False
         self.join_net = nn.Linear(
             in_features=feat_size,
             out_features=n_classes
