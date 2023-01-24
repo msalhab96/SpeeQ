@@ -1,10 +1,10 @@
 from models.encoders import (
-    ConformerEncoder, DeepSpeechV1Encoder, DeepSpeechV2Encoder, JasperEncoder
+    ConformerEncoder, DeepSpeechV1Encoder, DeepSpeechV2Encoder,
+    JasperEncoder, Wav2LetterEncoder
     )
 import torch
 from typing import List, Optional, Tuple, Union
 
-from utils.utils import calc_data_len
 from .layers import (
     ConvPredModule, JasperSubBlock,
     PredModule, QuartzBlocks,
@@ -326,7 +326,7 @@ class Jasper(CTCModel):
         )
 
 
-class Wav2Letter(nn.Module):
+class Wav2Letter(CTCModel):
     """Implements Wav2Letter model proposed in
     https://arxiv.org/abs/1609.03193
 
@@ -363,94 +363,25 @@ class Wav2Letter(nn.Module):
             wav_kernel_size: Optional[int] = None,
             wav_stride: Optional[int] = None
             ) -> None:
-        super().__init__()
-        self.is_wav = in_features == 1
-        self.has_bnorm = False
-        if self.is_wav:
-            assert wav_kernel_size is not None
-            assert wav_stride is not None
-            self.raw_conv = nn.Conv1d(
-                in_channels=1,
-                out_channels=layers_channels_size,
-                kernel_size=wav_kernel_size,
-                stride=wav_stride
-                )
-        self.pre_conv = nn.Conv1d(
-            in_channels=layers_channels_size if self.is_wav else in_features,
-            out_channels=layers_channels_size,
-            kernel_size=pre_conv_kernel_size,
-            stride=pre_conv_stride
+        super().__init__(1, 1)
+        self.encoder = Wav2LetterEncoder(
+            in_features=in_features,
+            n_conv_layers=n_conv_layers,
+            layers_kernel_size=layers_kernel_size,
+            layers_channels_size=layers_channels_size,
+            pre_conv_stride=pre_conv_stride,
+            pre_conv_kernel_size=pre_conv_kernel_size,
+            post_conv_channels_size=post_conv_channels_size,
+            post_conv_kernel_size=post_conv_kernel_size,
+            p_dropout=p_dropout,
+            wav_kernel_size=wav_kernel_size,
+            wav_stride=wav_stride
             )
-        self.convs = nn.ModuleList([
-            nn.Conv1d(
-                in_channels=layers_channels_size,
-                out_channels=layers_channels_size,
-                kernel_size=layers_kernel_size,
-                padding='same'
-            )
-            for _ in range(n_conv_layers - 1)
-        ])
-        self.convs.append(
-            nn.Conv1d(
-                in_channels=layers_channels_size,
-                out_channels=post_conv_channels_size,
-                kernel_size=post_conv_kernel_size,
-                padding='same'
-            )
+        self.pred_net = ConvPredModule(
+            in_features=post_conv_channels_size,
+            n_classes=n_classes,
+            activation=nn.LogSoftmax(dim=-2)
         )
-        self.post_conv = nn.Conv1d(
-            in_channels=post_conv_channels_size,
-            out_channels=post_conv_channels_size,
-            kernel_size=1,
-            padding='same'
-        )
-        self.pred_net = nn.Conv1d(
-            in_channels=post_conv_channels_size,
-            out_channels=n_classes,
-            kernel_size=1
-        )
-        self.log_softmax = nn.LogSoftmax(dim=-2)
-        self.dropout = nn.Dropout(p_dropout)
-
-    def forward(self, x: Tensor, mask: Tensor) -> Tuple[Tensor, Tensor]:
-        # x of shape [B, M, d]
-        lengths = mask.sum(dim=-1)
-        lengths = lengths.cpu()
-        x = x.transpose(-1, -2)
-        out = x
-        if self.is_wav:
-            out = self.raw_conv(out)
-            out = torch.tanh(out)
-            out = self.dropout(out)
-            lengths = calc_data_len(
-                result_len=out.shape[-1],
-                pad_len=x.shape[-1] - lengths,
-                data_len=lengths,
-                kernel_size=self.raw_conv.kernel_size[0],
-                stride=self.raw_conv.stride[0]
-            )
-        results = self.pre_conv(out)
-        lengths = calc_data_len(
-            result_len=results.shape[-1],
-            pad_len=out.shape[-1] - lengths,
-            data_len=lengths,
-            kernel_size=self.pre_conv.kernel_size[0],
-            stride=self.pre_conv.stride[0]
-        )
-        out = results
-        out = torch.tanh(out)
-        out = self.dropout(out)
-        for layer in self.convs:
-            out = layer(out)
-            out = torch.tanh(out)
-            out = self.dropout(out)
-        out = self.post_conv(out)
-        out = torch.tanh(out)
-        out = self.dropout(out)
-        preds = self.pred_net(out)
-        preds = self.log_softmax(preds)
-        preds = preds.permute(2, 0, 1)
-        return preds, lengths
 
 
 class QuartzNet(Jasper):
