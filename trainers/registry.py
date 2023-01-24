@@ -1,16 +1,15 @@
 import os
+
+from torch.optim import SGD, Adam, AdamW, RMSprop
+
 from data.registry import get_asr_loaders, get_tokenizer
 from interfaces import ITrainer
 from models.registry import get_model
-from torch.optim import (
-    Adam, RMSprop, SGD, AdamW
-)
-from trainers.criterions import CTCLoss, CrossEntropyLoss, NLLLoss, RNNTLoss
+from trainers.criterions import CrossEntropyLoss, CTCLoss, NLLLoss, RNNTLoss
 from trainers.schedulers import NoamScheduler, SqueezeformerNoamScheduler
-from trainers.trainers import (
-    CTCTrainer, DistCTCTrainer, DistSeq2SeqTrainer, DistTransducerTrainer,
-    Seq2SeqTrainer, TransducerTrainer
-)
+from trainers.trainers import (CTCTrainer, DistCTCTrainer, DistSeq2SeqTrainer,
+                               DistTransducerTrainer, Seq2SeqTrainer,
+                               TransducerTrainer)
 from utils.loggers import get_logger
 from utils.utils import set_state_dict
 

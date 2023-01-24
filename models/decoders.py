@@ -1,14 +1,11 @@
-import torch
-from torch import nn
-from torch import Tensor
 from typing import Tuple, Union
-from models.layers import (
-    GlobalMulAttention,
-    LocAwareGlobalAddAttention,
-    PositionalEmbedding,
-    PredModule,
-    TransformerDecLayer
-)
+
+import torch
+from torch import Tensor, nn
+
+from models.layers import (GlobalMulAttention, LocAwareGlobalAddAttention,
+                           PositionalEmbedding, PredModule,
+                           TransformerDecLayer)
 
 
 class GlobAttRNNDecoder(nn.Module):

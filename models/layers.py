@@ -1,15 +1,12 @@
-from models.activations import Sigmax
+from typing import List, Tuple, Union
+
 import torch
 import torch.nn as nn
 from torch import Tensor
-from typing import List, Tuple, Union
-from torch.nn.utils.rnn import (
-    pack_padded_sequence, pad_packed_sequence
-)
-from utils.utils import (
-    add_pos_enc, calc_data_len,
-    get_positional_encoding
-)
+from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
+
+from models.activations import Sigmax
+from utils.utils import add_pos_enc, calc_data_len, get_positional_encoding
 
 
 class PackedRNN(nn.Module):

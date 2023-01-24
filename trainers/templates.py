@@ -1,5 +1,6 @@
 from dataclasses import asdict, dataclass
 from numbers import Number
+
 from constants import SCHEDULER_TYPE_KEY
 from interfaces import ITemplate
 

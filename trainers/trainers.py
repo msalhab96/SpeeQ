@@ -1,26 +1,23 @@
+import os
+import time
 from functools import partial
 from math import inf
-import os
 from pathlib import Path
-import time
+from typing import Tuple, Union
+
 import torch
 from torch import Tensor
-from typing import Tuple, Union
-from trainers.decorators import export_ckpt, step_log
-from utils.loggers import ILogger
-from interfaces import (
-    IScheduler, ITrainer, IDataLoader
-)
-from constants import HistoryKeys, LogCategories
-from torch.optim import Optimizer
-from torch.nn import Module
-from torch.distributed import (
-    init_process_group, barrier, ReduceOp, all_reduce
-)
-from torch.nn.parallel import DistributedDataParallel
+from torch.distributed import ReduceOp, all_reduce, barrier, init_process_group
 from torch.multiprocessing import spawn
+from torch.nn import Module
+from torch.nn.parallel import DistributedDataParallel
+from torch.optim import Optimizer
 from tqdm import tqdm
 
+from constants import HistoryKeys, LogCategories
+from interfaces import IDataLoader, IScheduler, ITrainer
+from trainers.decorators import export_ckpt, step_log
+from utils.loggers import ILogger
 from utils.utils import get_key_tag
 
 

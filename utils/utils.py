@@ -1,15 +1,16 @@
-import os
 import json
-import torch
+import os
 import platform
-from torch import Tensor
-from pathlib import Path
-from typing import Union, List
 from csv import DictReader
-from constants import FileKeys
+from pathlib import Path
+from typing import List, Union
+
+import torch
+from torch import Tensor
 from torch.nn import Module
 from torch.optim import Optimizer
-from constants import StateKeys
+
+from constants import FileKeys, StateKeys
 
 
 def clear():
@@ -36,10 +37,10 @@ def load_text(file_path, encoding='utf-8'):
 
 
 def save_json(
-        file_path,
-        data: Union[dict, list],
-        encoding='utf-8'
-        ) -> None:
+    file_path,
+    data: Union[dict, list],
+    encoding='utf-8'
+) -> None:
     with open(file_path, 'w', encoding=encoding) as f:
         json.dump(data, f)
 
@@ -48,7 +49,7 @@ def save_text(
         file_path,
         data: str,
         encoding='utf-8'
-        ) -> None:
+) -> None:
     with open(file_path, 'w', encoding=encoding) as f:
         f.write(data)
 
@@ -57,7 +58,7 @@ def load_csv(
         file_path,
         encoding='utf-8',
         sep=','
-        ):
+):
     with open(file_path, 'r', encoding=encoding) as f:
         data = [*DictReader(f, delimiter=sep)]
     return data
@@ -73,11 +74,11 @@ def get_state_dict(
         optimizer: Optimizer,
         step: int,
         history: dict
-        ) -> dict:
+) -> dict:
     model = {
         key.replace('module.', ''): value
         for key, value in model.state_dict().items()
-        }
+    }
     return {
         StateKeys.model.value: model,
         StateKeys.optimizer.value: optimizer.state_dict(),
@@ -93,19 +94,19 @@ def save_state_dict(
         optimizer: Optimizer,
         step: int,
         history: dict
-        ) -> None:
+) -> None:
     ckpt_path = '{}_{}.pt'.format(
         model_name, step
     )
     ckpt_path = os.path.join(
         outdir, ckpt_path
-        )
+    )
     state = get_state_dict(
         model=model,
         optimizer=optimizer,
         step=step,
         history=history
-        )
+    )
     torch.save(state, ckpt_path)
     print(f'checkpoint save to {ckpt_path}!')
 
@@ -138,7 +139,7 @@ def calc_data_len(
         data_len: Union[Tensor, int],
         kernel_size: int,
         stride: int
-        ) -> Union[Tensor, int]:
+) -> Union[Tensor, int]:
     """Calculates the new data portion size
     after applying convolution on a padded tensor
 
@@ -217,6 +218,6 @@ def add_pos_enc(x: Tensor, d_model: int) -> Tensor:
     """
     pe = get_positional_encoding(
         x.shape[1], d_model
-        )
+    )
     pe = pe.to(x.device)
     return pe + x

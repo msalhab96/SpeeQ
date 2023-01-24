@@ -1,15 +1,14 @@
-from models.encoders import (
-    ConformerEncoder, DeepSpeechV1Encoder, DeepSpeechV2Encoder,
-    JasperEncoder, QuartzNetEncoder, Wav2LetterEncoder, SqueezeformerEncoder
-)
-import torch
 from typing import List, Optional, Tuple, Union
 
-from .layers import (
-    ConvPredModule, PredModule, TransformerEncLayer
-)
-from torch import nn
-from torch import Tensor
+import torch
+from torch import Tensor, nn
+
+from models.encoders import (ConformerEncoder, DeepSpeechV1Encoder,
+                             DeepSpeechV2Encoder, JasperEncoder,
+                             QuartzNetEncoder, SqueezeformerEncoder,
+                             Wav2LetterEncoder)
+
+from .layers import ConvPredModule, PredModule, TransformerEncLayer
 
 
 class CTCModel(nn.Module):

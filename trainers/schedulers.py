@@ -1,6 +1,7 @@
 from math import sqrt
 from numbers import Number
 from typing import Iterable
+
 from constants import OPTIMIZER_STATE_KEY
 from interfaces import IScheduler
 

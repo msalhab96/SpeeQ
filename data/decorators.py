@@ -1,5 +1,5 @@
-from typing import Callable
 from functools import wraps
+from typing import Callable
 
 
 def check_token(token: str) -> Callable:

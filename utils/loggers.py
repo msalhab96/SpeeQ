@@ -1,8 +1,11 @@
 from pathlib import Path
 from typing import Union
-from .utils import clear
+
 from torch.utils.tensorboard import SummaryWriter
+
 from interfaces import ILogger
+
+from .utils import clear
 
 
 class TBLogger(ILogger):
@@ -13,7 +16,7 @@ class TBLogger(ILogger):
             clear_screen: bool,
             *args,
             **kwargs
-            ) -> None:
+    ) -> None:
         super().__init__()
         self.writer = SummaryWriter(log_dir)
         self.__counters = dict()
@@ -26,7 +29,7 @@ class TBLogger(ILogger):
             key: str,
             category: str,
             value: Union[int, float]
-            ) -> None:
+    ) -> None:
         tag = f'{key}/{category}'
         if tag in self.__counters:
             self.__counters[tag] += 1
@@ -39,7 +42,7 @@ class TBLogger(ILogger):
     def log(self, history: dict):
         logs = {
             key: value[-self.n_logs:] for key, value in history.items()
-            }
+        }
         if self.clear_screen is True:
             clear()  # cleaning the screen up
         print(logs)
@@ -50,7 +53,7 @@ def get_logger(
         log_dir: Union[str, Path],
         n_logs: int,
         *args, **kwargs
-        ) -> ILogger:
+) -> ILogger:
     if name in 'tb':
         return TBLogger(
             log_dir=log_dir,

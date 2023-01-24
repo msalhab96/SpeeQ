@@ -1,19 +1,14 @@
-from models.seq2seq import (
-    LAS, BasicAttSeq2SeqRNN,
-    RNNWithLocationAwareAtt, SpeechTransformer
-)
-from models.transducers import RNNTransducer
-from torch import nn
 from typing import List
-from .layers import (
-    PackedGRU,
-    PackedLSTM,
-    PackedRNN
-)
-from .ctc import (
-    BERT, Conformer, DeepSpeechV1, DeepSpeechV2,
-    Jasper, QuartzNet, Squeezeformer, Wav2Letter
-)
+
+from torch import nn
+
+from models.seq2seq import (LAS, BasicAttSeq2SeqRNN, RNNWithLocationAwareAtt,
+                            SpeechTransformer)
+from models.transducers import RNNTransducer
+
+from .ctc import (BERT, Conformer, DeepSpeechV1, DeepSpeechV2, Jasper,
+                  QuartzNet, Squeezeformer, Wav2Letter)
+from .layers import PackedGRU, PackedLSTM, PackedRNN
 
 PACKED_RNN_REGISTRY = {
     'rnn': PackedRNN,

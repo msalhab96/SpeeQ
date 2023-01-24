@@ -1,8 +1,9 @@
 from typing import Tuple
+
+from torch import Tensor, nn
+
 from models.decoders import RNNDecoder
 from models.encoders import RNNEncoder
-from torch import nn
-from torch import Tensor
 
 
 class BaseTransducer(nn.Module):

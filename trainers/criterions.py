@@ -1,6 +1,6 @@
 from typing import Tuple
-from torch import Tensor
-from torch import nn
+
+from torch import Tensor, nn
 from torchaudio import transforms
 
 
