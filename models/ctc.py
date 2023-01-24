@@ -1,12 +1,12 @@
 from models.encoders import (
-    ConformerEncoder, DeepSpeechV1Encoder, DeepSpeechV2Encoder
+    ConformerEncoder, DeepSpeechV1Encoder, DeepSpeechV2Encoder, JasperEncoder
     )
 import torch
 from typing import List, Optional, Tuple, Union
 
 from utils.utils import calc_data_len
 from .layers import (
-    JasperBlocks, JasperSubBlock,
+    ConvPredModule, JasperSubBlock,
     PredModule, QuartzBlocks,
     SqueezeformerEncoder, TransformerEncLayer
     )
@@ -265,7 +265,7 @@ class Conformer(CTCModel):
         self.has_bnorm = True
 
 
-class Jasper(nn.Module):
+class Jasper(CTCModel):
     """Implements Jasper model architecture proposed
     in https://arxiv.org/abs/1904.03288
 
@@ -301,71 +301,29 @@ class Jasper(nn.Module):
             blocks_kernel_size: Union[int, List[int]],
             p_dropout: float
             ) -> None:
-        super().__init__()
+        super().__init__(1, 1)
         # TODO: Add activation function options
         # TODO: Add normalization options
         # TODO: Add residual connections options
         # TODO: passing dropout list
         self.has_bnorm = True
-        self.prelog = JasperSubBlock(
-            in_channels=in_features,
-            out_channels=prelog_n_channels,
-            kernel_size=prelog_kernel_size,
-            p_dropout=p_dropout,
-            padding=0,
-            stride=prelog_stride
-        )
-        self.prelog_stride = prelog_stride
-        self.prelog_kernel_size = prelog_kernel_size
-        self.blocks = JasperBlocks(
+        self.encoder = JasperEncoder(
+            in_features=in_features,
             num_blocks=num_blocks,
             num_sub_blocks=num_sub_blocks,
-            in_channels=prelog_n_channels,
             channel_inc=channel_inc,
-            kernel_size=blocks_kernel_size,
+            epilog_kernel_size=epilog_kernel_size,
+            prelog_kernel_size=prelog_kernel_size,
+            prelog_stride=prelog_stride,
+            prelog_n_channels=prelog_n_channels,
+            blocks_kernel_size=blocks_kernel_size,
             p_dropout=p_dropout
+            )
+        self.pred_net = ConvPredModule(
+            in_features=prelog_n_channels + channel_inc * (2 + num_blocks),
+            n_classes=n_classes,
+            activation=nn.LogSoftmax(dim=-2)
         )
-        self.epilog1 = JasperSubBlock(
-            in_channels=prelog_n_channels + channel_inc * num_blocks,
-            out_channels=prelog_n_channels + channel_inc * (1 + num_blocks),
-            kernel_size=epilog_kernel_size,
-            p_dropout=p_dropout,
-        )
-        self.epilog2 = JasperSubBlock(
-            in_channels=prelog_n_channels + channel_inc * (1 + num_blocks),
-            out_channels=prelog_n_channels + channel_inc * (2 + num_blocks),
-            kernel_size=1,
-            p_dropout=p_dropout
-        )
-        self.pred_net = nn.Conv1d(
-            in_channels=prelog_n_channels + channel_inc * (2 + num_blocks),
-            out_channels=n_classes,
-            kernel_size=1
-        )
-        self.log_softmax = nn.LogSoftmax(dim=-2)
-
-    def forward(
-            self, x: Tensor, mask: Tensor
-            ) -> Tuple[Tensor, Tensor]:
-        # x of shape [B, M, d]
-        lengths = mask.sum(dim=-1)
-        lengths = lengths.cpu()
-        x = x.transpose(-1, -2)
-        out = self.prelog(x)
-        lengths = calc_data_len(
-            result_len=out.shape[-1],
-            pad_len=x.shape[-1] - lengths,
-            data_len=lengths,
-            kernel_size=self.prelog_kernel_size,
-            stride=self.prelog_stride
-        )
-        out = self.blocks(out)
-        out = self.epilog1(out)
-        out = self.epilog2(out)
-        preds = self.pred_net(out)
-        preds = self.log_softmax(preds)
-        preds = preds.permute(2, 0, 1)
-        return preds, lengths
 
 
 class Wav2Letter(nn.Module):

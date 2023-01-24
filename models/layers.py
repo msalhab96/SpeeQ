@@ -122,6 +122,38 @@ class PredModule(nn.Module):
         return self.activation(self.fc(x))
 
 
+class ConvPredModule(nn.Module):
+    """A prediction module that consist of a signle
+    Conv1d layer followed by a pre-defined activation
+    function.
+
+    Args:
+        in_features (int): The input feature size.
+        n_classes (int): The number of classes to produce.
+        activation (Module): The activation function to be used.
+    """
+    def __init__(
+            self,
+            in_features: int,
+            n_classes: int,
+            activation: nn.Module
+            ) -> None:
+        super().__init__()
+        self.activation = activation
+        self.conv = nn.Conv1d(
+            in_channels=in_features,
+            out_channels=n_classes,
+            kernel_size=1
+        )
+
+    def forward(self, x: Tensor) -> Tensor:
+        # B, d, M
+        out = self.conv(x)
+        out = self.activation(out)
+        out = out.transpose(-1, -2)
+        return out
+
+
 class CReLu(nn.Module):
     """clipped rectified-linear unit, can be described as
     min{max{0, x}, max_value}

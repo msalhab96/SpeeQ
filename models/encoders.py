@@ -1,10 +1,11 @@
-from typing import Tuple
+from typing import List, Tuple, Union
 from models.layers import (
-    CReLu, ConformerBlock, ConformerPreNet, Conv1DLayers, RowConv1D
-    )
+    CReLu, ConformerBlock, ConformerPreNet, Conv1DLayers,
+    JasperBlocks, JasperSubBlock, RowConv1D
+)
 from torch import nn
 from torch import Tensor
-from utils.utils import get_mask_from_lens
+from utils.utils import calc_data_len, get_mask_from_lens
 
 
 class DeepSpeechV1Encoder(nn.Module):
@@ -231,4 +232,92 @@ class ConformerEncoder(nn.Module):
         mask = mask.to(x.device)
         for layer in self.blocks:
             out = layer(out, mask)
+        return out, lengths
+
+
+class JasperEncoder(nn.Module):
+    """Implements Jasper model architecture proposed
+    in https://arxiv.org/abs/1904.03288
+
+    Args:
+        in_features (int): The input/speech feature size.
+        num_blocks (int): The number of jasper blocks, denoted
+            as 'B' in the paper.
+        num_sub_blocks (int): The number of jasper subblocks, denoted
+            as 'R' in the paper.
+        channel_inc (int): The rate to increase the number of channels
+            across the blocks.
+        epilog_kernel_size (int): The epilog block convolution's kernel size.
+        prelog_kernel_size (int): The prelog block convolution's kernel size.
+        prelog_stride (int): The prelog block convolution's stride.
+        prelog_n_channels (int): The prelog block convolution's number of
+            output channnels.
+        blocks_kernel_size (Union[int, List[int]]): The convolution layer's
+            kernel size of each jasper block.
+        p_dropout (float): The dropout rate.
+    """
+
+    def __init__(
+            self,
+            in_features: int,
+            num_blocks: int,
+            num_sub_blocks: int,
+            channel_inc: int,
+            epilog_kernel_size: int,
+            prelog_kernel_size: int,
+            prelog_stride: int,
+            prelog_n_channels: int,
+            blocks_kernel_size: Union[int, List[int]],
+            p_dropout: float
+    ) -> None:
+        super().__init__()
+        self.prelog = JasperSubBlock(
+            in_channels=in_features,
+            out_channels=prelog_n_channels,
+            kernel_size=prelog_kernel_size,
+            p_dropout=p_dropout,
+            padding=0,
+            stride=prelog_stride
+        )
+        self.prelog_stride = prelog_stride
+        self.prelog_kernel_size = prelog_kernel_size
+        self.blocks = JasperBlocks(
+            num_blocks=num_blocks,
+            num_sub_blocks=num_sub_blocks,
+            in_channels=prelog_n_channels,
+            channel_inc=channel_inc,
+            kernel_size=blocks_kernel_size,
+            p_dropout=p_dropout
+        )
+        self.epilog1 = JasperSubBlock(
+            in_channels=prelog_n_channels + channel_inc * num_blocks,
+            out_channels=prelog_n_channels + channel_inc * (1 + num_blocks),
+            kernel_size=epilog_kernel_size,
+            p_dropout=p_dropout,
+        )
+        self.epilog2 = JasperSubBlock(
+            in_channels=prelog_n_channels + channel_inc * (1 + num_blocks),
+            out_channels=prelog_n_channels + channel_inc * (2 + num_blocks),
+            kernel_size=1,
+            p_dropout=p_dropout
+        )
+
+    def forward(
+            self, x: Tensor, mask: Tensor
+    ) -> Tuple[Tensor, Tensor]:
+        # x of shape [B, M, d]
+        lengths = mask.sum(dim=-1)
+        lengths = lengths.cpu()
+        x = x.transpose(-1, -2)
+        out = self.prelog(x)
+        lengths = calc_data_len(
+            result_len=out.shape[-1],
+            pad_len=x.shape[-1] - lengths,
+            data_len=lengths,
+            kernel_size=self.prelog_kernel_size,
+            stride=self.prelog_stride
+        )
+        out = self.blocks(out)
+        out = self.epilog1(out)
+        out = self.epilog2(out)
         return out, lengths
