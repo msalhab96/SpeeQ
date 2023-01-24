@@ -1,13 +1,13 @@
 from models.encoders import (
     ConformerEncoder, DeepSpeechV1Encoder, DeepSpeechV2Encoder,
     JasperEncoder, QuartzNetEncoder, Wav2LetterEncoder, SqueezeformerEncoder
-    )
+)
 import torch
 from typing import List, Optional, Tuple, Union
 
 from .layers import (
     ConvPredModule, PredModule, TransformerEncLayer
-    )
+)
 from torch import nn
 from torch import Tensor
 
@@ -24,7 +24,7 @@ class CTCModel(nn.Module):
 
     def forward(
             self, x: Tensor, mask: Tensor, *args, **kwargs
-            ):
+    ):
         out, lengths = self.encoder(x, mask, *args, **kwargs)  # B, M, d
         preds = self.pred_net(out)  # B, M, C
         preds = preds.permute(1, 0, 2)  # M, B, C
@@ -45,6 +45,7 @@ class DeepSpeechV1(CTCModel):
         rnn_type (str): rnn, gru or lstm.
         p_dropout (float): The dropout rate.
     """
+
     def __init__(
             self,
             in_features: int,
@@ -55,7 +56,7 @@ class DeepSpeechV1(CTCModel):
             max_clip_value: int,
             rnn_type: str,
             p_dropout: float
-            ) -> None:
+    ) -> None:
         super().__init__(
             pred_in_size=hidden_size,
             n_classes=n_classes
@@ -68,7 +69,7 @@ class DeepSpeechV1(CTCModel):
             max_clip_value=max_clip_value,
             rnn_type=rnn_type,
             p_dropout=p_dropout
-            )
+        )
 
     @torch.no_grad()
     def predict(self, x: Tensor) -> Tensor:
@@ -92,6 +93,7 @@ class BERT(nn.Module):
         n_classes (int): The number of classes.
         p_dropout (float): The dropout rate.
     """
+
     def __init__(
             self,
             max_len: int,
@@ -102,7 +104,7 @@ class BERT(nn.Module):
             n_layers: int,
             n_classes: int,
             p_dropout: float
-            ) -> None:
+    ) -> None:
         super().__init__()
         self.fc = nn.Linear(
             in_features=in_feature,
@@ -110,13 +112,13 @@ class BERT(nn.Module):
         )
         self.pos_emb = nn.Parameter(
             torch.randn(max_len, d_model)
-            )
+        )
         self.layers = nn.ModuleList([
             TransformerEncLayer(
                 d_model=d_model,
                 hidden_size=hidden_size,
                 h=h
-                )
+            )
             for _ in range(n_layers)
         ])
         self.pred_module = PredModule(
@@ -135,7 +137,7 @@ class BERT(nn.Module):
         emb = emb.unsqueeze(dim=0)  # 1, M, d
         emb = emb.repeat(
             mask.shape[0], 1, 1
-            )  # B, M , d
+        )  # B, M , d
         mask = mask.unsqueeze(dim=-1)  # B, M, 1
         emb = mask * emb
         return emb + x
@@ -173,6 +175,7 @@ class DeepSpeechV2(CTCModel):
         tau (int): The future context size.
         p_dropout (float): The dropout rate.
     """
+
     def __init__(
             self,
             n_conv: int,
@@ -188,7 +191,7 @@ class DeepSpeechV2(CTCModel):
             rnn_type: str,
             tau: int,
             p_dropout: float
-            ) -> None:
+    ) -> None:
         super().__init__(
             pred_in_size=hidden_size,
             n_classes=n_classes
@@ -206,7 +209,7 @@ class DeepSpeechV2(CTCModel):
             rnn_type=rnn_type,
             tau=tau,
             p_dropout=p_dropout
-            )
+        )
 
 
 class Conformer(CTCModel):
@@ -228,6 +231,7 @@ class Conformer(CTCModel):
         res_scaling (float): The residual connection multiplier.
         p_dropout (float): The dropout rate.
     """
+
     def __init__(
             self,
             n_classes: int,
@@ -242,7 +246,7 @@ class Conformer(CTCModel):
             in_features: int,
             res_scaling: float,
             p_dropout: float
-            ) -> None:
+    ) -> None:
         super().__init__(
             pred_in_size=d_model,
             n_classes=n_classes
@@ -259,7 +263,7 @@ class Conformer(CTCModel):
             in_features=in_features,
             res_scaling=res_scaling,
             p_dropout=p_dropout
-            )
+        )
         self.has_bnorm = True
 
 
@@ -285,6 +289,7 @@ class Jasper(CTCModel):
             kernel size of each jasper block.
         p_dropout (float): The dropout rate.
     """
+
     def __init__(
             self,
             n_classes: int,
@@ -298,7 +303,7 @@ class Jasper(CTCModel):
             prelog_n_channels: int,
             blocks_kernel_size: Union[int, List[int]],
             p_dropout: float
-            ) -> None:
+    ) -> None:
         super().__init__(1, 1)
         # TODO: Add activation function options
         # TODO: Add normalization options
@@ -316,7 +321,7 @@ class Jasper(CTCModel):
             prelog_n_channels=prelog_n_channels,
             blocks_kernel_size=blocks_kernel_size,
             p_dropout=p_dropout
-            )
+        )
         self.pred_net = ConvPredModule(
             in_features=prelog_n_channels + channel_inc * (2 + num_blocks),
             n_classes=n_classes,
@@ -346,6 +351,7 @@ class Wav2Letter(CTCModel):
             layer that process the wav samples directly if wav is modeled.
             Default None.
     """
+
     def __init__(
             self,
             in_features: int,
@@ -360,7 +366,7 @@ class Wav2Letter(CTCModel):
             p_dropout: float,
             wav_kernel_size: Optional[int] = None,
             wav_stride: Optional[int] = None
-            ) -> None:
+    ) -> None:
         super().__init__(1, 1)
         self.encoder = Wav2LetterEncoder(
             in_features=in_features,
@@ -374,7 +380,7 @@ class Wav2Letter(CTCModel):
             p_dropout=p_dropout,
             wav_kernel_size=wav_kernel_size,
             wav_stride=wav_stride
-            )
+        )
         self.pred_net = ConvPredModule(
             in_features=post_conv_channels_size,
             n_classes=n_classes,
@@ -408,6 +414,7 @@ class QuartzNet(Jasper):
             kernel size of each jasper block.
         p_dropout (float): The dropout rate.
     """
+
     def __init__(
             self,
             n_classes: int,
@@ -424,7 +431,7 @@ class QuartzNet(Jasper):
             groups: int,
             blocks_kernel_size: Union[int, List[int]],
             p_dropout: float
-            ) -> None:
+    ) -> None:
         super().__init__(1, 1)
         self.encoder = QuartzNetEncoder(
             in_features=in_features,
@@ -440,7 +447,7 @@ class QuartzNet(Jasper):
             groups=groups,
             blocks_kernel_size=blocks_kernel_size,
             p_dropout=p_dropout
-            )
+        )
         self.pred_net = ConvPredModule(
             in_features=epilog_channel_size[1],
             n_classes=n_classes,
@@ -489,7 +496,7 @@ class Squeezeformer(CTCModel):
             p_dropout: float,
             ss_groups: Union[int, List[int]] = 1,
             masking_value: int = -1e15
-            ) -> None:
+    ) -> None:
         super().__init__(
             pred_in_size=d_model,
             n_classes=n_classes
@@ -509,5 +516,5 @@ class Squeezeformer(CTCModel):
             p_dropout=p_dropout,
             ss_groups=ss_groups,
             masking_value=masking_value
-            )
+        )
         self.has_bnorm = True
