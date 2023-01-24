@@ -1,13 +1,12 @@
 from models.encoders import (
     ConformerEncoder, DeepSpeechV1Encoder, DeepSpeechV2Encoder,
-    JasperEncoder, QuartzNetEncoder, Wav2LetterEncoder
+    JasperEncoder, QuartzNetEncoder, Wav2LetterEncoder, SqueezeformerEncoder
     )
 import torch
 from typing import List, Optional, Tuple, Union
 
 from .layers import (
-    ConvPredModule, PredModule,
-    SqueezeformerEncoder, TransformerEncLayer
+    ConvPredModule, PredModule, TransformerEncLayer
     )
 from torch import nn
 from torch import Tensor
@@ -449,7 +448,7 @@ class QuartzNet(Jasper):
         )
 
 
-class Squeezeformer(nn.Module):
+class Squeezeformer(CTCModel):
     """Implements the Squeezeformer model architecture
     as described in https://arxiv.org/abs/2206.00888
 
@@ -491,7 +490,10 @@ class Squeezeformer(nn.Module):
             ss_groups: Union[int, List[int]] = 1,
             masking_value: int = -1e15
             ) -> None:
-        super().__init__()
+        super().__init__(
+            pred_in_size=d_model,
+            n_classes=n_classes
+        )
         self.encoder = SqueezeformerEncoder(
             in_features=in_features,
             n=n,
@@ -508,15 +510,4 @@ class Squeezeformer(nn.Module):
             ss_groups=ss_groups,
             masking_value=masking_value
             )
-        self.pred_net = PredModule(
-            in_features=d_model,
-            n_classes=n_classes,
-            activation=nn.LogSoftmax(dim=-1)
-        )
         self.has_bnorm = True
-
-    def forward(self, x: Tensor, mask: Tensor) -> Tuple[Tensor, Tensor]:
-        out, lengths = self.encoder(x, mask)
-        preds = self.pred_net(out)
-        preds = preds.permute(1, 0, 2)
-        return preds, lengths
