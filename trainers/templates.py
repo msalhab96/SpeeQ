@@ -55,4 +55,4 @@ class SqueezeformerNoamSchedulerTemp(BaseSchedulerTemplate):
     lr_peak: Number
     decay_rate: Number
     t_peak: int
-    _name = 'noam'
+    _name = 'squeezeformer_noam'
