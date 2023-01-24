@@ -1,3 +1,4 @@
+from models.encoders import DeepSpeechV1Encoder
 import torch
 from typing import List, Optional, Tuple, Union
 
@@ -12,6 +13,20 @@ from torch import nn
 from torch import Tensor
 
 
+class CTCModel(nn.Module):
+    def __init__(self) -> None:
+        super().__init__()
+        self.has_bnorm = False
+
+    def forward(
+        self, x: Tensor, mask: Tensor, *args, **kwargs
+        ):
+        out, lengths = self.encoder(x, mask, *args, **kwargs)  # B, M, d
+        preds = self.pred_net(out)  # B, M, C
+        preds = preds.permute(1, 0, 2)  # M, B, C
+        return preds, lengths
+
+
 class DeepSpeechV1(nn.Module):
     """Builds the DeepSpeech model described in
     https://arxiv.org/abs/1412.5567
@@ -20,8 +35,7 @@ class DeepSpeechV1(nn.Module):
         in_features (int): The input feature size.
         hidden_size (int): The layers' hidden size.
         n_linear_layers (int): The number of feed-forward layers.
-        bidirectional (bidirectional): if the rnn is bidirectional
-        or not.
+        bidirectional (bool): if the rnn is bidirectional or not.
         n_clases (int): The number of classes to predict.
         max_clip_value (int): The maximum relu value.
         rnn_type (str): rnn, gru or lstm.
@@ -39,54 +53,20 @@ class DeepSpeechV1(nn.Module):
             p_dropout: float
             ) -> None:
         super().__init__()
-        self.ff_layers = nn.ModuleList([
-            nn.Sequential(
-                nn.Linear(
-                    in_features=in_features if i == 0 else hidden_size,
-                    out_features=hidden_size
-                    ),
-                CReLu(
-                    max_val=max_clip_value
-                    ),
-                nn.Dropout(
-                    p=p_dropout
-                    )
-            )
-            for i in range(n_linear_layers)
-        ])
-        from .registry import PACKED_RNN_REGISTRY
-        self.rnn = PACKED_RNN_REGISTRY[rnn_type](
-            input_size=hidden_size,
+        self.encoder = DeepSpeechV1Encoder(
+            in_features=in_features,
             hidden_size=hidden_size,
-            bidirectional=bidirectional
-        )
-        self.fc = nn.Linear(
-            in_features=hidden_size,
-            out_features=hidden_size,
-        )
-        self.crelu = CReLu(max_val=max_clip_value)
+            n_linear_layers=n_linear_layers,
+            bidirectional=bidirectional,
+            max_clip_value=max_clip_value,
+            rnn_type=rnn_type,
+            p_dropout=p_dropout
+            )
         self.pred_net = PredModule(
             in_features=hidden_size,
             n_classes=n_classes,
             activation=nn.LogSoftmax(dim=-1)
         )
-        self.bidirectional = bidirectional
-        self.hidden_size = hidden_size
-        self.has_bnorm = False
-
-    def forward(self, x: Tensor, mask: Tensor) -> Tuple[Tensor, Tensor]:
-        # mask of shape [B, M] and True if there's no padding
-        # x of shape [B, T, F]
-        lengths = mask.sum(dim=-1)
-        for layer in self.ff_layers:
-            x = layer(x)
-        out, _, lengths = self.rnn(x, lengths.cpu())
-        if self.bidirectional is True:
-            out = out[..., :self.hidden_size] + out[..., self.hidden_size:]
-        out = self.crelu(self.fc(out))
-        preds = self.pred_net(out)
-        preds = preds.permute(1, 0, 2)
-        return preds, lengths
 
     @torch.no_grad()
     def predict(self, x: Tensor) -> Tensor:
@@ -101,13 +81,11 @@ class BERT(nn.Module):
     described in https://arxiv.org/abs/1810.04805
 
     Args:
-        max_len (int): The maximum length for positional
-            encoding.
+        max_len (int): The maximum length for positional encoding.
         in_feature (int): The input/speech feature size.
         d_model (int): The model dimensionality.
         h (int): The number of heads.
-        hidden_size (int): The inner size of the feed forward
-            module.
+        hidden_size (int): The inner size of the feed forward module.
         n_layers (int): The number of transformer encoders.
         n_classes (int): The number of classes.
         p_dropout (float): The dropout rate.
@@ -184,8 +162,7 @@ class DeepSpeechV2(nn.Module):
         stride (int): The convolution layers' stride.
         in_features (int): The input/speech feature size.
         hidden_size (int): The layers' hidden size.
-        bidirectional (bidirectional): if the rnn is bidirectional
-            or not.
+        bidirectional (bool): if the rnn is bidirectional or not.
         n_rnn (int): The number of RNN layers.
         n_linear_layers (int): The number of linear layers.
         n_classes (int): The number of classes.
@@ -275,7 +252,7 @@ class DeepSpeechV2(nn.Module):
 
 
 class Conformer(nn.Module):
-    """Implements the confformer model proposed in
+    """Implements the conformer model proposed in
     https://arxiv.org/abs/2005.08100, this model used
     with CTC, while in the paper used RNN-T.
 
@@ -666,7 +643,7 @@ class QuartzNet(Jasper):
 
 
 class Squeezeformer(nn.Module):
-    """Implements the Squeezeformer encoder
+    """Implements the Squeezeformer model architecture
     as described in https://arxiv.org/abs/2206.00888
 
     Args:
