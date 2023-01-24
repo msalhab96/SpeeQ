@@ -1,6 +1,7 @@
 from enum import Enum
 
 OPTIMIZER_STATE_KEY = 'optimizer'
+SCHEDULER_TYPE_KEY = 'scheduler'
 
 
 class FileKeys(Enum):
