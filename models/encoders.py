@@ -1,7 +1,7 @@
 from typing import List, Optional, Tuple, Union
 from models.layers import (
     CReLu, ConformerBlock, ConformerPreNet, Conv1DLayers,
-    JasperBlocks, JasperSubBlock, RowConv1D
+    JasperBlocks, JasperSubBlock, QuartzBlocks, RowConv1D
 )
 from torch import nn
 from torch import Tensor
@@ -438,3 +438,81 @@ class Wav2LetterEncoder(nn.Module):
         out = torch.tanh(out)
         out = self.dropout(out)
         return out, lengths
+
+
+class QuartzNetEncoder(JasperEncoder):
+    """Implements QuartzNet model architecture's encoder proposed
+    in https://arxiv.org/abs/1910.10261
+
+    Args:
+        in_features (int): The input/speech feature size.
+        num_blocks (int): The number of QuartzNet blocks, denoted
+            as 'B' in the paper.
+        block_repetition (int): The nubmer of times to repeat each block.
+            denoted as S in the paper.
+        num_sub_blocks (int): The number of QuartzNet subblocks, denoted
+            as 'R' in the paper.
+        channels_size (List[int]): The channel size of each block. it has to
+            be of length equal to num_blocks
+        epilog_kernel_size (int): The epilog block convolution's kernel size.
+        epilog_channel_size (Tuple[int, int]): The epilog blocks channels size.
+        prelog_kernel_size (int): The prelog block convolution's kernel size.
+        prelog_stride (int): The prelog block convolution's stride.
+        prelog_n_channels (int): The prelog block convolution's number of
+            output channnels.
+        groups (int): The groups size.
+        blocks_kernel_size (Union[int, List[int]]): The convolution layer's
+            kernel size of each jasper block.
+        p_dropout (float): The dropout rate.
+    """
+
+    def __init__(
+            self,
+            in_features: int,
+            num_blocks: int,
+            block_repetition: int,
+            num_sub_blocks: int,
+            channels_size: List[int],
+            epilog_kernel_size: int,
+            epilog_channel_size: Tuple[int, int],
+            prelog_kernel_size: int,
+            prelog_stride: int,
+            prelog_n_channels: int,
+            groups: int,
+            blocks_kernel_size: Union[int, List[int]],
+            p_dropout: float
+    ) -> None:
+        super().__init__(
+            in_features=in_features,
+            num_blocks=num_blocks,
+            num_sub_blocks=num_sub_blocks,
+            channel_inc=0,
+            epilog_kernel_size=epilog_kernel_size,
+            prelog_kernel_size=prelog_kernel_size,
+            prelog_stride=prelog_stride,
+            prelog_n_channels=prelog_n_channels,
+            blocks_kernel_size=blocks_kernel_size,
+            p_dropout=p_dropout
+        )
+        self.blocks = QuartzBlocks(
+            num_blocks=num_blocks,
+            block_repetition=block_repetition,
+            num_sub_blocks=num_sub_blocks,
+            in_channels=prelog_n_channels,
+            channels_size=channels_size,
+            kernel_size=blocks_kernel_size,
+            groups=groups,
+            p_dropout=p_dropout
+        )
+        self.epilog1 = JasperSubBlock(
+            in_channels=channels_size[-1],
+            out_channels=epilog_channel_size[0],
+            kernel_size=epilog_kernel_size,
+            p_dropout=p_dropout,
+        )
+        self.epilog2 = JasperSubBlock(
+            in_channels=epilog_channel_size[0],
+            out_channels=epilog_channel_size[1],
+            kernel_size=1,
+            p_dropout=p_dropout
+        )

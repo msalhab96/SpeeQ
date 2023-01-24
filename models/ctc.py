@@ -1,13 +1,12 @@
 from models.encoders import (
     ConformerEncoder, DeepSpeechV1Encoder, DeepSpeechV2Encoder,
-    JasperEncoder, Wav2LetterEncoder
+    JasperEncoder, QuartzNetEncoder, Wav2LetterEncoder
     )
 import torch
 from typing import List, Optional, Tuple, Union
 
 from .layers import (
-    ConvPredModule, JasperSubBlock,
-    PredModule, QuartzBlocks,
+    ConvPredModule, PredModule,
     SqueezeformerEncoder, TransformerEncLayer
     )
 from torch import nn
@@ -427,45 +426,26 @@ class QuartzNet(Jasper):
             blocks_kernel_size: Union[int, List[int]],
             p_dropout: float
             ) -> None:
-        super().__init__(
-            n_classes=n_classes,
+        super().__init__(1, 1)
+        self.encoder = QuartzNetEncoder(
             in_features=in_features,
-            num_blocks=num_blocks,
-            num_sub_blocks=num_sub_blocks,
-            channel_inc=0,
-            epilog_kernel_size=epilog_kernel_size,
-            prelog_kernel_size=prelog_kernel_size,
-            prelog_stride=prelog_stride,
-            prelog_n_channels=prelog_n_channels,
-            blocks_kernel_size=blocks_kernel_size,
-            p_dropout=p_dropout
-            )
-        self.blocks = QuartzBlocks(
             num_blocks=num_blocks,
             block_repetition=block_repetition,
             num_sub_blocks=num_sub_blocks,
-            in_channels=prelog_n_channels,
             channels_size=channels_size,
-            kernel_size=blocks_kernel_size,
+            epilog_kernel_size=epilog_kernel_size,
+            epilog_channel_size=epilog_channel_size,
+            prelog_kernel_size=prelog_kernel_size,
+            prelog_stride=prelog_stride,
+            prelog_n_channels=prelog_n_channels,
             groups=groups,
+            blocks_kernel_size=blocks_kernel_size,
             p_dropout=p_dropout
-        )
-        self.epilog1 = JasperSubBlock(
-            in_channels=channels_size[-1],
-            out_channels=epilog_channel_size[0],
-            kernel_size=epilog_kernel_size,
-            p_dropout=p_dropout,
-        )
-        self.epilog2 = JasperSubBlock(
-            in_channels=epilog_channel_size[0],
-            out_channels=epilog_channel_size[1],
-            kernel_size=1,
-            p_dropout=p_dropout
-        )
-        self.pred_net = nn.Conv1d(
-            in_channels=epilog_channel_size[1],
-            out_channels=n_classes,
-            kernel_size=1
+            )
+        self.pred_net = ConvPredModule(
+            in_features=epilog_channel_size[1],
+            n_classes=n_classes,
+            activation=nn.LogSoftmax(dim=-2)
         )
 
 
