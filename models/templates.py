@@ -1,6 +1,7 @@
 from dataclasses import asdict, dataclass
 from typing import List, Optional, Tuple, Union
 
+from constants import CTC_TYPE, SEQ2SEQ_TYPE, TRANSDUCER_TYPE
 from interfaces import ITemplate
 
 
@@ -39,7 +40,7 @@ class DeepSpeechV1Temp(BaseTemplate):
     p_dropout: float
     rnn_type: str = 'rnn'
     _name = 'deep_speech_v1'
-    _type = 'ctc'
+    _type = CTC_TYPE
 
 
 @dataclass
@@ -64,7 +65,7 @@ class BERTTemp(BaseTemplate):
     n_layers: int
     p_dropout: float
     _name = 'bert'
-    _type = 'ctc'
+    _type = CTC_TYPE
 
 
 @dataclass
@@ -99,7 +100,7 @@ class DeepSpeechV2Temp(BaseTemplate):
     p_dropout: float
     rnn_type: str = 'rnn'
     _name = 'deep_speech_v2'
-    _type = 'ctc'
+    _type = CTC_TYPE
 
 
 @dataclass
@@ -132,7 +133,7 @@ class ConformerCTCTemp(BaseTemplate):
     res_scaling: float
     p_dropout: float
     _name = 'conformer'
-    _type = 'ctc'
+    _type = CTC_TYPE
 
 
 @dataclass
@@ -168,7 +169,7 @@ class JasperTemp(BaseTemplate):
     blocks_kernel_size: Union[int, List[int]]
     p_dropout: float
     _name = 'jasper'
-    _type = 'ctc'
+    _type = CTC_TYPE
 
 
 @dataclass
@@ -205,7 +206,7 @@ class Wav2LetterTemp(BaseTemplate):
     wav_kernel_size: Optional[int] = None
     wav_stride: Optional[int] = None
     _name = 'wav2letter'
-    _type = 'ctc'
+    _type = CTC_TYPE
 
 
 @dataclass
@@ -236,7 +237,7 @@ class LASTemp(BaseTemplate):
     teacher_forcing_rate: float = 0.0
     rnn_type: str = 'rnn'
     _name = 'las'
-    _type = 'seq2seq'
+    _type = SEQ2SEQ_TYPE
 
 
 @dataclass
@@ -264,7 +265,7 @@ class BasicAttSeq2SeqRNNTemp(BaseTemplate):
     teacher_forcing_rate: float = 0.0
     rnn_type: str = 'rnn'
     _name = 'basic_att_rnn'
-    _type = 'seq2seq'
+    _type = SEQ2SEQ_TYPE
 
 
 @dataclass
@@ -301,7 +302,7 @@ class RNNWithLocationAwareAttTemp(BaseTemplate):
     teacher_forcing_rate: float = 0.0
     rnn_type: str = 'rnn'
     _name = 'rnn_with_location_att'
-    _type = 'seq2seq'
+    _type = SEQ2SEQ_TYPE
 
 
 @dataclass
@@ -338,7 +339,7 @@ class SpeechTransformerTemp(BaseTemplate):
     att_out_channels: int
     masking_value: int = -1e15
     _name = 'speech_transformer'
-    _type = 'seq2seq'
+    _type = SEQ2SEQ_TYPE
 
 
 @dataclass
@@ -381,7 +382,7 @@ class QuartzNetTemp(BaseTemplate):
     blocks_kernel_size: Union[int, List[int]]
     p_dropout: float
     _name = 'quartz_net'
-    _type = 'ctc'
+    _type = CTC_TYPE
 
 
 @dataclass
@@ -422,7 +423,7 @@ class SqueezeformerCTCTemp(BaseTemplate):
     ss_groups: Union[int, List[int]] = 1
     masking_value: int = -1e15
     _name = 'squeezeformer'
-    _type = 'ctc'
+    _type = CTC_TYPE
 
 
 @dataclass
@@ -447,4 +448,4 @@ class RNNTTemp(BaseTemplate):
     rnn_type: str
     p_dropout: float
     _name = 'rnn-t'
-    _type = 'transducer'
+    _type = TRANSDUCER_TYPE
