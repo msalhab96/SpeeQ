@@ -1,15 +1,12 @@
-from models.activations import Sigmax
+from typing import List, Tuple, Union
+
 import torch
 import torch.nn as nn
 from torch import Tensor
-from typing import List, Tuple, Union
-from torch.nn.utils.rnn import (
-    pack_padded_sequence, pad_packed_sequence
-)
-from utils.utils import (
-    add_pos_enc, calc_data_len,
-    get_mask_from_lens, get_positional_encoding
-    )
+from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
+
+from models.activations import Sigmax
+from utils.utils import add_pos_enc, calc_data_len, get_positional_encoding
 
 
 class PackedRNN(nn.Module):
@@ -26,6 +23,7 @@ class PackedRNN(nn.Module):
         bidirectional (bool): If the RNN is bidirectional or not.
         Default to False.
     """
+
     def __init__(
             self,
             input_size: int,
@@ -33,7 +31,7 @@ class PackedRNN(nn.Module):
             batch_first=True,
             enforce_sorted=False,
             bidirectional=False
-            ) -> None:
+    ) -> None:
         super().__init__()
         self.rnn = nn.RNN(
             input_size=input_size,
@@ -49,7 +47,7 @@ class PackedRNN(nn.Module):
             x, lens,
             batch_first=self.batch_first,
             enforce_sorted=self.enforce_sorted
-            )
+        )
         out, h = self.rnn(packed)
         out, lens = pad_packed_sequence(out, batch_first=self.batch_first)
         return out, h, lens
@@ -63,10 +61,10 @@ class PackedLSTM(PackedRNN):
             batch_first=True,
             enforce_sorted=False,
             bidirectional=False
-            ) -> None:
+    ) -> None:
         super().__init__(
             input_size, hidden_size, batch_first, enforce_sorted
-            )
+        )
         self.rnn = nn.LSTM(
             input_size=input_size,
             hidden_size=hidden_size,
@@ -83,10 +81,10 @@ class PackedGRU(PackedRNN):
             batch_first=True,
             enforce_sorted=False,
             bidirectional=False
-            ) -> None:
+    ) -> None:
         super().__init__(
             input_size, hidden_size, batch_first, enforce_sorted, bidirectional
-            )
+        )
         self.rnn = nn.GRU(
             input_size=input_size,
             hidden_size=hidden_size,
@@ -105,12 +103,13 @@ class PredModule(nn.Module):
         n_classes (int): The number of classes to produce.
         activation (Module): The activation function to be used.
     """
+
     def __init__(
             self,
             in_features: int,
             n_classes: int,
             activation: nn.Module
-            ) -> None:
+    ) -> None:
         super().__init__()
         self.fc = nn.Linear(
             in_features=in_features,
@@ -122,6 +121,39 @@ class PredModule(nn.Module):
         return self.activation(self.fc(x))
 
 
+class ConvPredModule(nn.Module):
+    """A prediction module that consist of a signle
+    Conv1d layer followed by a pre-defined activation
+    function.
+
+    Args:
+        in_features (int): The input feature size.
+        n_classes (int): The number of classes to produce.
+        activation (Module): The activation function to be used.
+    """
+
+    def __init__(
+            self,
+            in_features: int,
+            n_classes: int,
+            activation: nn.Module
+    ) -> None:
+        super().__init__()
+        self.activation = activation
+        self.conv = nn.Conv1d(
+            in_channels=in_features,
+            out_channels=n_classes,
+            kernel_size=1
+        )
+
+    def forward(self, x: Tensor) -> Tensor:
+        # B, d, M
+        out = self.conv(x)
+        out = self.activation(out)
+        out = out.transpose(-1, -2)
+        return out
+
+
 class CReLu(nn.Module):
     """clipped rectified-linear unit, can be described as
     min{max{0, x}, max_value}
@@ -131,6 +163,7 @@ class CReLu(nn.Module):
     Args:
         max_val (int): the maximum clipping value.
     """
+
     def __init__(self, max_val: int) -> None:
         super().__init__()
         self.max_val = max_val
@@ -138,7 +171,7 @@ class CReLu(nn.Module):
     def forward(self, x: Tensor) -> Tensor:
         return torch.clamp(
             x, min=0, max=self.max_val
-            )
+        )
 
 
 class FeedForwardModule(nn.Module):
@@ -149,11 +182,12 @@ class FeedForwardModule(nn.Module):
         d_model (int): The model dimensionality.
         hidden_size (int): The inner layer's dimensionality.
     """
+
     def __init__(
             self,
             d_model: int,
             hidden_size: int
-            ) -> None:
+    ) -> None:
         super().__init__()
         self.fc1 = nn.Linear(
             in_features=d_model,
@@ -179,6 +213,7 @@ class AddAndNorm(nn.Module):
     Args:
         d_model (int): The model dimensionality.
     """
+
     def __init__(self, d_model: int) -> None:
         super().__init__()
         self.lnorm = nn.LayerNorm(normalized_shape=d_model)
@@ -196,12 +231,13 @@ class MultiHeadAtt(nn.Module):
         h (int): The number of heads.
         masking_value (int): The masking value. Default -1e15
     """
+
     def __init__(
             self,
             d_model: int,
             h: int,
             masking_value: int = -1e15
-            ) -> None:
+    ) -> None:
         super().__init__()
         self.h = h
         self.dk = d_model // h
@@ -226,12 +262,12 @@ class MultiHeadAtt(nn.Module):
         batch_size, max_len, _ = x.shape
         x = x.view(
             batch_size, max_len, self.h, self.dk
-            )
+        )
         return x
 
     def _mask(
             self, att: Tensor, key_mask: Tensor, query_mask: Tensor
-            ) -> Tensor:
+    ) -> Tensor:
         key_max_len = key_mask.shape[-1]
         query_max_len = query_mask.shape[-1]
         key_mask = key_mask.repeat(1, query_max_len)
@@ -249,7 +285,7 @@ class MultiHeadAtt(nn.Module):
             value: Tensor,
             key_mask: Union[Tensor, None],
             query_mask: Union[Tensor, None]
-            ) -> Tensor:
+    ) -> Tensor:
         key = self._reshape(key)  # B, M, h, dk
         query = self._reshape(query)  # B, M, h, dk
         value = self._reshape(value)  # B, M, h, dk
@@ -260,16 +296,16 @@ class MultiHeadAtt(nn.Module):
         if key_mask is not None and query_mask is not None:
             att = self._mask(
                 att=att, key_mask=key_mask, query_mask=query_mask
-                )
+            )
         att = self.softmax(
             att / self.d_model
-            )
+        )
         out = torch.matmul(att, value)
         out = out.permute(0, 2, 1, 3)
         out = out.contiguous()
         out = out.view(
             out.shape[0], out.shape[1], -1
-            )
+        )
         return out
 
     def forward(
@@ -279,7 +315,7 @@ class MultiHeadAtt(nn.Module):
             value: Tensor,
             key_mask: Union[Tensor, None],
             query_mask: Union[Tensor, None]
-            ) -> Tensor:
+    ) -> Tensor:
         key = self.key_fc(key)
         query = self.query_fc(query)
         value = self.value_fc(value)
@@ -298,15 +334,16 @@ class MaskedMultiHeadAtt(MultiHeadAtt):
         h (int): The number of heads.
         masking_value (int): The masking value. Default -1e15
     """
+
     def __init__(
             self,
             d_model: int,
             h: int,
             masking_value: int = -1e15
-            ) -> None:
+    ) -> None:
         super().__init__(
             d_model=d_model, h=h, masking_value=masking_value
-            )
+        )
 
     def forward(
             self,
@@ -315,7 +352,7 @@ class MaskedMultiHeadAtt(MultiHeadAtt):
             value: Tensor,
             key_mask: Union[Tensor, None],
             query_mask: Union[Tensor, None]
-            ) -> Tensor:
+    ) -> Tensor:
         batch_size, max_len = key_mask.shape
         if key_mask is not None:
             query_mask = torch.tril(torch.ones(batch_size, max_len, max_len))
@@ -341,42 +378,43 @@ class TransformerEncLayer(nn.Module):
         h (int): The number of heads.
         masking_value (int): The masking value. Default -1e15
     """
+
     def __init__(
             self,
             d_model: int,
             hidden_size: int,
             h: int,
             masking_value: int = -1e15
-            ) -> None:
+    ) -> None:
         super().__init__()
         self.mhsa = MultiHeadAtt(
             d_model=d_model, h=h, masking_value=masking_value
-            )
+        )
         self.add_and_norm1 = AddAndNorm(
             d_model=d_model
-            )
+        )
         self.ff = FeedForwardModule(
             d_model=d_model, hidden_size=hidden_size
-            )
+        )
         self.add_and_norm2 = AddAndNorm(
             d_model=d_model
-            )
+        )
 
     def forward(
             self,
             x: Tensor,
             mask: Tensor
-            ) -> Tensor:
+    ) -> Tensor:
         out = self.mhsa(
             key=x, query=x,
             value=x, key_mask=mask,
             query_mask=mask
-            )
+        )
         out = self.add_and_norm1(x, out)
         result = self.ff(out)
         return self.add_and_norm2(
             out, result
-            )
+        )
 
 
 class RowConv1D(nn.Module):
@@ -387,11 +425,12 @@ class RowConv1D(nn.Module):
         tau (int): The size of future context.
         hidden_size (int): The input feature size.
     """
+
     def __init__(
             self,
             tau: int,
             hidden_size: int
-            ) -> None:
+    ) -> None:
         super().__init__()
         self.tau = tau
         self.conv = nn.Conv1d(
@@ -413,7 +452,7 @@ class RowConv1D(nn.Module):
         """
         zeros = torch.zeros(
             *x.shape[:-1], self.tau
-            )
+        )
         zeros = zeros.to(x.device)
         return torch.cat(
             [x, zeros], dim=-1
@@ -440,7 +479,7 @@ class Conv1DLayers(nn.Module):
             stride: int,
             n_layers: int,
             p_dropout: float
-            ) -> None:
+    ) -> None:
         super().__init__()
         self.layers = nn.ModuleList([
             nn.Conv1d(
@@ -455,7 +494,7 @@ class Conv1DLayers(nn.Module):
 
     def forward(
             self, x: Tensor, data_len: Tensor
-            ) -> Tuple[Tensor, Tensor]:
+    ) -> Tuple[Tensor, Tensor]:
         # x of shape [B, M, d]
         x = x.transpose(1, 2)
         out = x
@@ -489,26 +528,27 @@ class GlobalMulAttention(nn.Module):
             Default 1.
         mask_val (float): the masking value. Default -1e12.
     """
+
     def __init__(
             self,
             enc_feat_size: int,
             dec_feat_size: int,
             scaling_factor: Union[float, int] = 1,
             mask_val: float = -1e12
-            ) -> None:
+    ) -> None:
         super().__init__()
         self.fc_query = nn.Linear(
             in_features=dec_feat_size,
             out_features=dec_feat_size
-            )
+        )
         self.fc_key = nn.Linear(
             in_features=enc_feat_size,
             out_features=dec_feat_size
-            )
+        )
         self.fc_value = nn.Linear(
             in_features=enc_feat_size,
             out_features=dec_feat_size
-            )
+        )
         self.fc = nn.Linear(
             in_features=2 * dec_feat_size,
             out_features=dec_feat_size
@@ -521,7 +561,7 @@ class GlobalMulAttention(nn.Module):
             key: Tensor,
             query: Tensor,
             mask=None
-            ) -> Tensor:
+    ) -> Tensor:
         # key of shape [B, M, feat_size]
         # query of shape [B, 1, feat_size]
         # mask of shape [B, M], False for padding
@@ -530,15 +570,15 @@ class GlobalMulAttention(nn.Module):
         query = self.fc_query(query)
         att_weights = torch.matmul(
             query, key.transpose(-1, -2)
-            )
+        )
         if mask is not None:
             mask = mask.unsqueeze(dim=-2)
             att_weights = att_weights.masked_fill(
                 ~mask, self.mask_val
-                )
+            )
         att_weights = torch.softmax(
             att_weights / self.scaling_factor, dim=-1
-            )
+        )
         context = torch.matmul(att_weights, value)
         results = torch.cat([context, query], dim=-1)
         results = self.fc(results)
@@ -556,16 +596,17 @@ class ConformerFeedForward(nn.Module):
             factor.
         p_dropout (float): The dropout rate.
     """
+
     def __init__(
             self,
             d_model: int,
             expansion_factor: int,
             p_dropout: float
-            ) -> None:
+    ) -> None:
         super().__init__()
         self.lnrom = nn.LayerNorm(
             normalized_shape=d_model
-            )
+        )
         self.fc1 = nn.Linear(
             in_features=d_model,
             out_features=expansion_factor * d_model
@@ -596,16 +637,17 @@ class ConformerConvModule(nn.Module):
         kernel_size (int): The depth-wise convolution kernel size.
         p_dropout (float): The dropout rate.
     """
+
     def __init__(
             self,
             d_model: int,
             kernel_size: int,
             p_dropout: float
-            ) -> None:
+    ) -> None:
         super().__init__()
         self.lnorm = nn.LayerNorm(
             normalized_shape=d_model
-            )
+        )
         self.pwise_conv1 = nn.Conv1d(
             in_channels=d_model,
             out_channels=2 * d_model,
@@ -656,33 +698,34 @@ class ConformerRelativeMHSA(MultiHeadAtt):
         p_dropout (float): The dropout rate.
         masking_value (int): The masking value. Default -1e15
     """
+
     def __init__(
             self,
             d_model: int,
             h: int,
             p_dropout: float,
             masking_value: int = -1e15
-            ) -> None:
+    ) -> None:
         super().__init__(
             d_model=d_model, h=h, masking_value=masking_value
-            )
+        )
         self.lnrom = nn.LayerNorm(
             normalized_shape=d_model
-            )
+        )
         self.dropout = nn.Dropout(p_dropout)
 
     def forward(
             self,
             x: Tensor,
             mask: Union[None, Tensor]
-            ) -> Tensor:
+    ) -> Tensor:
         out = self.lnrom(x)
         out = add_pos_enc(out, self.d_model)
         out = super().forward(
             key=out, query=out,
             value=out, query_mask=mask,
             key_mask=mask
-            )
+        )
         out = self.dropout(out)
         return out
 
@@ -699,6 +742,7 @@ class ConformerBlock(nn.Module):
         p_dropout (float): The dropout rate.
         res_scaling (float): The residual connection multiplier.
     """
+
     def __init__(
             self,
             d_model: int,
@@ -707,7 +751,7 @@ class ConformerBlock(nn.Module):
             kernel_size: int,
             p_dropout: float,
             res_scaling: float = 0.5
-            ) -> None:
+    ) -> None:
         super().__init__()
         self.ff1 = ConformerFeedForward(
             d_model=d_model,
@@ -730,7 +774,7 @@ class ConformerBlock(nn.Module):
         )
         self.lnrom = nn.LayerNorm(
             normalized_shape=d_model
-            )
+        )
         self.res_scaling = res_scaling
 
     def forward(self, x: Tensor, mask: Union[None, Tensor]) -> Tensor:
@@ -757,6 +801,7 @@ class ConformerPreNet(nn.Module):
         p_dropout (float): The dropout rate.
         groups (Union[int, List[int]]): The convolution groups size.
     """
+
     def __init__(
             self,
             in_features: int,
@@ -766,7 +811,7 @@ class ConformerPreNet(nn.Module):
             d_model: int,
             p_dropout: float,
             groups: Union[int, List[int]] = 1
-            ) -> None:
+    ) -> None:
         super().__init__()
         self.layers = nn.ModuleList([
             nn.Conv1d(
@@ -776,9 +821,9 @@ class ConformerPreNet(nn.Module):
                 else kernel_size[i],
                 stride=stride if isinstance(stride, int) else stride[i],
                 groups=groups if isinstance(groups, int) else groups[i]
-                )
+            )
             for i in range(n_conv_layers)
-            ])
+        ])
 
         self.fc = nn.Linear(
             in_features=d_model,
@@ -788,7 +833,7 @@ class ConformerPreNet(nn.Module):
 
     def forward(
             self, x: Tensor, lengths: Tensor
-            ) -> Tuple[Tensor, Tensor]:
+    ) -> Tuple[Tensor, Tensor]:
         # x of shape [B, M, d]
         out = x.transpose(-1, -2)  # [B, d, M]
         for conv in self.layers:
@@ -820,6 +865,7 @@ class JasperSubBlock(nn.Module):
         stride (int): The convolution layer's stride. Default 1.
         padding (Union[str, int]): The padding mood/size. Default 'same'.
     """
+
     def __init__(
             self,
             in_channels: int,
@@ -828,7 +874,7 @@ class JasperSubBlock(nn.Module):
             p_dropout: float,
             stride: int = 1,
             padding: Union[str, int] = 'same'
-            ) -> None:
+    ) -> None:
         super().__init__()
         self.conv = nn.Conv1d(
             in_channels=in_channels,
@@ -846,7 +892,7 @@ class JasperSubBlock(nn.Module):
     def forward(
             self, x: Tensor,
             residual: Union[Tensor, None] = None
-            ) -> Tensor:
+    ) -> Tensor:
         # x and residual of shape [B, d, M]
         out = self.conv(x)
         out = self.bnorm(out)
@@ -865,11 +911,12 @@ class JasperResidual(nn.Module):
         in_channels (int): The number of the input's channels.
         out_channels (int): The number of the output's channels.
     """
+
     def __init__(
             self,
             in_channels: int,
             out_channels: int
-            ) -> None:
+    ) -> None:
         super().__init__()
         self.conv = nn.Conv1d(
             in_channels=in_channels,
@@ -900,6 +947,7 @@ class JasperBlock(nn.Module):
         kernel_size (int): The convolution layer's kernel size.
         p_dropout (float): The dropout rate.
     """
+
     def __init__(
             self,
             num_sub_blocks: int,
@@ -907,7 +955,7 @@ class JasperBlock(nn.Module):
             out_channels: int,
             kernel_size: int,
             p_dropout: float
-            ) -> None:
+    ) -> None:
         super().__init__()
         self.blocks = nn.ModuleList([
             JasperSubBlock(
@@ -919,9 +967,9 @@ class JasperBlock(nn.Module):
             for i in range(1, 1 + num_sub_blocks)
         ])
         self.residual_layer = JasperResidual(
-                in_channels=in_channels,
-                out_channels=out_channels
-            )
+            in_channels=in_channels,
+            out_channels=out_channels
+        )
         self.num_sub_blocks = num_sub_blocks
 
     def forward(self, x: Tensor) -> Tensor:
@@ -931,7 +979,7 @@ class JasperBlock(nn.Module):
             if (i + 1) == self.num_sub_blocks:
                 out = block(
                     out, residual=self.residual_layer(x)
-                    )
+                )
             else:
                 out = block(out)
         return out
@@ -953,6 +1001,7 @@ class JasperBlocks(nn.Module):
             kernel size of each block.
         p_dropout (float): The dropout rate.
     """
+
     def __init__(
             self,
             num_blocks: int,
@@ -961,7 +1010,7 @@ class JasperBlocks(nn.Module):
             channel_inc: int,
             kernel_size: Union[int, List[int]],
             p_dropout: float
-            ) -> None:
+    ) -> None:
         super().__init__()
         self.blocks = nn.ModuleList([
             JasperBlock(
@@ -970,7 +1019,7 @@ class JasperBlocks(nn.Module):
                 out_channels=in_channels + channel_inc * (1 + i),
                 kernel_size=kernel_size if isinstance(
                     kernel_size, int
-                    ) else kernel_size[i],
+                ) else kernel_size[i],
                 p_dropout=p_dropout
             )
             for i in range(num_blocks)
@@ -982,142 +1031,6 @@ class JasperBlocks(nn.Module):
         for block in self.blocks:
             out = block(out)
         return out
-
-
-class RNNLayers(nn.Module):
-    """Implements a stack of RNN layers.
-
-    Args:
-        in_features (int): The input features size.
-        hidden_size (int): The RNN hidden size.
-        bidirectional (bool): If the RNN is bidirectional or not.
-        n_layers (int): The number of RNN layers.
-        p_dropout (float): The dropout rate.
-        rnn_type (str): The rnn type. default 'rnn'.
-    """
-    def __init__(
-            self,
-            in_features: int,
-            hidden_size: int,
-            bidirectional: bool,
-            n_layers: int,
-            p_dropout: float,
-            rnn_type: str = 'rnn'
-            ) -> None:
-        super().__init__()
-        from .registry import PACKED_RNN_REGISTRY
-        if bidirectional is True:
-            assert hidden_size % 2 == 0
-        self.rnns = nn.ModuleList([
-            PACKED_RNN_REGISTRY[rnn_type](
-                input_size=in_features if i == 0 else hidden_size,
-                hidden_size=hidden_size // 2 if bidirectional else hidden_size,
-                batch_first=True,
-                enforce_sorted=False,
-                bidirectional=bidirectional
-            )
-            for i in range(n_layers)
-        ])
-        self.dropout = nn.Dropout(p_dropout)
-        self.n_layers = n_layers
-
-    def forward(
-            self, x: Tensor, mask: Tensor
-            ) -> Tuple[Tensor, Tensor, Tensor]:
-        out = x
-        lengths = mask.sum(dim=-1).cpu()
-        for i, layer in enumerate(self.rnns):
-            out, h, lengths = layer(out, lengths)
-            if (i + 1) != self.n_layers:
-                out = self.dropout(out)
-        return out, h, lengths
-
-
-class PyramidRNNLayers(nn.Module):
-    """Implements a pyramid of RNN as described in
-    https://arxiv.org/abs/1508.01211.
-
-    Args:
-        in_features (int): The input features size.
-        hidden_size (int): The RNN hidden size.
-        reduction_factor (int): The time resolution reduction factor.
-        bidirectional (bool): If the RNN is bidirectional or not.
-        n_layers (int): The number of RNN layers.
-        p_dropout (float): The dropout rate.
-        rnn_type (str): The rnn type. default 'rnn'.
-    """
-    def __init__(
-            self,
-            in_features: int,
-            hidden_size: int,
-            reduction_factor: int,
-            bidirectional: bool,
-            n_layers: int,
-            p_dropout: float,
-            rnn_type: str = 'rnn'
-            ) -> None:
-        super().__init__()
-        self.reduction_factor = reduction_factor
-        from .registry import PACKED_RNN_REGISTRY
-        if bidirectional is True:
-            assert hidden_size % 2 == 0
-        if bidirectional is True:
-            hidden_size = hidden_size // 2
-        self.rnns = nn.ModuleList([
-            PACKED_RNN_REGISTRY[rnn_type](
-                input_size=in_features,
-                hidden_size=hidden_size,
-                batch_first=True,
-                enforce_sorted=False,
-                bidirectional=bidirectional
-            )
-        ])
-        for _ in range(n_layers - 1):
-            inp_size = (1 + bidirectional) * hidden_size * reduction_factor
-            self.rnns.append(
-                PACKED_RNN_REGISTRY[rnn_type](
-                    input_size=inp_size,
-                    hidden_size=hidden_size,
-                    batch_first=True,
-                    enforce_sorted=False,
-                    bidirectional=bidirectional
-                )
-            )
-        self.dropout = nn.Dropout(p_dropout)
-        self.n_layers = n_layers
-
-    def _reduce(self, x: Tensor) -> Tensor:
-        # x of shape [B, M, d]
-        max_len = x.shape[1]
-        assert max_len > self.reduction_factor
-        # making sure it's divisible by the reduction factor
-        res_len = max_len % self.reduction_factor
-        res_len = self.reduction_factor if res_len == 0 else res_len
-        pad_len = self.reduction_factor - res_len
-        # adding trailing zeros to make the sequence divisible
-        x = torch.cat(
-            [
-                x,
-                torch.zeros(x.shape[0], pad_len, x.shape[-1]).to(x.device)
-                ],
-            dim=1
-        )
-        x = x.view(x.shape[0], x.shape[1] // self.reduction_factor, -1)
-        return x
-
-    def forward(
-            self, x: Tensor, mask: Tensor
-            ) -> Tuple[Tensor, Tensor, Tensor]:
-        out = x
-        lengths = mask.sum(dim=-1).cpu()
-        for i, layer in enumerate(self.rnns):
-            out, h, lengths = layer(out, lengths)
-            if (i + 1) != self.n_layers:
-                out = self._reduce(out)
-                lengths = torch.ceil(lengths / self.reduction_factor)
-                out = self.dropout(out)
-        lengths = lengths.long()
-        return out, h, lengths
 
 
 class LocAwareGlobalAddAttention(nn.Module):
@@ -1134,6 +1047,7 @@ class LocAwareGlobalAddAttention(nn.Module):
             Default 1.
         mask_val (float): The masking value. Default -1e12.
     """
+
     def __init__(
             self,
             enc_feat_size: int,
@@ -1142,7 +1056,7 @@ class LocAwareGlobalAddAttention(nn.Module):
             activation: str,
             inv_temperature: Union[float, int] = 1,
             mask_val: float = -1e12
-            ) -> None:
+    ) -> None:
         super().__init__()
         activations = {
             'softmax': nn.Softmax,
@@ -1153,21 +1067,21 @@ class LocAwareGlobalAddAttention(nn.Module):
         self.fc_query = nn.Linear(
             in_features=dec_feat_size,
             out_features=dec_feat_size
-            )
+        )
         self.fc_key = nn.Linear(
             in_features=enc_feat_size,
             out_features=dec_feat_size
-            )
+        )
         self.fc_value = nn.Linear(
             in_features=enc_feat_size,
             out_features=dec_feat_size
-            )
+        )
         self.conv = nn.Conv1d(
-                in_channels=1,
-                out_channels=dec_feat_size,
-                kernel_size=kernel_size,
-                padding='same'
-                )
+            in_channels=1,
+            out_channels=dec_feat_size,
+            kernel_size=kernel_size,
+            padding='same'
+        )
         self.pos_fc = nn.Linear(
             in_features=dec_feat_size,
             out_features=dec_feat_size
@@ -1184,7 +1098,7 @@ class LocAwareGlobalAddAttention(nn.Module):
             query: Tensor,
             alpha: Tensor,
             mask=None
-            ) -> Tuple[Tensor, Tensor]:
+    ) -> Tuple[Tensor, Tensor]:
         # alpha of shape [B, 1, M_enc]
         value = self.fc_value(key)
         key = self.fc_key(key)
@@ -1201,10 +1115,10 @@ class LocAwareGlobalAddAttention(nn.Module):
             mask = mask.unsqueeze(dim=-1)
             att_weights = att_weights.masked_fill(
                 ~mask, self.mask_val
-                )
+            )
         att_weights = self.activation(
             att_weights * self.inv_temperature
-            )
+        )
         att_weights = att_weights.transpose(-1, -2)
         context = torch.matmul(att_weights, value)
         return context, att_weights
@@ -1220,13 +1134,14 @@ class MultiHeadAtt2d(MultiHeadAtt):
         out_channels (int): The number of output channels of the convolution
         kernel_size (int): The convolutional layers' kernel size.
     """
+
     def __init__(
             self,
             d_model: int,
             h: int,
             out_channels: int,
             kernel_size: int
-            ) -> None:
+    ) -> None:
         super().__init__(out_channels, h)
         assert out_channels % h == 0
         self.query_conv = nn.Conv1d(
@@ -1234,19 +1149,19 @@ class MultiHeadAtt2d(MultiHeadAtt):
             out_channels=out_channels,
             kernel_size=kernel_size,
             padding='same'
-            )
+        )
         self.key_conv = nn.Conv1d(
             in_channels=d_model,
             out_channels=out_channels,
             kernel_size=kernel_size,
             padding='same'
-            )
+        )
         self.value_conv = nn.Conv1d(
             in_channels=d_model,
             out_channels=out_channels,
             kernel_size=kernel_size,
             padding='same'
-            )
+        )
         self.fc = nn.Linear(
             in_features=2 * out_channels,
             out_features=d_model
@@ -1257,7 +1172,7 @@ class MultiHeadAtt2d(MultiHeadAtt):
             key: Tensor,
             query: Tensor,
             value: Tensor,
-            ) -> Tensor:
+    ) -> Tensor:
         key = self._reshape(key)  # B, M, h, dk
         query = self._reshape(query)  # B, M, h, dk
         value = self._reshape(value)  # B, M, h, dk
@@ -1266,13 +1181,13 @@ class MultiHeadAtt2d(MultiHeadAtt):
         value = value.permute(0, 2, 3, 1)  # B, h, dk, M
         att = self.softmax(
             torch.matmul(query, key) / self.d_model
-            )
+        )
         out = torch.matmul(att, value)
         out = out.permute(0, 3, 2, 1)
         out = out.contiguous()
         out = out.view(
             out.shape[0], out.shape[1], -1
-            )
+        )
         return out
 
     def forward(
@@ -1281,7 +1196,7 @@ class MultiHeadAtt2d(MultiHeadAtt):
             query: Tensor,
             value: Tensor,
             mask: Union[Tensor, None]
-            ) -> Tensor:
+    ) -> Tensor:
         key = key.transpose(-1, -2)
         query = query.transpose(-1, -2)
         value = value.transpose(-1, -2)
@@ -1316,6 +1231,7 @@ class SpeechTransformerEncLayer(TransformerEncLayer):
         out_channels (int): The number of output channels of the convolution
         kernel_size (int): The convolutional layers' kernel size.
     """
+
     def __init__(
             self,
             d_model: int,
@@ -1323,7 +1239,7 @@ class SpeechTransformerEncLayer(TransformerEncLayer):
             h: int,
             out_channels: int,
             kernel_size: int
-            ) -> None:
+    ) -> None:
         # TODO: pass masking value
         # TODO: rename hidden size to ff_size
         super().__init__(
@@ -1341,12 +1257,12 @@ class SpeechTransformerEncLayer(TransformerEncLayer):
     def forward(self, x: Tensor, mask: Tensor) -> Tensor:
         out = self.mhsa(
             key=x, query=x, value=x, mask=mask
-            )
+        )
         out = self.add_and_norm1(x, out)
         result = self.ff(out)
         return self.add_and_norm2(
             out, result
-            )
+        )
 
 
 class TransformerDecLayer(nn.Module):
@@ -1359,13 +1275,14 @@ class TransformerDecLayer(nn.Module):
         h (int): The number of heads.
         masking_value (int): The masking value. Default -1e15
     """
+
     def __init__(
             self,
             d_model: int,
             hidden_size: int,
             h: int,
             masking_value: int = -1e15
-            ) -> None:
+    ) -> None:
         super().__init__()
         self.mmhsa = MaskedMultiHeadAtt(
             d_model=d_model,
@@ -1373,19 +1290,19 @@ class TransformerDecLayer(nn.Module):
         )
         self.add_and_norm1 = AddAndNorm(
             d_model=d_model
-            )
+        )
         self.mha = MultiHeadAtt(
             d_model=d_model, h=h, masking_value=masking_value
-            )
+        )
         self.add_and_norm2 = AddAndNorm(
             d_model=d_model
-            )
+        )
         self.ff = FeedForwardModule(
             d_model=d_model, hidden_size=hidden_size
-            )
+        )
         self.add_and_norm3 = AddAndNorm(
             d_model=d_model
-            )
+        )
 
     def forward(
             self,
@@ -1393,7 +1310,7 @@ class TransformerDecLayer(nn.Module):
             enc_mask: Union[Tensor, None],
             dec_inp: Tensor,
             dec_mask: Union[Tensor, None],
-            ) -> Tensor:
+    ) -> Tensor:
         out = self.mmhsa(
             key=dec_inp,
             query=dec_inp,
@@ -1426,179 +1343,26 @@ class PositionalEmbedding(nn.Module):
         vocab_size (int): The vocabulary size.
         embed_dim (int): The embedding size.
     """
+
     def __init__(
             self,
             vocab_size: int,
             embed_dim: int
-            ) -> None:
+    ) -> None:
         super().__init__()
         self.emb = nn.Embedding(
             num_embeddings=vocab_size,
             embedding_dim=embed_dim
-            )
+        )
         self.d_model = embed_dim
 
     def forward(self, x: Tensor) -> Tensor:
         max_len = x.shape[-1]
         pe = get_positional_encoding(
             max_length=max_len, d_model=self.d_model
-            )
+        )
         pe = pe.to(x.device)
         return self.emb(x) + pe
-
-
-class SpeechTransformerEncoder(nn.Module):
-    """Implements the speech transformer encoder
-    described in https://ieeexplore.ieee.org/document/8462506
-
-    Args:
-        in_features (int): The input/speech feature size.
-        n_conv_layers (int): The number of down-sampling convolutional layers.
-        kernel_size (int): The down-sampling convolutional layers kernel size.
-        stride (int): The down-sampling convolutional layers stride.
-        d_model (int): The model dimensionality.
-        n_layers (int): The number of encoder layers.
-        ff_size (int): The feed-forward inner layer dimensionality.
-        h (int): The number of attention heads.
-        att_kernel_size (int): The attentional convolutional
-            layers' kernel size.
-        att_out_channels (int): The number of output channels of the
-            attentional convolution
-    """
-    def __init__(
-            self,
-            in_features: int,
-            n_conv_layers: int,
-            kernel_size: int,
-            stride: int,
-            d_model: int,
-            n_layers: int,
-            ff_size: int,
-            h: int,
-            att_kernel_size: int,
-            att_out_channels: int
-            ) -> None:
-        super().__init__()
-        self.conv_layers = nn.ModuleList(
-            [
-                torch.nn.Conv2d(
-                    in_channels=1,
-                    out_channels=1,
-                    kernel_size=kernel_size,
-                    stride=stride
-                    )
-                for _ in range(n_conv_layers)
-                ]
-            )
-        self.relu = nn.ReLU()
-        for _ in range(n_conv_layers):
-            in_features = (in_features - kernel_size) // stride + 1
-        self.fc = nn.Linear(
-            in_features=in_features, out_features=d_model
-            )
-        self.layers = nn.ModuleList(
-            [
-                SpeechTransformerEncLayer(
-                    d_model=d_model,
-                    hidden_size=ff_size,
-                    h=h, out_channels=att_out_channels,
-                    kernel_size=att_kernel_size
-                )
-                for _ in range(n_layers)
-            ]
-        )
-        self.d_model = d_model
-
-    def _pre_process(self, x: Tensor, mask: Tensor) -> Tuple[Tensor, Tensor]:
-        x = x.unsqueeze(dim=1)  # B, 1, M, d
-        lengths = mask.sum(dim=-1)
-        for layer in self.conv_layers:
-            length = x.shape[-2]
-            x = layer(x)
-            lengths = calc_data_len(
-                result_len=x.shape[-2],
-                pad_len=length - lengths,
-                data_len=lengths,
-                kernel_size=layer.kernel_size[0],
-                stride=layer.stride[0]
-            )
-            x = self.relu(x)
-        x = x.squeeze(dim=1)
-        x = self.fc(x)
-        x = add_pos_enc(x, self.d_model)
-        mask = get_mask_from_lens(lengths=lengths, max_len=x.shape[1])
-        mask = mask.to(x.device)
-        return x, mask
-
-    def forward(self, x: Tensor, mask: Tensor) -> Tuple[Tensor, Tensor]:
-        out, mask = self._pre_process(x, mask)
-        for layer in self.layers:
-            out = layer(
-                out, mask
-            )
-        return out, mask
-
-
-class TransformerDecoder(nn.Module):
-    """Implements the transformer decoder as described in
-    https://arxiv.org/abs/1706.03762
-
-    Args:
-        n_classes (int): The number of classes.
-        n_layers (int): The nnumber of decoder layers.
-        d_model (int): The model dimensionality.
-        ff_size (int): The feed-forward inner layer dimensionality.
-        h (int): The number of attentional heads.
-        masking_value (int): The attentin masking value. Default -1e15
-    """
-
-    def __init__(
-            self,
-            n_classes: int,
-            n_layers: int,
-            d_model: int,
-            ff_size: int,
-            h: int,
-            masking_value: int = -1e15
-            ) -> None:
-        super().__init__()
-        self.emb = PositionalEmbedding(
-            vocab_size=n_classes,
-            embed_dim=d_model
-        )
-        self.layers = nn.ModuleList(
-            [
-                TransformerDecLayer(
-                    d_model=d_model,
-                    hidden_size=ff_size,
-                    h=h, masking_value=masking_value
-                )
-                for _ in range(n_layers)
-            ]
-        )
-        self.pred_net = PredModule(
-            in_features=d_model,
-            n_classes=n_classes,
-            activation=nn.LogSoftmax(dim=-1)
-        )
-
-    def forward(
-            self,
-            enc_out: Tensor,
-            enc_mask: Union[Tensor, None],
-            dec_inp: Tensor,
-            dec_mask: Union[Tensor, None],
-            ) -> Tensor:
-        out = self.emb(dec_inp)
-        for layer in self.layers:
-            out = layer(
-                enc_out=enc_out,
-                enc_mask=enc_mask,
-                dec_inp=out,
-                dec_mask=dec_mask
-            )
-        out = self.pred_net(out)
-        return out
 
 
 class GroupsShuffle(nn.Module):
@@ -1608,6 +1372,7 @@ class GroupsShuffle(nn.Module):
     Args:
         groups (int): The groups size.
     """
+
     def __init__(self, groups: int) -> None:
         super().__init__()
         self.groups = groups
@@ -1618,7 +1383,7 @@ class GroupsShuffle(nn.Module):
         dims = x.shape[2:]
         x = x.view(
             batch_size, self.groups, channels // self.groups, *dims
-            )
+        )
         x = x.transpose(1, 2)
         x = x.contiguous()
         x = x.view(batch_size, channels, *dims)
@@ -1648,7 +1413,7 @@ class QuartzSubBlock(JasperSubBlock):
             groups: int,
             stride: int = 1,
             padding: Union[str, int] = 'same'
-            ) -> None:
+    ) -> None:
         super().__init__(
             in_channels,
             out_channels,
@@ -1656,14 +1421,14 @@ class QuartzSubBlock(JasperSubBlock):
             p_dropout,
             stride,
             padding
-            )
+        )
         self.conv = nn.Sequential(
             nn.Conv1d(
                 in_channels=out_channels,
                 out_channels=out_channels,
                 kernel_size=1,
                 groups=groups
-                ),
+            ),
             GroupsShuffle(
                 groups=groups
             )
@@ -1679,7 +1444,7 @@ class QuartzSubBlock(JasperSubBlock):
     def forward(
             self, x: Tensor,
             residual: Union[Tensor, None] = None
-            ) -> Tensor:
+    ) -> Tensor:
         # x and residual of shape [B, d, M]
         x = self.dwise_conv(x)
         return super().forward(x=x, residual=residual)
@@ -1698,6 +1463,7 @@ class QuartzBlock(JasperBlock):
         groups (int): The groups size.
         p_dropout (float): The dropout rate.
     """
+
     def __init__(
             self,
             num_sub_blocks: int,
@@ -1706,14 +1472,14 @@ class QuartzBlock(JasperBlock):
             kernel_size: int,
             groups: int,
             p_dropout: float
-            ) -> None:
+    ) -> None:
         super().__init__(
             num_sub_blocks,
             in_channels,
             out_channels,
             kernel_size,
             p_dropout
-            )
+        )
         self.blocks = nn.ModuleList([
             QuartzSubBlock(
                 in_channels=in_channels if i == 1 else out_channels,
@@ -1744,6 +1510,7 @@ class QuartzBlocks(JasperBlocks):
         groups (int): The groups size.
         p_dropout (float): The dropout rate.
     """
+
     def __init__(
             self,
             num_blocks: int,
@@ -1754,7 +1521,7 @@ class QuartzBlocks(JasperBlocks):
             kernel_size: Union[int, List[int]],
             groups: int,
             p_dropout: float
-            ) -> None:
+    ) -> None:
         super().__init__(
             num_blocks=num_blocks,
             num_sub_blocks=num_sub_blocks,
@@ -1762,7 +1529,7 @@ class QuartzBlocks(JasperBlocks):
             channel_inc=0,
             kernel_size=kernel_size,
             p_dropout=p_dropout
-            )
+        )
         assert len(channels_size) == num_blocks
         self.blocks = nn.ModuleList([])
         for i in range(num_blocks):
@@ -1794,6 +1561,7 @@ class Scaling1d(nn.Module):
     Args:
         d_model (int): The model dimension.
     """
+
     def __init__(self, d_model: int) -> None:
         super().__init__()
         self.gamma = nn.Parameter(
@@ -1820,7 +1588,7 @@ class SqueezeformerConvModule(ConformerConvModule):
 
     def __init__(
             self, d_model: int, kernel_size: int, p_dropout: float
-            ) -> None:
+    ) -> None:
         super().__init__(d_model, kernel_size, p_dropout)
         self.pwise_conv1 = nn.Conv1d(
             in_channels=d_model,
@@ -1856,16 +1624,17 @@ class SqueezeformerRelativeMHSA(MultiHeadAtt):
         p_dropout (float): The dropout rate.
         masking_value (int): The masking value. Default -1e15
     """
+
     def __init__(
             self,
             d_model: int,
             h: int,
             p_dropout: float,
             masking_value: int = -1e15
-            ) -> None:
+    ) -> None:
         super().__init__(
             d_model=d_model, h=h, masking_value=masking_value
-            )
+        )
         self.dropout = nn.Dropout(p_dropout)
         self.scaler = Scaling1d(d_model=d_model)
 
@@ -1873,14 +1642,14 @@ class SqueezeformerRelativeMHSA(MultiHeadAtt):
             self,
             x: Tensor,
             mask: Union[None, Tensor]
-            ) -> Tensor:
+    ) -> Tensor:
         out = self.scaler(x)
         out = add_pos_enc(out, self.d_model)
         out = super().forward(
             key=out, query=out,
             value=out, query_mask=mask,
             key_mask=mask
-            )
+        )
         out = self.dropout(out)
         return out
 
@@ -1902,7 +1671,7 @@ class SqueezeformerFeedForward(ConformerFeedForward):
             d_model: int,
             expansion_factor: int,
             p_dropout: float
-            ) -> None:
+    ) -> None:
         super().__init__(
             d_model=d_model,
             expansion_factor=expansion_factor,
@@ -1938,7 +1707,7 @@ class SqueezeformerBlock(nn.Module):
             self, d_model: int, ff_expansion_factor: int,
             h: int, kernel_size: int, p_dropout: float,
             masking_value: int = -1e15
-            ) -> None:
+    ) -> None:
         super().__init__()
         self.mhsa = SqueezeformerRelativeMHSA(
             d_model=d_model, h=h, p_dropout=p_dropout,
@@ -1955,7 +1724,7 @@ class SqueezeformerBlock(nn.Module):
             d_model=d_model,
             kernel_size=kernel_size,
             p_dropout=p_dropout
-            )
+        )
         self.add_and_norm3 = AddAndNorm(d_model=d_model)
         self.ff2 = SqueezeformerFeedForward(
             d_model=d_model,
@@ -1970,145 +1739,3 @@ class SqueezeformerBlock(nn.Module):
         out = self.add_and_norm3(self.conv(out), out)
         out = self.add_and_norm4(self.ff2(out), out)
         return out
-
-
-class SqueezeformerEncoder(nn.Module):
-    """Implements the Squeezeformer encoder
-    as described in https://arxiv.org/abs/2206.00888
-
-    Args:
-        in_features (int): The input/speech feature size.
-        n (int): The number of layers per block, denoted as N in the paper.
-        d_model (int): The model dimension.
-        ff_expansion_factor (int): The linear layer's expansion factor.
-        h (int): The number of heads.
-        kernel_size (int): The depth-wise convolution kernel size.
-        pooling_kernel_size (int): The pooling convolution kernel size.
-        pooling_stride (int): The pooling convolution stride size.
-        ss_kernel_size (Union[int, List[int]]): The kernel size of the
-            subsampling layer.
-        ss_stride (Union[int, List[int]]): The stride of the subsampling layer.
-        ss_n_conv_layers (int): The number of subsampling convolutional layers.
-        p_dropout (float): The dropout rate.
-        ss_groups (Union[int, List[int]]): The subsampling convolution groups
-            size.
-        masking_value (int): The masking value. Default -1e15
-    """
-
-    def __init__(
-            self,
-            in_features: int,
-            n: int,
-            d_model: int,
-            ff_expansion_factor: int,
-            h: int,
-            kernel_size: int,
-            pooling_kernel_size: int,
-            pooling_stride: int,
-            ss_kernel_size: Union[int, List[int]],
-            ss_stride: Union[int, List[int]],
-            ss_n_conv_layers: int,
-            p_dropout: float,
-            ss_groups: Union[int, List[int]] = 1,
-            masking_value: int = -1e15
-            ) -> None:
-        super().__init__()
-        self.subsampling = ConformerPreNet(
-            in_features=in_features,
-            kernel_size=ss_kernel_size,
-            stride=ss_stride,
-            n_conv_layers=ss_n_conv_layers,
-            d_model=d_model,
-            p_dropout=p_dropout,
-            groups=ss_groups
-        )
-        self.layers1 = nn.ModuleList([
-            SqueezeformerBlock(
-                d_model=d_model,
-                ff_expansion_factor=ff_expansion_factor,
-                h=h,
-                kernel_size=kernel_size,
-                p_dropout=p_dropout,
-                masking_value=masking_value
-            )
-            for _ in range(n - 1)
-        ])
-        self.pooling = nn.Conv1d(
-            in_channels=d_model,
-            out_channels=d_model,
-            kernel_size=pooling_kernel_size,
-            stride=pooling_stride,
-            groups=d_model
-        )
-        self.layers2 = nn.ModuleList([
-            SqueezeformerBlock(
-                d_model=d_model,
-                ff_expansion_factor=ff_expansion_factor,
-                h=h,
-                kernel_size=kernel_size,
-                p_dropout=p_dropout,
-                masking_value=masking_value
-            )
-            for _ in range(n)
-        ])
-        self.upsampling_conv = nn.ConvTranspose1d(
-            in_channels=d_model,
-            out_channels=d_model,
-            kernel_size=pooling_kernel_size,
-            stride=pooling_stride
-            )
-        self.sf_layer = SqueezeformerBlock(
-            d_model=d_model,
-            ff_expansion_factor=ff_expansion_factor,
-            h=h,
-            kernel_size=kernel_size,
-            p_dropout=p_dropout,
-            masking_value=masking_value
-            )
-
-    def _pass_through_layers(
-            self, x: Tensor, mask: Tensor, layers: nn.ModuleList
-            ) -> Tensor:
-        for layer in layers:
-            x = layer(x, mask)
-        return x
-
-    def _upsample(self, x: Tensor, target_len: int):
-        # x of shape [B, M, d]
-        x = x.transpose(-1, -2)
-        out = self.upsampling_conv(x)
-        res_len = target_len - x.shape[-1]
-        out = torch.cat(
-            [x, torch.zeros(*x.shape[:2], res_len).to(x.device)],
-            dim=-1
-            )
-        out = out.transpose(-1, -2)
-        return out
-
-    def _time_pooling(self, x: Tensor):
-        x = x.transpose(-1, -2)
-        out = self.pooling(x)
-        out = out.transpose(-1, -2)
-        return out
-
-    def forward(self, x: Tensor, mask: Tensor) -> Tuple[Tensor, Tensor]:
-        lengths = mask.sum(dim=-1)
-        out, lengths = self.subsampling(x, lengths)
-        mask = get_mask_from_lens(lengths=lengths, max_len=out.shape[1])
-        out = self._pass_through_layers(out, mask, self.layers1)
-        result = self._time_pooling(out)
-        pooled_len = calc_data_len(
-            result_len=result.shape[1],
-            pad_len=out.shape[1] - lengths,
-            data_len=lengths,
-            kernel_size=self.pooling.kernel_size[0],
-            stride=self.pooling.stride[0],
-        )
-        pooled_mask = get_mask_from_lens(
-            lengths=pooled_len, max_len=result.shape[1]
-            )
-        result = self._pass_through_layers(result, pooled_mask, self.layers2)
-        result = self._upsample(result, out.shape[1])
-        out = result + out
-        out = self.sf_layer(out, mask)
-        return out, lengths

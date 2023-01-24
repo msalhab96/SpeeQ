@@ -1,11 +1,14 @@
-import torch
 import functools
-import torchaudio
-from typing import Union
 from pathlib import Path
-from torch import nn, Tensor
-from interfaces import IProcess
+from typing import Union
+
+import torch
+import torchaudio
+from torch import Tensor, nn
 from torchaudio import transforms
+
+from interfaces import IProcess
+
 SAMPLER_CACHE_SIZE = 5
 
 
@@ -13,7 +16,7 @@ class AudioLoader(IProcess):
     def __init__(
             self,
             sample_rate: int
-            ) -> None:
+    ) -> None:
         super().__init__()
         self.sample_rate = sample_rate
 
@@ -39,11 +42,11 @@ class FeatExtractor(IProcess):
             self,
             feat_ext_name: str,
             feat_ext_args: dict,
-            ) -> None:
+    ) -> None:
         super().__init__()
         self.feat_extractor = self.__feat_extractor[feat_ext_name](
             **feat_ext_args
-            )
+        )
 
     def run(self, x: Tensor):
         x = self.feat_extractor(x)
@@ -58,6 +61,7 @@ class FeatStacker(IProcess):
         feat_stack_factor (int): The feature stacking
         ratio.
     """
+
     def __init__(self, feat_stack_factor: int) -> None:
         super().__init__()
         assert feat_stack_factor > 1
@@ -77,7 +81,7 @@ class FeatStacker(IProcess):
             *x.shape[:-2],
             x.shape[-2] // self.feat_stack_factor,
             -1
-            )
+        )
         return x
 
 
@@ -89,6 +93,7 @@ class FrameContextualizer(IProcess):
         contex_size (int): The context size, or the number
         of left and right frames to take with the current frame.
     """
+
     def __init__(self, contex_size: int) -> None:
         super().__init__()
         self.contex_size = contex_size
@@ -101,7 +106,7 @@ class FrameContextualizer(IProcess):
         )
         self.conv.weight.data = torch.eye(self.win_size).view(
             self.win_size, 1, self.win_size
-            )
+        )
         self.conv.weight.requires_grad = False
 
     def run(self, x: Tensor) -> Tensor:
@@ -109,7 +114,7 @@ class FrameContextualizer(IProcess):
         x = x.permute(2, 0, 1)  # [F, 1, T]
         zeros = torch.zeros(
             x.shape[0], 1, self.contex_size
-            )
+        )
         x = torch.cat([zeros, x, zeros], dim=-1)
         x = self.conv(x)  # [F, W, T]
         x = x.permute(2, 1, 0).contiguous()  # [T, W, F]

@@ -1,10 +1,12 @@
 import os
 from typing import Tuple, Union
+
 from constants import FileKeys
 from data.loaders import SpeechTextDataset, SpeechTextLoader
 from data.padders import DynamicPadder, StaticPadder
 from interfaces import IDataLoader, IDataset, IPadder, ITokenizer
 from utils.utils import load_csv
+
 from .tokenizer import CharTokenizer
 
 PADDING_TYPES = {
@@ -42,7 +44,7 @@ def get_tokenizer(data_config: object) -> ITokenizer:
 def get_asr_datasets(
         data_config: object,
         tokenizer: ITokenizer
-        ) -> Tuple[IDataset, IDataset]:
+) -> Tuple[IDataset, IDataset]:
     """Creates a train and test dataset objects
 
     Args:
@@ -76,7 +78,7 @@ def get_asr_datasets(
 def get_text_padder(
         data_config: object,
         pad_val: Union[float, int]
-        ) -> IPadder:
+) -> IPadder:
     return PADDING_TYPES[data_config.padding_type](
         dim=0,
         pad_val=pad_val,
@@ -86,10 +88,10 @@ def get_text_padder(
 
 def get_speech_padder(data_config) -> IPadder:
     return PADDING_TYPES[data_config.padding_type](
-            dim=1,
-            pad_val=0.0,
-            max_len=data_config.speech_pad_max_len
-        )
+        dim=1,
+        pad_val=0.0,
+        max_len=data_config.speech_pad_max_len
+    )
 
 
 def get_asr_loaders(
@@ -98,7 +100,7 @@ def get_asr_loaders(
         batch_size: int,
         world_size: int,
         rank: int
-        ) -> Tuple[IDataLoader, IDataLoader]:
+) -> Tuple[IDataLoader, IDataLoader]:
     """Builds training and testing dataloaders.
 
     Args:

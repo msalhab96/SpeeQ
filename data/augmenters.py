@@ -1,7 +1,9 @@
-from .processors import StochasticProcess
-from torch import Tensor
 import random
+
 import torch
+from torch import Tensor
+
+from .processors import StochasticProcess
 
 
 class WhiteNoiseInjector(StochasticProcess):
@@ -15,6 +17,7 @@ class WhiteNoiseInjector(StochasticProcess):
         ratio (float): The ratio/rate that the augmentation will be
         applied to the data. Default 1.0
     """
+
     def __init__(self, ratio=1.0) -> None:
         super().__init__(ratio)
 
@@ -35,12 +38,13 @@ class VolumeChanger(StochasticProcess):
         max_gain (float): The maximum gain that will be multiplied by
         the signal.
     """
+
     def __init__(
             self,
             min_gain: float,
             max_gain: float,
             ratio=1.0
-            ) -> None:
+    ) -> None:
         super().__init__(ratio)
         self.min_gain = min_gain
         self.max_gain = max_gain
@@ -65,6 +69,7 @@ class ConsistentAttenuator(VolumeChanger):
         min_gain (float): The minimum gain that will be multiplied by
         the signal. Default 0.1
     """
+
     def __init__(self, ratio=1.0, min_gain=0.1) -> None:
         super().__init__(ratio, min_gain, max_gain=1)
 
@@ -78,6 +83,7 @@ class VariableAttenuator(StochasticProcess):
         ratio (float): The ratio/rate that the augmentation will be
         applied to the data. Default 1.0
     """
+
     def __init__(self, ratio=1.0) -> None:
         super().__init__(ratio)
 
@@ -101,6 +107,7 @@ class Reverberation(StochasticProcess):
         eps (float): smoothing value, to prevent devision by 0.
         Default to 1e-3.
     """
+
     def __init__(
             self,
             ratio=1.0,
@@ -109,7 +116,7 @@ class Reverberation(StochasticProcess):
             start_val=-10,
             end_val=10,
             eps=1e-3
-            ) -> None:
+    ) -> None:
         super().__init__(ratio)
         self.min_len = min_len
         self.max_len = max_len
@@ -163,7 +170,7 @@ class BaseMasking(StochasticProcess):
                 dim=dim,
                 index=indices,
                 value=0
-                )
+            )
         return mask
 
 
@@ -176,6 +183,7 @@ class FrequencyMasking(BaseMasking):
         ratio (float): The ratio/rate that the augmentation will be
         applied to the data. Default 1.0
     """
+
     def __init__(self, n: int, max_length: int, ratio=1.0) -> None:
         super().__init__(ratio, n, max_length)
 
@@ -196,6 +204,7 @@ class TimeMasking(BaseMasking):
         ratio (float): The ratio/rate that the augmentation will be
         applied to the data. Default 1.0
     """
+
     def __init__(self, n: int, max_length: int, ratio=1.0) -> None:
         super().__init__(ratio, n, max_length)
 

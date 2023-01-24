@@ -1,7 +1,8 @@
-from abc import abstractmethod
 import random
+from abc import abstractmethod
 from typing import List
-from interfaces import IProcessor, IProcess
+
+from interfaces import IProcess, IProcessor
 
 
 class OrderedProcessor(IProcessor):

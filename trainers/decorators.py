@@ -1,5 +1,6 @@
-from typing import Callable
 from functools import wraps
+from typing import Callable
+
 from utils.utils import get_key_tag, save_state_dict
 
 

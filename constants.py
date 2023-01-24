@@ -1,6 +1,10 @@
 from enum import Enum
 
 OPTIMIZER_STATE_KEY = 'optimizer'
+SCHEDULER_TYPE_KEY = 'scheduler'
+CTC_TYPE = 'ctc'
+SEQ2SEQ_TYPE = 'seq2seq'
+TRANSDUCER_TYPE = 'transducer'
 
 
 class FileKeys(Enum):

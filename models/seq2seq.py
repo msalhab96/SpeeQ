@@ -1,8 +1,11 @@
 from typing import Union
-from models.decoders import GlobAttRNNDecoder, LocationAwareAttDecoder
-from models.layers import PyramidRNNLayers, RNNLayers, SpeechTransformerEncoder, TransformerDecoder
-from torch import Tensor
-from torch import nn
+
+from torch import Tensor, nn
+
+from models.decoders import (GlobAttRNNDecoder, LocationAwareAttDecoder,
+                             TransformerDecoder)
+from models.encoders import (PyramidRNNEncoder, RNNEncoder,
+                             SpeechTransformerEncoder)
 from utils.utils import get_mask_from_lens
 
 
@@ -21,6 +24,7 @@ class BasicAttSeq2SeqRNN(nn.Module):
         teacher_forcing_rate (float): The teacher forcing rate. Default 0.0
         rnn_type (str): The rnn type. default 'rnn'.
     """
+
     def __init__(
             self,
             in_features: int,
@@ -33,9 +37,10 @@ class BasicAttSeq2SeqRNN(nn.Module):
             p_dropout: float,
             teacher_forcing_rate: float = 0.0,
             rnn_type: str = 'rnn',
-            ) -> None:
+    ) -> None:
         super().__init__()
-        self.encoder = RNNLayers(
+        self.has_bnorm = False
+        self.encoder = RNNEncoder(
             in_features=in_features,
             hidden_size=hidden_size,
             bidirectional=bidirectional,
@@ -67,8 +72,8 @@ class BasicAttSeq2SeqRNN(nn.Module):
             enc_mask: Tensor,
             dec_inp: Tensor,
             *args, **kwargs
-            ) -> Tensor:
-        out, h, lengths = self.encoder(enc_inp, enc_mask)
+    ) -> Tensor:
+        out, h, lengths = self.encoder(enc_inp, enc_mask, return_h=True)
         if self.bidirectional is True:
             if isinstance(h, tuple):
                 # if LSTM is used
@@ -85,7 +90,7 @@ class BasicAttSeq2SeqRNN(nn.Module):
             enc_h=out,
             enc_mask=enc_mask,
             target=dec_inp
-            )
+        )
         return preds
 
 
@@ -106,6 +111,7 @@ class LAS(BasicAttSeq2SeqRNN):
         teacher_forcing_rate (float): The teacher forcing rate. Default 0.0
         rnn_type (str): The rnn type. default 'rnn'.
     """
+
     def __init__(
             self,
             in_features: int,
@@ -119,7 +125,7 @@ class LAS(BasicAttSeq2SeqRNN):
             p_dropout: float,
             teacher_forcing_rate: float = 0.0,
             rnn_type: str = 'rnn',
-            ) -> None:
+    ) -> None:
         super().__init__(
             in_features=in_features,
             n_classes=n_classes,
@@ -131,9 +137,9 @@ class LAS(BasicAttSeq2SeqRNN):
             p_dropout=p_dropout,
             teacher_forcing_rate=teacher_forcing_rate,
             rnn_type=rnn_type
-            )
+        )
         self.reduction_factor = reduction_factor
-        self.encoder = PyramidRNNLayers(
+        self.encoder = PyramidRNNEncoder(
             in_features=in_features,
             hidden_size=hidden_size,
             reduction_factor=reduction_factor,
@@ -165,6 +171,7 @@ class RNNWithLocationAwareAtt(BasicAttSeq2SeqRNN):
         teacher_forcing_rate (float): The teacher forcing rate. Default 0.0
         rnn_type (str): The rnn type. default 'rnn'.
     """
+
     def __init__(
             self,
             in_features: int,
@@ -180,7 +187,7 @@ class RNNWithLocationAwareAtt(BasicAttSeq2SeqRNN):
             inv_temperature: Union[float, int] = 1,
             teacher_forcing_rate: float = 0.0,
             rnn_type: str = 'rnn'
-            ) -> None:
+    ) -> None:
         super().__init__(
             in_features=in_features,
             n_classes=n_classes,
@@ -191,7 +198,7 @@ class RNNWithLocationAwareAtt(BasicAttSeq2SeqRNN):
             emb_dim=emb_dim,
             p_dropout=p_dropout,
             rnn_type=rnn_type
-            )
+        )
         self.decoder = LocationAwareAttDecoder(
             embed_dim=emb_dim,
             hidden_size=hidden_size,
@@ -243,8 +250,9 @@ class SpeechTransformer(nn.Module):
             att_kernel_size: int,
             att_out_channels: int,
             masking_value: int = -1e15
-            ) -> None:
+    ) -> None:
         super().__init__()
+        self.has_bnorm = False
         self.encoder = SpeechTransformerEncoder(
             in_features=in_features,
             n_conv_layers=n_conv_layers,
@@ -271,9 +279,12 @@ class SpeechTransformer(nn.Module):
             speech_mask: Tensor, text: Tensor,
             text_mask: Tensor,
             *args, **kwargs
-            ) -> Tensor:
-        speech, speech_mask = self.encoder(
+    ) -> Tensor:
+        speech, lengths = self.encoder(
             speech, speech_mask
+        )
+        speech_mask = get_mask_from_lens(
+            lengths, speech.shape[1]
         )
         preds = self.decoder(
             enc_out=speech,

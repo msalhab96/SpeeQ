@@ -1,12 +1,11 @@
-import torch
-from torch import nn
-from torch import Tensor
 from typing import Tuple, Union
-from models.layers import (
-    GlobalMulAttention,
-    LocAwareGlobalAddAttention,
-    PredModule
-    )
+
+import torch
+from torch import Tensor, nn
+
+from models.layers import (GlobalMulAttention, LocAwareGlobalAddAttention,
+                           PositionalEmbedding, PredModule,
+                           TransformerDecLayer)
 
 
 class GlobAttRNNDecoder(nn.Module):
@@ -21,6 +20,7 @@ class GlobAttRNNDecoder(nn.Module):
         teacher_forcing_rate (float): The teacher forcing rate. Default 0.0
         rnn_type (str): The RNN type to use. Default 'rnn'.
     """
+
     def __init__(
             self,
             embed_dim: int,
@@ -30,7 +30,7 @@ class GlobAttRNNDecoder(nn.Module):
             pred_activation: nn.Module,
             teacher_forcing_rate: float = 0.0,
             rnn_type: str = 'rnn'
-            ) -> None:
+    ) -> None:
         super().__init__()
         self.emb = nn.Embedding(
             num_embeddings=hidden_size,
@@ -50,9 +50,9 @@ class GlobAttRNNDecoder(nn.Module):
             GlobalMulAttention(
                 enc_feat_size=hidden_size,
                 dec_feat_size=hidden_size
-                )
+            )
             for _ in range(n_layers)
-            ])
+        ])
         self.pred_net = PredModule(
             in_features=hidden_size,
             n_classes=n_classes,
@@ -88,7 +88,7 @@ class GlobAttRNNDecoder(nn.Module):
             enc_mask: Tensor,
             target: Tensor,
             *args, **kwargs
-            ) -> Tensor:
+    ) -> Tensor:
         # h is the encoder's last hidden state
         # target of shape [B, M]
         max_len = target.shape[-1]
@@ -131,6 +131,7 @@ class LocationAwareAttDecoder(GlobAttRNNDecoder):
         teacher_forcing_rate (float): The teacher forcing rate. Default 0.0
         rnn_type (str): The RNN type to use. Default 'rnn'.
     """
+
     def __init__(
             self,
             embed_dim: int,
@@ -143,7 +144,7 @@ class LocationAwareAttDecoder(GlobAttRNNDecoder):
             inv_temperature: Union[float, int] = 1,
             teacher_forcing_rate: float = 0.0,
             rnn_type: str = 'rnn'
-            ) -> None:
+    ) -> None:
         super().__init__(
             embed_dim=embed_dim,
             hidden_size=hidden_size,
@@ -152,7 +153,7 @@ class LocationAwareAttDecoder(GlobAttRNNDecoder):
             pred_activation=pred_activation,
             teacher_forcing_rate=teacher_forcing_rate,
             rnn_type=rnn_type
-            )
+        )
         self.att_layers = nn.ModuleList([
             LocAwareGlobalAddAttention(
                 enc_feat_size=hidden_size,
@@ -160,9 +161,9 @@ class LocationAwareAttDecoder(GlobAttRNNDecoder):
                 kernel_size=kernel_size,
                 activation=activation,
                 inv_temperature=inv_temperature
-                )
+            )
             for _ in range(n_layers)
-            ])
+        ])
 
     def forward(
             self,
@@ -171,7 +172,7 @@ class LocationAwareAttDecoder(GlobAttRNNDecoder):
             enc_mask: Tensor,
             target: Tensor,
             *args, **kwargs
-            ) -> Tensor:
+    ) -> Tensor:
         # target of shape [B, M]
         batch_size, max_len = target.shape
         results = None
@@ -185,7 +186,7 @@ class LocationAwareAttDecoder(GlobAttRNNDecoder):
                 h = h.permute(1, 0, 2)
                 h, alpha = att(
                     key=enc_h, query=h, alpha=alpha, mask=enc_mask
-                    )
+                )
                 h = h.permute(1, 0, 2)
                 if self.is_lstm:
                     h = (h, c)
@@ -209,30 +210,93 @@ class RNNDecoder(nn.Module):
         hidden_size (int): The RNN's hidden size.
         rnn_type (str): The RNN type.
     """
+
     def __init__(
             self,
             vocab_size: int,
             emb_dim: int,
             hidden_size: int,
             rnn_type: str
-            ) -> None:
+    ) -> None:
         super().__init__()
         self.emb = nn.Embedding(
             num_embeddings=vocab_size, embedding_dim=emb_dim
         )
         from .registry import PACKED_RNN_REGISTRY
         self.rnn = PACKED_RNN_REGISTRY[rnn_type](
-                input_size=emb_dim,
-                hidden_size=hidden_size,
-                batch_first=True,
-                enforce_sorted=False,
-                bidirectional=False
-            )
+            input_size=emb_dim,
+            hidden_size=hidden_size,
+            batch_first=True,
+            enforce_sorted=False,
+            bidirectional=False
+        )
 
     def forward(
             self, x: Tensor, mask: Tensor,
-            ) -> Tuple[Tensor, Tensor]:
+    ) -> Tuple[Tensor, Tensor]:
         lengths = mask.sum(dim=-1).cpu()
         out = self.emb(x)
         out, _, lens = self.rnn(out, lengths)
         return out, lens
+
+
+class TransformerDecoder(nn.Module):
+    """Implements the transformer decoder as described in
+    https://arxiv.org/abs/1706.03762
+
+    Args:
+        n_classes (int): The number of classes.
+        n_layers (int): The nnumber of decoder layers.
+        d_model (int): The model dimensionality.
+        ff_size (int): The feed-forward inner layer dimensionality.
+        h (int): The number of attentional heads.
+        masking_value (int): The attentin masking value. Default -1e15
+    """
+
+    def __init__(
+            self,
+            n_classes: int,
+            n_layers: int,
+            d_model: int,
+            ff_size: int,
+            h: int,
+            masking_value: int = -1e15
+    ) -> None:
+        super().__init__()
+        self.emb = PositionalEmbedding(
+            vocab_size=n_classes,
+            embed_dim=d_model
+        )
+        self.layers = nn.ModuleList(
+            [
+                TransformerDecLayer(
+                    d_model=d_model,
+                    hidden_size=ff_size,
+                    h=h, masking_value=masking_value
+                )
+                for _ in range(n_layers)
+            ]
+        )
+        self.pred_net = PredModule(
+            in_features=d_model,
+            n_classes=n_classes,
+            activation=nn.LogSoftmax(dim=-1)
+        )
+
+    def forward(
+            self,
+            enc_out: Tensor,
+            enc_mask: Union[Tensor, None],
+            dec_inp: Tensor,
+            dec_mask: Union[Tensor, None],
+    ) -> Tensor:
+        out = self.emb(dec_inp)
+        for layer in self.layers:
+            out = layer(
+                enc_out=enc_out,
+                enc_mask=enc_mask,
+                dec_inp=out,
+                dec_mask=dec_mask
+            )
+        out = self.pred_net(out)
+        return out

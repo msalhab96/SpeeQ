@@ -1,13 +1,12 @@
 from __future__ import annotations
+
 from dataclasses import dataclass
-from typing import (
-    List,
-    Tuple,
-    Union
-    )
 from pathlib import Path
-from utils.utils import save_json, load_json
+from typing import List, Tuple, Union
+
 from interfaces import ITokenizer
+from utils.utils import load_json, save_json
+
 from .decorators import check_token
 
 PAD = '<PAD>'
@@ -116,7 +115,7 @@ class BaseTokenizer(ITokenizer):
         self._id_to_token = dict(zip(
             self._token_to_id.values(),
             self._token_to_id.keys()
-            ))
+        ))
 
     def __set_special_tokens_dict(self, data: dict) -> None:
         if self._pad_key in data:
@@ -145,7 +144,7 @@ class BaseTokenizer(ITokenizer):
             tokenizer_path: Union[str, Path],
             *args,
             **kwargs
-            ) -> ITokenizer:
+    ) -> ITokenizer:
         data = load_json(tokenizer_path)
         self._token_to_id = data[self._token_to_id_key]
         self.__set_special_tokens_dict(data[self._special_tokens_key])
@@ -164,7 +163,7 @@ class BaseTokenizer(ITokenizer):
             save_path: Union[str, Path],
             *args,
             **kwargs
-            ) -> None:
+    ) -> None:
         data = {
             self._token_to_id_key: self._token_to_id,
             self._special_tokens_key: self.__get_special_tokens_dict()
@@ -176,21 +175,21 @@ class BaseTokenizer(ITokenizer):
 
     def tokenize(
             self, sentence: str, add_sos=False, add_eos=False
-            ) -> List[int]:
+    ) -> List[int]:
         results = []
         if add_sos is True:
             results.append(self.special_tokens.sos_id)
         results.extend(map(
             lambda x: self._token_to_id[x],
             sentence)
-            )
+        )
         if add_eos is True:
             results.append(self.special_tokens.eos_id)
         return results
 
     def batch_tokenizer(
             self, data: List[str], add_sos=False, add_eos=False
-            ) -> list:
+    ) -> list:
         def func(sentence):
             return self.tokenize(
                 sentence=sentence, add_sos=add_sos, add_eos=add_eos

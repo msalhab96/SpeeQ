@@ -1,18 +1,36 @@
-import torch
 from typing import List, Optional, Tuple, Union
 
-from utils.utils import calc_data_len, get_mask_from_lens
-from .layers import (
-    CReLu, ConformerBlock, ConformerPreNet,
-    Conv1DLayers, JasperBlocks, JasperSubBlock,
-    PredModule, QuartzBlocks, RowConv1D,
-    SqueezeformerEncoder, TransformerEncLayer
-    )
-from torch import nn
-from torch import Tensor
+import torch
+from torch import Tensor, nn
+
+from models.encoders import (ConformerEncoder, DeepSpeechV1Encoder,
+                             DeepSpeechV2Encoder, JasperEncoder,
+                             QuartzNetEncoder, SqueezeformerEncoder,
+                             Wav2LetterEncoder)
+
+from .layers import ConvPredModule, PredModule, TransformerEncLayer
 
 
-class DeepSpeechV1(nn.Module):
+class CTCModel(nn.Module):
+    def __init__(self, pred_in_size: int, n_classes: int) -> None:
+        super().__init__()
+        self.has_bnorm = False
+        self.pred_net = PredModule(
+            in_features=pred_in_size,
+            n_classes=n_classes,
+            activation=nn.LogSoftmax(dim=-1)
+        )
+
+    def forward(
+            self, x: Tensor, mask: Tensor, *args, **kwargs
+    ):
+        out, lengths = self.encoder(x, mask, *args, **kwargs)  # B, M, d
+        preds = self.pred_net(out)  # B, M, C
+        preds = preds.permute(1, 0, 2)  # M, B, C
+        return preds, lengths
+
+
+class DeepSpeechV1(CTCModel):
     """Builds the DeepSpeech model described in
     https://arxiv.org/abs/1412.5567
 
@@ -20,13 +38,13 @@ class DeepSpeechV1(nn.Module):
         in_features (int): The input feature size.
         hidden_size (int): The layers' hidden size.
         n_linear_layers (int): The number of feed-forward layers.
-        bidirectional (bidirectional): if the rnn is bidirectional
-        or not.
+        bidirectional (bool): if the rnn is bidirectional or not.
         n_clases (int): The number of classes to predict.
         max_clip_value (int): The maximum relu value.
         rnn_type (str): rnn, gru or lstm.
         p_dropout (float): The dropout rate.
     """
+
     def __init__(
             self,
             in_features: int,
@@ -37,56 +55,20 @@ class DeepSpeechV1(nn.Module):
             max_clip_value: int,
             rnn_type: str,
             p_dropout: float
-            ) -> None:
-        super().__init__()
-        self.ff_layers = nn.ModuleList([
-            nn.Sequential(
-                nn.Linear(
-                    in_features=in_features if i == 0 else hidden_size,
-                    out_features=hidden_size
-                    ),
-                CReLu(
-                    max_val=max_clip_value
-                    ),
-                nn.Dropout(
-                    p=p_dropout
-                    )
-            )
-            for i in range(n_linear_layers)
-        ])
-        from .registry import PACKED_RNN_REGISTRY
-        self.rnn = PACKED_RNN_REGISTRY[rnn_type](
-            input_size=hidden_size,
+    ) -> None:
+        super().__init__(
+            pred_in_size=hidden_size,
+            n_classes=n_classes
+        )
+        self.encoder = DeepSpeechV1Encoder(
+            in_features=in_features,
             hidden_size=hidden_size,
-            bidirectional=bidirectional
+            n_linear_layers=n_linear_layers,
+            bidirectional=bidirectional,
+            max_clip_value=max_clip_value,
+            rnn_type=rnn_type,
+            p_dropout=p_dropout
         )
-        self.fc = nn.Linear(
-            in_features=hidden_size,
-            out_features=hidden_size,
-        )
-        self.crelu = CReLu(max_val=max_clip_value)
-        self.pred_net = PredModule(
-            in_features=hidden_size,
-            n_classes=n_classes,
-            activation=nn.LogSoftmax(dim=-1)
-        )
-        self.bidirectional = bidirectional
-        self.hidden_size = hidden_size
-        self.has_bnorm = False
-
-    def forward(self, x: Tensor, mask: Tensor) -> Tuple[Tensor, Tensor]:
-        # mask of shape [B, M] and True if there's no padding
-        # x of shape [B, T, F]
-        lengths = mask.sum(dim=-1)
-        for layer in self.ff_layers:
-            x = layer(x)
-        out, _, lengths = self.rnn(x, lengths.cpu())
-        if self.bidirectional is True:
-            out = out[..., :self.hidden_size] + out[..., self.hidden_size:]
-        out = self.crelu(self.fc(out))
-        preds = self.pred_net(out)
-        preds = preds.permute(1, 0, 2)
-        return preds, lengths
 
     @torch.no_grad()
     def predict(self, x: Tensor) -> Tensor:
@@ -101,17 +83,16 @@ class BERT(nn.Module):
     described in https://arxiv.org/abs/1810.04805
 
     Args:
-        max_len (int): The maximum length for positional
-            encoding.
+        max_len (int): The maximum length for positional encoding.
         in_feature (int): The input/speech feature size.
         d_model (int): The model dimensionality.
         h (int): The number of heads.
-        hidden_size (int): The inner size of the feed forward
-            module.
+        hidden_size (int): The inner size of the feed forward module.
         n_layers (int): The number of transformer encoders.
         n_classes (int): The number of classes.
         p_dropout (float): The dropout rate.
     """
+
     def __init__(
             self,
             max_len: int,
@@ -122,7 +103,7 @@ class BERT(nn.Module):
             n_layers: int,
             n_classes: int,
             p_dropout: float
-            ) -> None:
+    ) -> None:
         super().__init__()
         self.fc = nn.Linear(
             in_features=in_feature,
@@ -130,13 +111,13 @@ class BERT(nn.Module):
         )
         self.pos_emb = nn.Parameter(
             torch.randn(max_len, d_model)
-            )
+        )
         self.layers = nn.ModuleList([
             TransformerEncLayer(
                 d_model=d_model,
                 hidden_size=hidden_size,
                 h=h
-                )
+            )
             for _ in range(n_layers)
         ])
         self.pred_module = PredModule(
@@ -155,7 +136,7 @@ class BERT(nn.Module):
         emb = emb.unsqueeze(dim=0)  # 1, M, d
         emb = emb.repeat(
             mask.shape[0], 1, 1
-            )  # B, M , d
+        )  # B, M , d
         mask = mask.unsqueeze(dim=-1)  # B, M, 1
         emb = mask * emb
         return emb + x
@@ -174,7 +155,7 @@ class BERT(nn.Module):
         return preds, lengths
 
 
-class DeepSpeechV2(nn.Module):
+class DeepSpeechV2(CTCModel):
     """Implements the deep speech model
     proposed in https://arxiv.org/abs/1512.02595
 
@@ -184,8 +165,7 @@ class DeepSpeechV2(nn.Module):
         stride (int): The convolution layers' stride.
         in_features (int): The input/speech feature size.
         hidden_size (int): The layers' hidden size.
-        bidirectional (bidirectional): if the rnn is bidirectional
-            or not.
+        bidirectional (bool): if the rnn is bidirectional or not.
         n_rnn (int): The number of RNN layers.
         n_linear_layers (int): The number of linear layers.
         n_classes (int): The number of classes.
@@ -194,6 +174,7 @@ class DeepSpeechV2(nn.Module):
         tau (int): The future context size.
         p_dropout (float): The dropout rate.
     """
+
     def __init__(
             self,
             n_conv: int,
@@ -209,73 +190,29 @@ class DeepSpeechV2(nn.Module):
             rnn_type: str,
             tau: int,
             p_dropout: float
-            ) -> None:
-        super().__init__()
-        self.conv = Conv1DLayers(
-            in_size=in_features,
-            out_size=hidden_size,
+    ) -> None:
+        super().__init__(
+            pred_in_size=hidden_size,
+            n_classes=n_classes
+        )
+        self.encoder = DeepSpeechV2Encoder(
+            n_conv=n_conv,
             kernel_size=kernel_size,
             stride=stride,
-            n_layers=n_conv,
+            in_features=in_features,
+            hidden_size=hidden_size,
+            bidirectional=bidirectional,
+            n_rnn=n_rnn,
+            n_linear_layers=n_linear_layers,
+            max_clip_value=max_clip_value,
+            rnn_type=rnn_type,
+            tau=tau,
             p_dropout=p_dropout
         )
-        from .registry import PACKED_RNN_REGISTRY
-        self.rnns = nn.ModuleList(
-            [
-                PACKED_RNN_REGISTRY[rnn_type](
-                    input_size=hidden_size,
-                    hidden_size=hidden_size,
-                    bidirectional=bidirectional
-                    )
-                for _ in range(n_rnn)
-                ]
-            )
-        self.linear_layers = nn.ModuleList(
-            [
-                nn.Linear(
-                    in_features=hidden_size,
-                    out_features=hidden_size
-                    )
-                for _ in range(n_linear_layers)
-                ]
-            )
-        self.crelu = CReLu(max_val=max_clip_value)
-        self.context_conv = RowConv1D(
-            tau=tau, hidden_size=hidden_size
-        )
-        self.pred_net = PredModule(
-            in_features=hidden_size,
-            n_classes=n_classes,
-            activation=nn.LogSoftmax(dim=-1)
-        )
-        self.hidden_size = hidden_size
-        self.bidirectional = bidirectional
-        self.has_bnorm = False
-
-    def forward(self, x: Tensor, mask: Tensor):
-        lengths = mask.sum(dim=-1)
-        lengths = lengths.cpu()
-        out, lengths = self.conv(x, lengths)
-        out = self.crelu(out)
-        for layer in self.rnns:
-            out, _, lengths = layer(
-                out, lengths
-                )
-            if self.bidirectional is True:
-                out = out[..., :self.hidden_size] +\
-                    out[..., self.hidden_size:]
-            out = self.crelu(out)
-        out = self.context_conv(out)
-        for layer in self.linear_layers:
-            out = layer(out)
-            out = self.crelu(out)
-        preds = self.pred_net(out)
-        preds = preds.permute(1, 0, 2)
-        return preds, lengths
 
 
-class Conformer(nn.Module):
-    """Implements the confformer model proposed in
+class Conformer(CTCModel):
+    """Implements the conformer model proposed in
     https://arxiv.org/abs/2005.08100, this model used
     with CTC, while in the paper used RNN-T.
 
@@ -288,11 +225,12 @@ class Conformer(nn.Module):
         kernel_size (int): The kernel size of conv module.
         ss_kernel_size (int): The kernel size of the subsampling layer.
         ss_stride (int): The stride of the subsampling layer.
-        ss_num_conv_layers (int): The number of subsampling layer.
+        ss_num_conv_layers (int): The number of subsampling layers.
         in_features (int): The input/speech feature size.
         res_scaling (float): The residual connection multiplier.
         p_dropout (float): The dropout rate.
     """
+
     def __init__(
             self,
             n_classes: int,
@@ -307,50 +245,28 @@ class Conformer(nn.Module):
             in_features: int,
             res_scaling: float,
             p_dropout: float
-            ) -> None:
-        super().__init__()
-        self.sub_sampling = ConformerPreNet(
-            in_features=in_features,
-            kernel_size=ss_kernel_size,
-            stride=ss_stride,
-            n_conv_layers=ss_num_conv_layers,
-            d_model=d_model,
-            p_dropout=p_dropout
+    ) -> None:
+        super().__init__(
+            pred_in_size=d_model,
+            n_classes=n_classes
         )
-        self.blocks = nn.ModuleList([
-            ConformerBlock(
-                d_model=d_model,
-                ff_expansion_factor=ff_expansion_factor,
-                h=h, kernel_size=kernel_size,
-                p_dropout=p_dropout, res_scaling=res_scaling
-            )
-            for _ in range(n_conf_layers)
-        ])
-        self.pred_net = PredModule(
-            in_features=d_model,
-            n_classes=n_classes,
-            activation=nn.LogSoftmax(dim=-1)
+        self.encoder = ConformerEncoder(
+            d_model=d_model,
+            n_conf_layers=n_conf_layers,
+            ff_expansion_factor=ff_expansion_factor,
+            h=h,
+            kernel_size=kernel_size,
+            ss_kernel_size=ss_kernel_size,
+            ss_stride=ss_stride,
+            ss_num_conv_layers=ss_num_conv_layers,
+            in_features=in_features,
+            res_scaling=res_scaling,
+            p_dropout=p_dropout
         )
         self.has_bnorm = True
 
-    def forward(
-            self, x: Tensor, mask: Tensor
-            ) -> Tuple[Tensor, Tensor]:
-        lengths = mask.sum(dim=-1)
-        lengths = lengths.cpu()
-        out, lengths = self.sub_sampling(x, lengths)
-        mask = get_mask_from_lens(
-            lengths, lengths.max().item()
-            )
-        mask = mask.to(x.device)
-        for layer in self.blocks:
-            out = layer(out, mask)
-        preds = self.pred_net(out)
-        preds = preds.permute(1, 0, 2)
-        return preds, lengths
 
-
-class Jasper(nn.Module):
+class Jasper(CTCModel):
     """Implements Jasper model architecture proposed
     in https://arxiv.org/abs/1904.03288
 
@@ -372,6 +288,7 @@ class Jasper(nn.Module):
             kernel size of each jasper block.
         p_dropout (float): The dropout rate.
     """
+
     def __init__(
             self,
             n_classes: int,
@@ -385,75 +302,33 @@ class Jasper(nn.Module):
             prelog_n_channels: int,
             blocks_kernel_size: Union[int, List[int]],
             p_dropout: float
-            ) -> None:
-        super().__init__()
+    ) -> None:
+        super().__init__(1, 1)
         # TODO: Add activation function options
         # TODO: Add normalization options
         # TODO: Add residual connections options
         # TODO: passing dropout list
         self.has_bnorm = True
-        self.prelog = JasperSubBlock(
-            in_channels=in_features,
-            out_channels=prelog_n_channels,
-            kernel_size=prelog_kernel_size,
-            p_dropout=p_dropout,
-            padding=0,
-            stride=prelog_stride
-        )
-        self.prelog_stride = prelog_stride
-        self.prelog_kernel_size = prelog_kernel_size
-        self.blocks = JasperBlocks(
+        self.encoder = JasperEncoder(
+            in_features=in_features,
             num_blocks=num_blocks,
             num_sub_blocks=num_sub_blocks,
-            in_channels=prelog_n_channels,
             channel_inc=channel_inc,
-            kernel_size=blocks_kernel_size,
+            epilog_kernel_size=epilog_kernel_size,
+            prelog_kernel_size=prelog_kernel_size,
+            prelog_stride=prelog_stride,
+            prelog_n_channels=prelog_n_channels,
+            blocks_kernel_size=blocks_kernel_size,
             p_dropout=p_dropout
         )
-        self.epilog1 = JasperSubBlock(
-            in_channels=prelog_n_channels + channel_inc * num_blocks,
-            out_channels=prelog_n_channels + channel_inc * (1 + num_blocks),
-            kernel_size=epilog_kernel_size,
-            p_dropout=p_dropout,
+        self.pred_net = ConvPredModule(
+            in_features=prelog_n_channels + channel_inc * (2 + num_blocks),
+            n_classes=n_classes,
+            activation=nn.LogSoftmax(dim=-2)
         )
-        self.epilog2 = JasperSubBlock(
-            in_channels=prelog_n_channels + channel_inc * (1 + num_blocks),
-            out_channels=prelog_n_channels + channel_inc * (2 + num_blocks),
-            kernel_size=1,
-            p_dropout=p_dropout
-        )
-        self.pred_net = nn.Conv1d(
-            in_channels=prelog_n_channels + channel_inc * (2 + num_blocks),
-            out_channels=n_classes,
-            kernel_size=1
-        )
-        self.log_softmax = nn.LogSoftmax(dim=-2)
-
-    def forward(
-            self, x: Tensor, mask: Tensor
-            ) -> Tuple[Tensor, Tensor]:
-        # x of shape [B, M, d]
-        lengths = mask.sum(dim=-1)
-        lengths = lengths.cpu()
-        x = x.transpose(-1, -2)
-        out = self.prelog(x)
-        lengths = calc_data_len(
-            result_len=out.shape[-1],
-            pad_len=x.shape[-1] - lengths,
-            data_len=lengths,
-            kernel_size=self.prelog_kernel_size,
-            stride=self.prelog_stride
-        )
-        out = self.blocks(out)
-        out = self.epilog1(out)
-        out = self.epilog2(out)
-        preds = self.pred_net(out)
-        preds = self.log_softmax(preds)
-        preds = preds.permute(2, 0, 1)
-        return preds, lengths
 
 
-class Wav2Letter(nn.Module):
+class Wav2Letter(CTCModel):
     """Implements Wav2Letter model proposed in
     https://arxiv.org/abs/1609.03193
 
@@ -475,6 +350,7 @@ class Wav2Letter(nn.Module):
             layer that process the wav samples directly if wav is modeled.
             Default None.
     """
+
     def __init__(
             self,
             in_features: int,
@@ -489,95 +365,26 @@ class Wav2Letter(nn.Module):
             p_dropout: float,
             wav_kernel_size: Optional[int] = None,
             wav_stride: Optional[int] = None
-            ) -> None:
-        super().__init__()
-        self.is_wav = in_features == 1
-        self.has_bnorm = False
-        if self.is_wav:
-            assert wav_kernel_size is not None
-            assert wav_stride is not None
-            self.raw_conv = nn.Conv1d(
-                in_channels=1,
-                out_channels=layers_channels_size,
-                kernel_size=wav_kernel_size,
-                stride=wav_stride
-                )
-        self.pre_conv = nn.Conv1d(
-            in_channels=layers_channels_size if self.is_wav else in_features,
-            out_channels=layers_channels_size,
-            kernel_size=pre_conv_kernel_size,
-            stride=pre_conv_stride
-            )
-        self.convs = nn.ModuleList([
-            nn.Conv1d(
-                in_channels=layers_channels_size,
-                out_channels=layers_channels_size,
-                kernel_size=layers_kernel_size,
-                padding='same'
-            )
-            for _ in range(n_conv_layers - 1)
-        ])
-        self.convs.append(
-            nn.Conv1d(
-                in_channels=layers_channels_size,
-                out_channels=post_conv_channels_size,
-                kernel_size=post_conv_kernel_size,
-                padding='same'
-            )
+    ) -> None:
+        super().__init__(1, 1)
+        self.encoder = Wav2LetterEncoder(
+            in_features=in_features,
+            n_conv_layers=n_conv_layers,
+            layers_kernel_size=layers_kernel_size,
+            layers_channels_size=layers_channels_size,
+            pre_conv_stride=pre_conv_stride,
+            pre_conv_kernel_size=pre_conv_kernel_size,
+            post_conv_channels_size=post_conv_channels_size,
+            post_conv_kernel_size=post_conv_kernel_size,
+            p_dropout=p_dropout,
+            wav_kernel_size=wav_kernel_size,
+            wav_stride=wav_stride
         )
-        self.post_conv = nn.Conv1d(
-            in_channels=post_conv_channels_size,
-            out_channels=post_conv_channels_size,
-            kernel_size=1,
-            padding='same'
+        self.pred_net = ConvPredModule(
+            in_features=post_conv_channels_size,
+            n_classes=n_classes,
+            activation=nn.LogSoftmax(dim=-2)
         )
-        self.pred_net = nn.Conv1d(
-            in_channels=post_conv_channels_size,
-            out_channels=n_classes,
-            kernel_size=1
-        )
-        self.log_softmax = nn.LogSoftmax(dim=-2)
-        self.dropout = nn.Dropout(p_dropout)
-
-    def forward(self, x: Tensor, mask: Tensor) -> Tuple[Tensor, Tensor]:
-        # x of shape [B, M, d]
-        lengths = mask.sum(dim=-1)
-        lengths = lengths.cpu()
-        x = x.transpose(-1, -2)
-        out = x
-        if self.is_wav:
-            out = self.raw_conv(out)
-            out = torch.tanh(out)
-            out = self.dropout(out)
-            lengths = calc_data_len(
-                result_len=out.shape[-1],
-                pad_len=x.shape[-1] - lengths,
-                data_len=lengths,
-                kernel_size=self.raw_conv.kernel_size[0],
-                stride=self.raw_conv.stride[0]
-            )
-        results = self.pre_conv(out)
-        lengths = calc_data_len(
-            result_len=results.shape[-1],
-            pad_len=out.shape[-1] - lengths,
-            data_len=lengths,
-            kernel_size=self.pre_conv.kernel_size[0],
-            stride=self.pre_conv.stride[0]
-        )
-        out = results
-        out = torch.tanh(out)
-        out = self.dropout(out)
-        for layer in self.convs:
-            out = layer(out)
-            out = torch.tanh(out)
-            out = self.dropout(out)
-        out = self.post_conv(out)
-        out = torch.tanh(out)
-        out = self.dropout(out)
-        preds = self.pred_net(out)
-        preds = self.log_softmax(preds)
-        preds = preds.permute(2, 0, 1)
-        return preds, lengths
 
 
 class QuartzNet(Jasper):
@@ -606,6 +413,7 @@ class QuartzNet(Jasper):
             kernel size of each jasper block.
         p_dropout (float): The dropout rate.
     """
+
     def __init__(
             self,
             n_classes: int,
@@ -622,51 +430,32 @@ class QuartzNet(Jasper):
             groups: int,
             blocks_kernel_size: Union[int, List[int]],
             p_dropout: float
-            ) -> None:
-        super().__init__(
-            n_classes=n_classes,
+    ) -> None:
+        super().__init__(1, 1)
+        self.encoder = QuartzNetEncoder(
             in_features=in_features,
-            num_blocks=num_blocks,
-            num_sub_blocks=num_sub_blocks,
-            channel_inc=0,
-            epilog_kernel_size=epilog_kernel_size,
-            prelog_kernel_size=prelog_kernel_size,
-            prelog_stride=prelog_stride,
-            prelog_n_channels=prelog_n_channels,
-            blocks_kernel_size=blocks_kernel_size,
-            p_dropout=p_dropout
-            )
-        self.blocks = QuartzBlocks(
             num_blocks=num_blocks,
             block_repetition=block_repetition,
             num_sub_blocks=num_sub_blocks,
-            in_channels=prelog_n_channels,
             channels_size=channels_size,
-            kernel_size=blocks_kernel_size,
+            epilog_kernel_size=epilog_kernel_size,
+            epilog_channel_size=epilog_channel_size,
+            prelog_kernel_size=prelog_kernel_size,
+            prelog_stride=prelog_stride,
+            prelog_n_channels=prelog_n_channels,
             groups=groups,
+            blocks_kernel_size=blocks_kernel_size,
             p_dropout=p_dropout
         )
-        self.epilog1 = JasperSubBlock(
-            in_channels=channels_size[-1],
-            out_channels=epilog_channel_size[0],
-            kernel_size=epilog_kernel_size,
-            p_dropout=p_dropout,
-        )
-        self.epilog2 = JasperSubBlock(
-            in_channels=epilog_channel_size[0],
-            out_channels=epilog_channel_size[1],
-            kernel_size=1,
-            p_dropout=p_dropout
-        )
-        self.pred_net = nn.Conv1d(
-            in_channels=epilog_channel_size[1],
-            out_channels=n_classes,
-            kernel_size=1
+        self.pred_net = ConvPredModule(
+            in_features=epilog_channel_size[1],
+            n_classes=n_classes,
+            activation=nn.LogSoftmax(dim=-2)
         )
 
 
-class Squeezeformer(nn.Module):
-    """Implements the Squeezeformer encoder
+class Squeezeformer(CTCModel):
+    """Implements the Squeezeformer model architecture
     as described in https://arxiv.org/abs/2206.00888
 
     Args:
@@ -706,8 +495,11 @@ class Squeezeformer(nn.Module):
             p_dropout: float,
             ss_groups: Union[int, List[int]] = 1,
             masking_value: int = -1e15
-            ) -> None:
-        super().__init__()
+    ) -> None:
+        super().__init__(
+            pred_in_size=d_model,
+            n_classes=n_classes
+        )
         self.encoder = SqueezeformerEncoder(
             in_features=in_features,
             n=n,
@@ -723,16 +515,5 @@ class Squeezeformer(nn.Module):
             p_dropout=p_dropout,
             ss_groups=ss_groups,
             masking_value=masking_value
-            )
-        self.pred_net = PredModule(
-            in_features=d_model,
-            n_classes=n_classes,
-            activation=nn.LogSoftmax(dim=-1)
         )
         self.has_bnorm = True
-
-    def forward(self, x: Tensor, mask: Tensor) -> Tuple[Tensor, Tensor]:
-        out, lengths = self.encoder(x, mask)
-        preds = self.pred_net(out)
-        preds = preds.permute(1, 0, 2)
-        return preds, lengths

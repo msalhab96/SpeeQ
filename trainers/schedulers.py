@@ -1,6 +1,7 @@
 from math import sqrt
 from numbers import Number
 from typing import Iterable
+
 from constants import OPTIMIZER_STATE_KEY
 from interfaces import IScheduler
 
@@ -19,7 +20,7 @@ class Scheduler(IScheduler):
             params: Iterable,
             optimizer: str,
             optimizer_args: dict
-            ) -> None:
+    ) -> None:
         super().__init__()
         from .registry import OPTIMIZERS
         self.optimizer = OPTIMIZERS[optimizer](
@@ -68,12 +69,12 @@ class NoamScheduler(Scheduler):
             warmup_staps: int,
             d_model: int,
             *args, **kwargs
-            ) -> None:
+    ) -> None:
         super().__init__(
             params=params,
             optimizer=optimizer,
             optimizer_args=optimizer_args
-            )
+        )
         self.peak = 1 / sqrt(d_model)
         self.counter = 0
         self.warmup_staps = warmup_staps
@@ -95,6 +96,19 @@ class NoamScheduler(Scheduler):
 
 
 class SqueezeformerNoamScheduler(NoamScheduler):
+    """Implements The Noam scheduler with the modifications
+    presented in https://arxiv.org/abs/2206.00888
+
+    Args:
+        params (Iterable): The mdoel's parameters.
+        optimizer (str): The optimizer's name.
+        optimizer_args (dict): The optimizer's arguments.
+        warmup_staps (int): The warmup steps.
+        lr_peak (Number): The peak value of the learning rate.
+        decay_rate (Number): The decay rate of the learning rate.
+        t_peak (Number): The number of steps to keep the peak learning rate for.
+    """
+
     def __init__(
             self,
             params: Iterable,
@@ -105,7 +119,7 @@ class SqueezeformerNoamScheduler(NoamScheduler):
             decay_rate: Number,
             t_peak: int,
             *args, **kwargs
-            ) -> None:
+    ) -> None:
         self.lr_peak = lr_peak
         self.decay_rate = decay_rate
         self.t_peak = t_peak
@@ -116,7 +130,7 @@ class SqueezeformerNoamScheduler(NoamScheduler):
             optimizer_args=optimizer_args,
             warmup_staps=warmup_staps,
             d_model=1  # not used
-            )
+        )
 
     def get_lr(self) -> float:
         if self.counter < self.warmup_staps:

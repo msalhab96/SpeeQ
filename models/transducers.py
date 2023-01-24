@@ -1,21 +1,19 @@
 from typing import Tuple
+
+from torch import Tensor, nn
+
 from models.decoders import RNNDecoder
-from models.layers import RNNLayers
-from torch import nn
-from torch import Tensor
+from models.encoders import RNNEncoder
 
 
 class BaseTransducer(nn.Module):
     def __init__(
             self,
-            encoder: nn.Module,
-            predictor: nn.Module,
             feat_size: int,
             n_classes: int
-            ) -> None:
+    ) -> None:
         super().__init__()
-        self.encoder = encoder
-        self.predictor = predictor
+        self.has_bnorm = False
         self.join_net = nn.Linear(
             in_features=feat_size,
             out_features=n_classes
@@ -26,21 +24,25 @@ class BaseTransducer(nn.Module):
             speech_mask: Tensor, text: Tensor,
             text_mask: Tensor,
             *args, **kwargs
-            ) -> Tensor:
+    ) -> Tuple[Tensor, Tensor, Tensor]:
         speech, speech_len = self.encoder(
             speech, speech_mask
         )
-        text, text_len = self.predictor(
+        text, text_len = self.decoder(
             text, text_mask
         )
-        speech = speech.unsqueeze(-1)
+        speech = speech.unsqueeze(-2)
         text = text.unsqueeze(1)
         result = speech + text
+        result = self.join_net(result)
+        speech_len, text_len = (
+            speech_len.to(speech.device), text_len.to(speech.device)
+        )
         return result, speech_len, text_len
 
 
 class RNNTransducer(BaseTransducer):
-    """Implements the RNN transducer model model proposed in
+    """Implements the RNN transducer model proposed in
     https://arxiv.org/abs/1211.3711
 
     Args:
@@ -53,6 +55,7 @@ class RNNTransducer(BaseTransducer):
         rnn_type (str): The RNN type.
         p_dropout (float): The dropout rate.
     """
+
     def __init__(
             self,
             in_features: int,
@@ -63,8 +66,11 @@ class RNNTransducer(BaseTransducer):
             bidirectional: bool,
             rnn_type: str,
             p_dropout: float
-            ) -> None:
-        encoder = RNNLayers(
+    ) -> None:
+        super().__init__(
+            feat_size=hidden_size, n_classes=n_classes
+        )
+        encoder = RNNEncoder(
             in_features=in_features,
             hidden_size=hidden_size,
             bidirectional=bidirectional,
@@ -78,27 +84,3 @@ class RNNTransducer(BaseTransducer):
             hidden_size=hidden_size,
             rnn_type=rnn_type
         )
-        super().__init__(
-            encoder, decoder, hidden_size, n_classes
-            )
-
-    def forward(
-            self, speech: Tensor,
-            speech_mask: Tensor, text: Tensor,
-            text_mask: Tensor,
-            *args, **kwargs
-            ) -> Tuple[Tensor, Tensor, Tensor]:
-        speech, _, speech_len = self.encoder(
-            speech, speech_mask
-        )
-        text, text_len = self.predictor(
-            text, text_mask
-        )
-        speech = speech.unsqueeze(-2)
-        text = text.unsqueeze(1)
-        result = speech + text
-        result = self.join_net(result)
-        speech_len, text_len = (
-            speech_len.to(speech.device), text_len.to(speech.device)
-            )
-        return result, speech_len, text_len

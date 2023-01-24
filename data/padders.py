@@ -1,7 +1,9 @@
-import torch
-from interfaces import IPadder
-from torch import Tensor
 from typing import Union
+
+import torch
+from torch import Tensor
+
+from interfaces import IPadder
 
 
 class DynamicPadder(IPadder):
@@ -13,13 +15,14 @@ class DynamicPadder(IPadder):
         will be used to fill the padding sequence.
         left_pad (int): The side to pad the padding sequence to.
     """
+
     def __init__(
             self,
             dim: int,
             pad_val: Union[int, Tensor, float],
             left_pad=False,
             *args, **kwargs
-            ) -> None:
+    ) -> None:
         super().__init__()
         self.dim = dim
         self.left_pad = left_pad
@@ -36,7 +39,7 @@ class DynamicPadder(IPadder):
             pad_len,
             *x.shape[1 + self.dim:],
             dtype=x.dtype
-            ).to(x.device)
+        ).to(x.device)
         pad = pad + self.pad_val
         if self.left_pad:
             x = torch.cat([pad, x], dim=self.dim)
@@ -55,6 +58,7 @@ class StaticPadder(DynamicPadder):
         max_len (int): The maximum sequence length.
         left_pad (int): The side to pad the padding sequence to.
     """
+
     def __init__(
             self,
             dim: int,
@@ -62,7 +66,7 @@ class StaticPadder(DynamicPadder):
             max_len: int,
             left_pad=False,
             *args, **kwargs
-            ) -> None:
+    ) -> None:
         super().__init__(dim, pad_val, left_pad)
         self.max_len = max_len
 
