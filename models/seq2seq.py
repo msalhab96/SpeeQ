@@ -1,9 +1,10 @@
 from typing import Union
-from models.decoders import GlobAttRNNDecoder, LocationAwareAttDecoder
+from models.decoders import (
+    GlobAttRNNDecoder, LocationAwareAttDecoder, TransformerDecoder
+    )
 from models.encoders import (
     PyramidRNNEncoder, RNNEncoder, SpeechTransformerEncoder
-    )
-from models.layers import TransformerDecoder
+)
 from torch import Tensor
 from torch import nn
 from utils.utils import get_mask_from_lens
