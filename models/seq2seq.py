@@ -1,6 +1,7 @@
 from typing import Union
 from models.decoders import GlobAttRNNDecoder, LocationAwareAttDecoder
-from models.layers import PyramidRNNLayers, RNNLayers, SpeechTransformerEncoder, TransformerDecoder
+from models.encoders import SpeechTransformerEncoder
+from models.layers import PyramidRNNLayers, RNNLayers, TransformerDecoder
 from torch import Tensor
 from torch import nn
 from utils.utils import get_mask_from_lens
@@ -272,9 +273,12 @@ class SpeechTransformer(nn.Module):
             text_mask: Tensor,
             *args, **kwargs
             ) -> Tensor:
-        speech, speech_mask = self.encoder(
+        speech, lengths = self.encoder(
             speech, speech_mask
         )
+        speech_mask = get_mask_from_lens(
+            lengths, speech.shape[1]
+            )
         preds = self.decoder(
             enc_out=speech,
             enc_mask=speech_mask,
