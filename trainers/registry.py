@@ -62,12 +62,12 @@ def get_criterion(
 
 
 def get_optimizer(model, trainer_config):
-    if trainer_config.scheduler is not None:
-        return SCHEDULERS[trainer_config.scheduler](
+    if trainer_config.scheduler_template is not None:
+        return SCHEDULERS[trainer_config.scheduler_template.name](
             params=model.parameters(),
             optimizer=trainer_config.optimizer,
             optimizer_args=trainer_config.optim_args,
-            **trainer_config.scheduler_args
+            **trainer_config.scheduler_template.get_dict()
         )
     return OPTIMIZERS[trainer_config.optimizer](
         model.parameters(), **trainer_config.optim_args

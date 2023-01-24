@@ -22,13 +22,9 @@ class NoamSchedulerTemp(BaseSchedulerTemplate):
     """Noam scheduler template
 
     Args:
-        optimizer (str): The optimizer's name (i.e adam, sgd ..etc).
-        optimizer_args (dict): The optimizer's arguments.
         warmup_staps (int): The warmup steps.
         d_model (int): The model dimension.
     """
-    optimizer: str
-    optimizer_args: dict
     warmup_staps: int
     d_model: int
     _name = 'noam'
@@ -39,19 +35,13 @@ class SqueezeformerNoamSchedulerTemp(BaseSchedulerTemplate):
     """Noam scheduler with changes proposed in Squeezeformer paper template.
 
     Args:
-        optimizer (str): The optimizer's name (i.e adam, sgd ..etc).
-        optimizer_args (dict): The optimizer's arguments.
         warmup_staps (int): The warmup steps.
-        d_model (int): The model dimension.
         lr_peak (Number): The peak value of the learning rate.
         decay_rate (Number): The decay rate of the learning rate.
         t_peak (Number): The number of steps to keep the peak learning
             rate for.
     """
-    optimizer: str
-    optimizer_args: dict
     warmup_staps: int
-    d_model: int
     lr_peak: Number
     decay_rate: Number
     t_peak: int

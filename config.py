@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Union
 from dataclasses import dataclass, field
-from interfaces import IProcessor, ITemplate
+from interfaces import IProcessor, IScheduler, ITemplate
 
 
 @dataclass
@@ -19,9 +19,8 @@ class TrainerConfig:
         criterion (str): The criterion name to be used.
         optimizer (str): The name of the optimizer to be used.
         optim_args (dict): The optimizer arguments.
-        scheduler (Union[str, None]): The name of the scheduler to be used.
+        scheduler_template (Union[IScheduler, None]): The scheduler template to be used.
         Default None.
-        scheduler_args (dict): The scheduler arguments. Default {}.
         dist_config (Union[object, None]): The DDP configuration object,
         for a single node/GPU training use None. Default None.
         logger (str): The logger name to be used. Default 'tb'.
@@ -43,8 +42,7 @@ class TrainerConfig:
     criterion: str
     optimizer: str
     optim_args: dict
-    scheduler: Union[str, None] = None
-    scheduler_args: dict = field(default_factory=dict)
+    scheduler_template: Union[ITemplate, None] = None
     dist_config: Union[object, None] = None
     device: str = 'cuda'
     logger: str = 'tb'
