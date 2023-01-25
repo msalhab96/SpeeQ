@@ -449,3 +449,40 @@ class RNNTTemp(BaseTemplate):
     p_dropout: float
     _name = 'rnn-t'
     _type = TRANSDUCER_TYPE
+
+
+@dataclass
+class ConformerTransducerTemp(BaseTemplate):
+    """Conformer transducer model template
+    https://arxiv.org/abs/2005.08100
+
+    Args:
+        d_model (int): The model dimension.
+        n_conf_layers (int): The number of conformer blocks.
+        ff_expansion_factor (int): The feed-forward expansion factor.
+        h (int): The number of heads.
+        kernel_size (int): The kernel size of conv module.
+        ss_kernel_size (int): The kernel size of the subsampling layer.
+        ss_stride (int): The stride of the subsampling layer.
+        ss_num_conv_layers (int): The number of subsampling layers.
+        in_features (int): The input/speech feature size.
+        res_scaling (float): The residual connection multiplier.
+        emb_dim (int): The embedding layer's size.
+        rnn_type (str): The RNN type.
+        p_dropout (float): The dropout rate.
+    """
+    d_model: int
+    n_conf_layers: int
+    ff_expansion_factor: int
+    h: int
+    kernel_size: int
+    ss_kernel_size: int
+    ss_stride: int
+    ss_num_conv_layers: int
+    in_features: int
+    res_scaling: float
+    emb_dim: int
+    rnn_type: str
+    p_dropout: float
+    _name = 'conformer'
+    _type = TRANSDUCER_TYPE
