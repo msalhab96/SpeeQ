@@ -583,7 +583,7 @@ class DistTransducerTrainer(BaseDistTrainer, TransducerTrainer):
             grad_clip_norm_type: float = 2.0,
             history: dict = {}
     ) -> None:
-        Seq2SeqTrainer.__init__(
+        TransducerTrainer.__init__(
             self,
             optimizer=optimizer,
             criterion=criterion,
