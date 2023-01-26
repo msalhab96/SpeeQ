@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 from typing import Tuple, Union
 
 from constants import FileKeys
@@ -39,6 +40,10 @@ def get_tokenizer(data_config: object) -> ITokenizer:
         tokenizer.save_tokenizer(tokenizer_path)
         print(f'Tokenizer saved to {tokenizer_path}!')
     return tokenizer
+
+
+def load_tokenizer(tokenizer_path: Union[Path, str]) -> ITokenizer:
+    return CharTokenizer().load_tokenizer(tokenizer_path)
 
 
 def get_asr_datasets(
