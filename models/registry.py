@@ -61,6 +61,13 @@ def list_seq2seq_models() -> List[str]:
     return list(SEQ2SEQ_MODELS.values())
 
 
+def list_transducer_models() -> List[str]:
+    """Lists all pre-implemented transducer based
+    models.
+    """
+    return list(TRANSDUCER_MODELS.values())
+
+
 def get_model(model_config, n_classes):
     if model_config.template.type == CTC_TYPE:
         return CTC_MODELS[model_config.template.name](
