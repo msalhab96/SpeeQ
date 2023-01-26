@@ -39,12 +39,12 @@ class GlobAttRNNDecoder(nn.Module):
         from .registry import RNN_REGISTRY
         self.rnn_layers = nn.ModuleList([
             RNN_REGISTRY[rnn_type](
-                input_size=embed_dim,
+                input_size=embed_dim if i == 0 else hidden_size,
                 hidden_size=hidden_size,
                 batch_first=True,
                 bidirectional=False
             )
-            for _ in range(n_layers)
+            for i in range(n_layers)
         ])
         self.att_layers = nn.ModuleList([
             GlobalMulAttention(
@@ -94,16 +94,21 @@ class GlobAttRNNDecoder(nn.Module):
         max_len = target.shape[-1]
         results = None
         out = self.emb(target[:, 0: 1])
+        h = [h] * len(self.rnn_layers)
         for i in range(max_len):
-            for rnn, att in zip(self.rnn_layers, self.att_layers):
-                out, h = rnn(out, h)
+            for j, (rnn, att) in enumerate(
+                    zip(self.rnn_layers, self.att_layers)
+            ):
+                out, h_ = rnn(out, h[j])
                 if self.is_lstm:
-                    (h, c) = h
-                h = h.permute(1, 0, 2)
-                h = att(key=enc_h, query=h, mask=enc_mask)
-                h = h.permute(1, 0, 2)
+                    (h_, c_) = h_
+                h_ = h_.permute(1, 0, 2)
+                h_ = att(key=enc_h, query=h_, mask=enc_mask)
+                h_ = h_.permute(1, 0, 2)
                 if self.is_lstm:
-                    h = (h, c)
+                    h[j] = (h_, c_)
+                else:
+                    h[j] = h_
             out = self.pred_net(out)
             results = out if results is None \
                 else torch.cat([results, out], dim=1)
