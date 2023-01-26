@@ -183,18 +183,23 @@ class LocationAwareAttDecoder(GlobAttRNNDecoder):
         results = None
         alpha = torch.zeros(batch_size, 1, enc_h.shape[1]).to(enc_h.device)
         out = self.emb(target[:, 0: 1])
+        h = [h] * len(self.rnn_layers)
         for i in range(max_len):
-            for rnn, att in zip(self.rnn_layers, self.att_layers):
-                out, h = rnn(out, h)
+            for j, (rnn, att) in enumerate(
+                    zip(self.rnn_layers, self.att_layers)
+            ):
+                out, h_ = rnn(out, h[j])
                 if self.is_lstm:
-                    (h, c) = h
-                h = h.permute(1, 0, 2)
-                h, alpha = att(
-                    key=enc_h, query=h, alpha=alpha, mask=enc_mask
+                    (h_, c_) = h_
+                h_ = h_.permute(1, 0, 2)
+                h_, alpha = att(
+                    key=enc_h, query=h_, alpha=alpha, mask=enc_mask
                 )
                 h = h.permute(1, 0, 2)
                 if self.is_lstm:
-                    h = (h, c)
+                    h[j] = (h_, c_)
+                else:
+                    h[j] = h_
             out = self.pred_net(out)
             results = out if results is None \
                 else torch.cat([results, out], dim=1)
