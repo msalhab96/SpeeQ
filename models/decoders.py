@@ -236,6 +236,39 @@ class LocationAwareAttDecoder(GlobAttRNNDecoder):
             out = self.emb(y)
         return results
 
+    def predict(self, state: dict) -> Tuple[Tensor, dict, Tensor]:
+        alpha_key = 'alpha'
+        enc_out = state[ENC_OUT_KEY]
+        batch_size, _, hidden_size = enc_out.shape
+        last_pred = state[PREDS_KEY][:, -1:]
+        h = state[HIDDEN_STATE_KEY]
+        alpha = state.get(
+            alpha_key, torch.zeros(
+                batch_size, 1, hidden_size
+            )
+        )
+        alpha = alpha.to(enc_out.device)
+        if isinstance(h, list) is False:
+            h = [h] * len(self.rnn_layers)
+        out = self.emb(last_pred)
+        for i, (rnn, att) in enumerate(zip(self.rnn_layers, self.att_layers)):
+            out, h_ = rnn(out, h[i])
+            if self.is_lstm:
+                (h_, c_) = h[i]
+            h_ = h_.permute(1, 0, 2)
+            h_, alpha = att(key=enc_out, query=h_, alpha=alpha, mask=None)
+            h_ = h_.permute(1, 0, 2)
+            if self.is_lstm:
+                h_ = (h_, c_)
+            h[i] = h_
+        out = self.pred_net(out)
+        state[PREDS_KEY] = torch.cat(
+            [state[PREDS_KEY], torch.argmax(out, dim=-1)], dim=-1
+        )
+        state[HIDDEN_STATE_KEY] = h
+        state[alpha_key] = alpha
+        return state
+
 
 class RNNDecoder(nn.Module):
     """Builds a simple RNN-decoder that contains embedding layer
