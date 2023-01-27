@@ -3,6 +3,7 @@ from typing import Tuple, Union
 import torch
 from torch import Tensor, nn
 
+from constants import ENC_OUT_KEY, HIDDEN_STATE_KEY, LAST_PRED_KEY, PREDS_KEY
 from models.layers import (GlobalMulAttention, LocAwareGlobalAddAttention,
                            PositionalEmbedding, PredModule,
                            TransformerDecLayer)
@@ -117,6 +118,32 @@ class GlobAttRNNDecoder(nn.Module):
                 y = self._apply_teacher_forcing(y=y, out=out)
             out = self.emb(y)
         return results
+
+    def predict(self, state: dict) -> Tuple[Tensor, dict, Tensor]:
+        enc_out = state[ENC_OUT_KEY]
+        preds = state[PREDS_KEY]  # [B, M]
+        h = state[HIDDEN_STATE_KEY]
+        last_pred = preds[:, -1:]
+        if isinstance(h, list) is False:
+            # for the first prediction iteration
+            h = [h] * len(self.rnn_layers)
+        out = self.emb(last_pred)
+        for i, (rnn, att) in enumerate(zip(self.rnn_layers, self.att_layers)):
+            out, h_ = rnn(out, h[i])
+            if self.is_lstm:
+                (h_, c_) = h_
+            h_ = h_.permute(1, 0, 2)
+            h_ = att(key=enc_out, query=h_, mask=None)
+            h_ = h_.permute(1, 0, 2)
+            if self.is_lstm:
+                h_ = (h_, c_)
+            h[i] = h_
+        out = self.pred_net(out)
+        state[PREDS_KEY] = torch.cat(
+            [state[PREDS_KEY], torch.argmax(out, dim=-1)], dim=-1
+        )
+        state[HIDDEN_STATE_KEY] = h
+        return state
 
 
 class LocationAwareAttDecoder(GlobAttRNNDecoder):
