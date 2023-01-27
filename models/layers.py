@@ -353,8 +353,8 @@ class MaskedMultiHeadAtt(MultiHeadAtt):
             key_mask: Union[Tensor, None],
             query_mask: Union[Tensor, None]
     ) -> Tensor:
-        batch_size, max_len = key_mask.shape
         if key_mask is not None:
+            batch_size, max_len = key_mask.shape
             query_mask = torch.tril(torch.ones(batch_size, max_len, max_len))
             query_mask = query_mask.bool()
             query_mask = query_mask.to(key_mask.device)
