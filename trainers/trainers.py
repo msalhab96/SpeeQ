@@ -447,7 +447,6 @@ class Seq2SeqTrainer(BaseTrainer):
         ]
         [speech, speech_mask, text, text_mask] = batch
         preds = self.model(speech, speech_mask, text, text_mask)
-        # preds of shape [T, B, C]
         loss = self.criterion(preds, text, text_mask)
         return loss
 
