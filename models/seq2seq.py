@@ -2,6 +2,7 @@ from typing import Union
 
 from torch import Tensor, nn
 
+from constants import ENC_OUT_KEY, HIDDEN_STATE_KEY
 from models.decoders import (GlobAttRNNDecoder, LocationAwareAttDecoder,
                              TransformerDecoder)
 from models.encoders import (PyramidRNNEncoder, RNNEncoder,
@@ -92,6 +93,23 @@ class BasicAttSeq2SeqRNN(nn.Module):
             target=dec_inp
         )
         return preds
+
+    def predict(self, x: Tensor, mask: Tensor, state: dict) -> dict:
+        if ENC_OUT_KEY not in state:
+            enc_out, h, _ = self.encoder(x, mask, return_h=True)
+            if self.bidirectional is True:
+                if isinstance(h, tuple):
+                    # if LSTM is used
+                    h = (
+                        self._process_hiddens(h[0]),
+                        self._process_hiddens(h[1])
+                    )
+                else:
+                    h = self._process_hiddens(h)
+            state[HIDDEN_STATE_KEY] = h
+            state[ENC_OUT_KEY] = enc_out
+        state = self.decoder.predict(state)
+        return state
 
 
 class LAS(BasicAttSeq2SeqRNN):
@@ -293,3 +311,9 @@ class SpeechTransformer(nn.Module):
             dec_mask=text_mask
         )
         return preds
+
+    def predict(self, speech: Tensor, mask: Tensor, state: dict):
+        if ENC_OUT_KEY not in state:
+            state[ENC_OUT_KEY], _ = self.encoder(speech, mask)
+        state = self.decoder.predict(state)
+        return state
