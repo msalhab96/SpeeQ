@@ -5,6 +5,11 @@ SCHEDULER_TYPE_KEY = 'scheduler'
 CTC_TYPE = 'ctc'
 SEQ2SEQ_TYPE = 'seq2seq'
 TRANSDUCER_TYPE = 'transducer'
+HIDDEN_STATE_KEY = 'h'
+ENC_OUT_KEY = 'enc_out'
+PREDS_KEY = 'preds'
+PROBABILITIES_KEY = 'props'
+TERMINATION_STATE_KEY = 'is_term'
 
 
 class FileKeys(Enum):
