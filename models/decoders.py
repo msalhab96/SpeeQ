@@ -3,7 +3,7 @@ from typing import Tuple, Union
 import torch
 from torch import Tensor, nn
 
-from constants import ENC_OUT_KEY, HIDDEN_STATE_KEY, LAST_PRED_KEY, PREDS_KEY
+from constants import ENC_OUT_KEY, HIDDEN_STATE_KEY, PREDS_KEY
 from models.layers import (GlobalMulAttention, LocAwareGlobalAddAttention,
                            PositionalEmbedding, PredModule,
                            TransformerDecLayer)
@@ -370,3 +370,18 @@ class TransformerDecoder(nn.Module):
             )
         out = self.pred_net(out)
         return out
+
+    def predict(self, state: dict) -> dict:
+        preds = state[PREDS_KEY]
+        out = self.emb(preds)
+        for layer in self.layers:
+            out = layer(
+                enc_out=state[ENC_OUT_KEY],
+                enc_mask=None,
+                dec_inp=out,
+                dec_mask=None
+            )
+        out = self.pred_net(out[:, -1:, :])
+        last_pred = torch.argmax(out, dim=-1)
+        state[PREDS_KEY] = torch.cat([state[PREDS_KEY], last_pred], dim=-1)
+        return state
