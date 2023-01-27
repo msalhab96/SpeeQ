@@ -4,6 +4,7 @@ from typing import Union
 import torch
 
 from config import ModelConfig
+from constants import PREDS_KEY, TERMINATION_STATE_KEY
 from data.registry import load_tokenizer
 from interfaces import IProcessor
 from models.registry import get_model
@@ -30,7 +31,7 @@ class _ASRBasePredictor:
             model_config=model_config,
             n_classes=self.tokenizer.vocab_size
         ).to(self.device)
-        model, *_ = load_state_dict(self.cfg.model_config.model_path)
+        model, *_ = load_state_dict(model_config.model_path)
         self.model.load_state_dict(model)
         self.model.eval()
         self.blank_id = self.tokenizer.special_tokens.blank_id
@@ -78,4 +79,52 @@ class CTCPredictor(_ASRBasePredictor):
             results = results[1:]
         if results[-1] == self.eos:
             results = results[:-1]
+        return ''.join(self.tokenizer.ids2tokens(results))
+
+
+class Seq2SeqPredictor(_ASRBasePredictor):
+    """Implements Seq2Seq-Based models predictor
+
+    Args:
+        speech_processor (IProcessor): The speech/file pre-processing
+            processor.
+        tokenizer_path (Union[str, Path]): The trained tokenizer path.
+        model_config (ModelConfig): The model configuration.
+        device (str): The device to map the operations to.
+        max_len (int): The maximum decoding length.
+    """
+
+    def __init__(
+            self,
+            speech_processor: IProcessor,
+            tokenizer_path: Union[str, Path],
+            model_config: ModelConfig,
+            device: str,
+            max_len: int,
+            *args, **kwargs
+    ) -> None:
+        super().__init__(
+            speech_processor, tokenizer_path, model_config, device
+        )
+        self.max_len = max_len
+        # TODO: Add beam search
+
+    def predict(self, file_path: Union[Path, str]) -> str:
+        speech = self.speech_processor.execute(file_path)
+        speech = speech.to(self.device)
+        mask = torch.ones(1, speech.shape[1], dtype=torch.bool)
+        mask = mask.to(self.device)
+        counter = 0
+        state = {
+            PREDS_KEY: torch.LongTensor([[self.sos]]).to(self.device),
+            TERMINATION_STATE_KEY: False
+        }
+        while counter <= self.max_len:
+            state = self.model.predict(speech, mask, state)
+            last_idx = state[PREDS_KEY][0, -1].item()
+            state[TERMINATION_STATE_KEY] = last_idx == self.eos
+            if state[TERMINATION_STATE_KEY] is True:
+                break
+            counter += 1
+        results = state[PREDS_KEY][0, 1:-1].tolist()
         return ''.join(self.tokenizer.ids2tokens(results))
