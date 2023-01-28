@@ -3,7 +3,7 @@ from typing import Tuple, Union
 import torch
 from torch import Tensor, nn
 
-from constants import ENC_OUT_KEY, HIDDEN_STATE_KEY, PREDS_KEY
+from constants import DECODER_OUT_KEY, ENC_OUT_KEY, HIDDEN_STATE_KEY, PREDS_KEY
 from models.layers import (GlobalMulAttention, LocAwareGlobalAddAttention,
                            PositionalEmbedding, PredModule,
                            TransformerDecLayer)
@@ -308,6 +308,16 @@ class RNNDecoder(nn.Module):
         out = self.emb(x)
         out, _, lens = self.rnn(out, lengths)
         return out, lens
+
+    def predict(self, state: dict) -> dict:
+        h = state[HIDDEN_STATE_KEY]
+        last_pred = state[PREDS_KEY][:, -1:]
+        lens = torch.ones(last_pred.shape[0], dtype=torch.long)
+        out = self.emb(last_pred)
+        out, h, _ = self.rnn(out, lens, h)
+        state[HIDDEN_STATE_KEY] = h
+        state[DECODER_OUT_KEY] = out
+        return state
 
 
 class TransformerDecoder(nn.Module):
