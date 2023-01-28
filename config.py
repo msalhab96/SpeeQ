@@ -1,6 +1,7 @@
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Union
-from dataclasses import dataclass, field
+
 from interfaces import IProcessor, ITemplate
 
 
@@ -102,11 +103,11 @@ class ModelConfig:
 
     Args:
         template (ITemplate): The model template.
-        model_path (Union[str, Path, None]): The pre-trained checkpoint
-        to load the weights from. Default None.
+        model_path (Union[str, Path]): The pre-trained checkpoint
+            to load the weights from. Default ''.
     """
     template: ITemplate
-    model_path: Union[str, Path, None] = ''
+    model_path: Union[str, Path] = ''
 
 
 @dataclass
