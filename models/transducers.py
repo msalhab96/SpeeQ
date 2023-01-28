@@ -1,7 +1,10 @@
 from typing import Tuple
 
+import torch
 from torch import Tensor, nn
 
+from constants import (DECODER_OUT_KEY, ENC_OUT_KEY, HIDDEN_STATE_KEY,
+                       PREDS_KEY, PREV_HIDDEN_STATE_KEY, SPEECH_IDX_KEY)
 from models.decoders import RNNDecoder
 from models.encoders import ConformerEncoder, RNNEncoder
 
@@ -39,6 +42,23 @@ class BaseTransducer(nn.Module):
             speech_len.to(speech.device), text_len.to(speech.device)
         )
         return result, speech_len, text_len
+
+    def predict(self, x: Tensor, mask: Tensor, state: dict) -> dict:
+        if ENC_OUT_KEY not in state:
+            state[ENC_OUT_KEY], _ = self.encoder(x, mask)
+            state[SPEECH_IDX_KEY] = 0
+            state[HIDDEN_STATE_KEY] = None
+        last_hidden_state = state[HIDDEN_STATE_KEY]
+        state = self.decoder.predict(state)
+        speech_idx = state[SPEECH_IDX_KEY]
+        out = state[DECODER_OUT_KEY] + \
+            state[ENC_OUT_KEY][:, speech_idx: speech_idx + 1, :]
+        out = self.join_net(out)
+        out = torch.nn.functional.log_softmax(out, dim=-1)
+        out = torch.argmax(out, dim=-1)
+        state[PREDS_KEY] = torch.cat([state[PREDS_KEY], out], dim=-1)
+        state[PREV_HIDDEN_STATE_KEY] = last_hidden_state
+        return state
 
 
 class RNNTransducer(BaseTransducer):
