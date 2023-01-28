@@ -10,6 +10,9 @@ ENC_OUT_KEY = 'enc_out'
 PREDS_KEY = 'preds'
 PROBABILITIES_KEY = 'props'
 TERMINATION_STATE_KEY = 'is_term'
+SPEECH_IDX_KEY = 'speech_idx'
+DECODER_OUT_KEY = 'decoder_out'
+PREV_HIDDEN_STATE_KEY = 'prev_h'
 
 
 class FileKeys(Enum):
