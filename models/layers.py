@@ -42,13 +42,20 @@ class PackedRNN(nn.Module):
         self.batch_first = batch_first
         self.enforce_sorted = enforce_sorted
 
-    def forward(self, x: Tensor, lens: Union[List[int], Tensor]):
+    def forward(
+            self, x: Tensor,
+            lens: Union[List[int], Tensor],
+            h: Union[Tensor, None] = None
+    ):
         packed = pack_padded_sequence(
             x, lens,
             batch_first=self.batch_first,
             enforce_sorted=self.enforce_sorted
         )
-        out, h = self.rnn(packed)
+        if h is not None:
+            out, h = self.rnn(packed, h)
+        else:
+            out, h = self.rnn(packed)
         out, lens = pad_packed_sequence(out, batch_first=self.batch_first)
         return out, h, lens
 
