@@ -94,6 +94,8 @@ def _get_asr_trainer_args(
         model_config=model_config,
         n_classes=tokenizer.vocab_size
     )
+    if world_size == 1:
+        model = model.to(trainer_config.device)
     optimizer = get_optimizer(
         model=model, trainer_config=trainer_config
     )
