@@ -3,9 +3,9 @@ from typing import List, Optional, Tuple, Union
 import torch
 from torch import Tensor, nn
 
-from models.layers import (ConformerBlock, ConformerPreNet, Conv1DLayers,
-                           CReLu, JasperBlocks, JasperSubBlock, QuartzBlocks,
-                           RowConv1D, SpeechTransformerEncLayer,
+from models.layers import (ConformerBlock, ConformerPreNet, ContextNetBlock,
+                           Conv1DLayers, CReLu, JasperBlocks, JasperSubBlock,
+                           QuartzBlocks, RowConv1D, SpeechTransformerEncLayer,
                            SqueezeformerBlock)
 from utils.utils import add_pos_enc, calc_data_len, get_mask_from_lens
 
@@ -894,4 +894,96 @@ class PyramidRNNEncoder(nn.Module):
         lengths = lengths.long()
         if return_h is True:
             return out, h, lengths
+        return out, lengths
+
+
+class ContextNetEncoder(nn.Module):
+    """Implements the ContextNet encoder proposed in
+    https://arxiv.org/abs/2005.03191
+
+    Args:
+        in_features (int): The input feature size.
+        n_layers (int): The number of ContextNet blocks.
+        n_sub_layers (Union[int, List[int]]): The number of convolutional
+            layers per block, if list is passed, it has to be of length equal
+            to n_layers.
+        stride (Union[int, List[int]]): The stride of the last convolutional
+            layers per block, if list is passed, it has to be of length equal
+            to n_layers.
+        out_channels (Union[int, List[int]]): The channels size of the
+            convolutional layers per block, if list is passed, it has to be of
+            length equal to n_layers.
+        kernel_size (int): The convolutional layers kernel size.
+        reduction_factor (int): The feature reduction size of the
+            Squeeze-and-excitation module.
+    """
+
+    def __init__(
+            self,
+            in_features: int,
+            n_layers: int,
+            n_sub_layers: Union[int, List[int]],
+            stride: Union[int, List[int]],
+            out_channels: Union[int, List[int]],
+            kernel_size: int,
+            reduction_factor: int
+    ) -> None:
+        super().__init__()
+        self.layers = nn.ModuleList([])
+        for i in range(n_layers):
+            if i == 0:
+                self.layers.append(
+                    ContextNetBlock(
+                        n_layers=1,
+                        in_channels=in_features,
+                        out_channels=out_channels[i] if isinstance(
+                            out_channels, list
+                        ) else out_channels,
+                        kernel_size=kernel_size,
+                        reduction_factor=reduction_factor,
+                        add_residual=False,
+                        last_layer_stride=1
+                    )
+                )
+            elif i == n_layers - 1:
+                self.layers.append(
+                    ContextNetBlock(
+                        n_layers=1,
+                        in_channels=out_channels[i - 1] if isinstance(
+                            out_channels, list) else out_channels,
+                        out_channels=out_channels[i] if isinstance(
+                            out_channels, list
+                        ) else out_channels,
+                        kernel_size=kernel_size,
+                        reduction_factor=reduction_factor,
+                        add_residual=False,
+                        last_layer_stride=1
+                    )
+                )
+            else:
+                self.layers.append(
+                    ContextNetBlock(
+                        n_layers=n_sub_layers[i] if isinstance(
+                            n_sub_layers, list) else n_sub_layers,
+                        in_channels=out_channels[i - 1] if isinstance(
+                            out_channels, list
+                        ) else out_channels,
+                        out_channels=out_channels[i] if isinstance(
+                            out_channels, list
+                        ) else out_channels,
+                        kernel_size=kernel_size,
+                        reduction_factor=reduction_factor,
+                        add_residual=True,
+                        last_layer_stride=stride[i] if isinstance(
+                            stride, list) else stride
+                    )
+                )
+
+    def forward(self, x: Tensor, mask: Tensor) -> Tuple[Tensor, Tensor]:
+        # x of shape [B,  M, d]
+        lengths = mask.sum(dim=-1)
+        out = x.transpose(-1, -2)  # [B, d, M]
+        for layer in self.layers:
+            out, lengths = layer(out, lengths)
+        out = out.transpose(-1, -2)  # [B, M, d']
         return out, lengths

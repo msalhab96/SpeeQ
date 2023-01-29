@@ -6,7 +6,8 @@ from torch import Tensor
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 
 from models.activations import Sigmax
-from utils.utils import add_pos_enc, calc_data_len, get_positional_encoding
+from utils.utils import (add_pos_enc, calc_data_len, get_mask_from_lens,
+                         get_positional_encoding)
 
 
 class PackedRNN(nn.Module):
@@ -1746,3 +1747,191 @@ class SqueezeformerBlock(nn.Module):
         out = self.add_and_norm3(self.conv(out), out)
         out = self.add_and_norm4(self.ff2(out), out)
         return out
+
+
+class SqueezeAndExcit1D(nn.Module):
+    """Implements the squeeze and excite module
+    proposed in https://arxiv.org/abs/1709.01507 and used
+    in https://arxiv.org/abs/2005.03191
+
+    Args:
+        in_feature (int): The number of channels or feature size.
+        reduction_factor (int): The feature reduction size.
+    """
+
+    def __init__(
+            self,
+            in_feature: int,
+            reduction_factor: int
+    ) -> None:
+        super().__init__()
+        self.swish = nn.SiLU()
+        self.fc1 = nn.Linear(
+            in_features=in_feature, out_features=in_feature // reduction_factor
+        )
+        self.fc2 = nn.Linear(
+            in_features=in_feature // reduction_factor, out_features=in_feature
+        )
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x: Tensor, mask: Tensor):
+        # x of shape [B, d, M]
+        # mask of shape [B, M]
+        lengths = mask.sum(dim=-1)  # [B]
+        x = mask.unsqueeze(dim=1) * x  # zeroing out padded values
+        x_pooled = x.sum(dim=-1)  # [B, d]
+        x_pooled = x_pooled / lengths.unsqueeze(dim=1)
+        x_pooled = self.fc1(x_pooled)
+        x_pooled = self.swish(x_pooled)
+        x_pooled = self.fc2(x_pooled)
+        x_pooled = self.sigmoid(x_pooled)
+        x_pooled = x_pooled.unsqueeze(dim=-1)  # [B, d, 1]
+        return x_pooled * x
+
+
+class ContextNetConvLayer(nn.Module):
+    """Implements the convolution layer of the ContextNet
+    model proposed in https://arxiv.org/abs/2005.03191
+    f(x) = Act(BN(Conv(x))
+
+    Args:
+        in_channels (int): The input's channel size.
+        out_channels (int): The number of output channels.
+        kernel_size (int): The convolution kernel size.
+        stride (int): The convolution stride size. Default 1.
+    """
+
+    def __init__(
+            self,
+            in_channels: int,
+            out_channels: int,
+            kernel_size: int,
+            stride: int = 1
+    ) -> None:
+        super().__init__()
+        self.conv = nn.Conv1d(
+            in_channels=in_channels,
+            out_channels=out_channels,
+            kernel_size=kernel_size,
+            stride=stride,
+            padding='same' if stride == 1 else 0,
+            groups=in_channels
+        )
+        self.bnorm = nn.BatchNorm1d(
+            num_features=out_channels
+        )
+        self.swish = nn.SiLU()
+
+    def forward(self, x: Tensor, lengths: Tensor) -> Tuple[Tensor, Tensor]:
+        out = self.conv(x)
+        out = self.bnorm(out)
+        out = self.swish(out)
+        if self.conv.stride[0] != 1:
+            lengths = calc_data_len(
+                result_len=out.shape[-1],
+                pad_len=x.shape[-1] - lengths,
+                data_len=lengths,
+                kernel_size=self.conv.kernel_size[0],
+                stride=self.conv.stride[0]
+            )
+        return out, lengths
+
+
+class ContextNetResidual(nn.Module):
+    """Implements the residual branch of the ContextNet block
+    as proposed in https://arxiv.org/abs/2005.03191
+
+    Args:
+        in_channels (int): The number of channels in the input.
+        out_channels (int): The number of output channels.
+        kernel_size (int): The convolution kernel size.
+        stride (int): The convolution stride size.
+
+    """
+
+    def __init__(
+            self,
+            in_channels: int,
+            out_channels: int,
+            kernel_size: int,
+            stride: int
+    ) -> None:
+        super().__init__()
+        self.conv = nn.Conv1d(
+            in_channels=in_channels,
+            out_channels=out_channels,
+            kernel_size=kernel_size,
+            stride=stride,
+            padding='same' if stride == 1 else 0
+        )
+        self.bnorm = nn.BatchNorm1d(
+            num_features=out_channels
+        )
+
+    def forward(self, x: Tensor, out: Tensor) -> Tensor:
+        # x of shape [B, d, M]
+        # out of shape [B, d/s, M]  s=1 if the block has no stride
+        x = self.conv(x)
+        x = self.bnorm(x)
+        return x + out
+
+
+class ContextNetBlock(nn.Module):
+    """Implements the convolution block of the ContextNet
+    model proposd in https://arxiv.org/abs/2005.03191
+
+    Args:
+        n_layers (int): The number of convolution layers.
+        in_channels (int): The number of channels in the input.
+        out_channels (int): The number of output channels.
+        kernel_size (int): The convolution kernel size.
+        reduction_factor (int): The feature reduction size of the
+            Squeeze-and-excitation module.
+        add_residual (bool): A flag to include a residual connection or not.
+        last_layer_stride (int): The last convolution layer stride size.
+    """
+
+    def __init__(
+            self,
+            n_layers: int,
+            in_channels: int,
+            out_channels: int,
+            kernel_size: int,
+            reduction_factor: int,
+            add_residual: bool,
+            last_layer_stride: int = 1
+    ) -> None:
+        super().__init__()
+        self.conv_layers = nn.ModuleList([
+            ContextNetConvLayer(
+                in_channels=in_channels if i == 0 else out_channels,
+                out_channels=out_channels,
+                kernel_size=kernel_size,
+                stride=1 if i < n_layers - 1 else last_layer_stride
+            )
+            for i in range(n_layers)
+        ])
+        self.squeeze_and_excite = SqueezeAndExcit1D(
+            in_feature=out_channels,
+            reduction_factor=reduction_factor
+        )
+        if add_residual is True:
+            self.residual = ContextNetResidual(
+                in_channels=in_channels,
+                out_channels=out_channels,
+                kernel_size=kernel_size,
+                stride=last_layer_stride
+            )
+        self.swish = nn.SiLU()
+        self.add_residual = add_residual
+
+    def forward(self, x: Tensor, lengths: Tensor) -> Tuple[Tensor, Tensor]:
+        out = x
+        for layer in self.conv_layers:
+            out, lengths = layer(out, lengths)
+        mask = get_mask_from_lens(lengths=lengths, max_len=out.shape[-1])
+        out = self.squeeze_and_excite(out, mask)
+        if self.add_residual is True:
+            out = self.residual(x, out)
+        out = self.swish(out)
+        return out, lengths

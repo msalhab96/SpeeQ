@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import List, Tuple, Union
 
 import torch
 from torch import Tensor, nn
@@ -6,7 +6,7 @@ from torch import Tensor, nn
 from constants import (DECODER_OUT_KEY, ENC_OUT_KEY, HIDDEN_STATE_KEY,
                        PREDS_KEY, PREV_HIDDEN_STATE_KEY, SPEECH_IDX_KEY)
 from models.decoders import RNNDecoder
-from models.encoders import ConformerEncoder, RNNEncoder
+from models.encoders import ConformerEncoder, ContextNetEncoder, RNNEncoder
 
 
 class BaseTransducer(nn.Module):
@@ -158,4 +158,61 @@ class ConformerTransducer(RNNTransducer):
             in_features=in_features,
             res_scaling=res_scaling,
             p_dropout=p_dropout
+        )
+
+
+class ContextNet(BaseTransducer):
+    """Implements the ContextNet transducer model proposed in
+    https://arxiv.org/abs/2005.03191
+
+    Args:
+        in_features (int): The input feature size.
+        n_classes (int): The number of classes/vocabulary.
+        emb_dim (int): The embedding layer's size.
+        n_layers (int): The number of ContextNet blocks.
+        n_sub_layers (Union[int, List[int]]): The number of convolutional
+            layers per block, if list is passed, it has to be of length equal
+            to n_layers.
+        stride (Union[int, List[int]]): The stride of the last convolutional
+            layers per block, if list is passed, it has to be of length equal
+            to n_layers.
+        out_channels (Union[int, List[int]]): The channels size of the
+            convolutional layers per block, if list is passed, it has to be of
+            length equal to n_layers.
+        kernel_size (int): The convolutional layers kernel size.
+        reduction_factor (int): The feature reduction size of the
+            Squeeze-and-excitation module.
+        rnn_type (str): The RNN type.
+    """
+
+    def __init__(
+            self,
+            in_features: int,
+            n_classes: int,
+            emb_dim: int,
+            n_layers: int,
+            n_sub_layers: Union[int, List[int]],
+            stride: Union[int, List[int]],
+            out_channels: Union[int, List[int]],
+            kernel_size: int,
+            reduction_factor: int,
+            rnn_type: str
+    ) -> None:
+        super().__init__(out_channels[-1] if isinstance(
+            out_channels, list) else out_channels, n_classes)
+        self.encoder = ContextNetEncoder(
+            in_features=in_features,
+            n_layers=n_layers,
+            n_sub_layers=n_sub_layers,
+            stride=stride,
+            out_channels=out_channels,
+            kernel_size=kernel_size,
+            reduction_factor=reduction_factor
+        )
+        self.decoder = RNNDecoder(
+            vocab_size=n_classes,
+            emb_dim=emb_dim,
+            hidden_size=out_channels[-1] if isinstance(
+                out_channels, list) else out_channels,
+            rnn_type=rnn_type
         )

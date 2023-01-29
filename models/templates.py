@@ -486,3 +486,39 @@ class ConformerTransducerTemp(BaseTemplate):
     p_dropout: float
     _name = 'conformer'
     _type = TRANSDUCER_TYPE
+
+
+@dataclass
+class ContextNetTemp(BaseTemplate):
+    """ContextNet transducer model template
+    https://arxiv.org/abs/2005.03191
+
+    Args:
+        in_features (int): The input feature size.
+        emb_dim (int): The embedding layer's size.
+        n_layers (int): The number of ContextNet blocks.
+        n_sub_layers (Union[int, List[int]]): The number of convolutional
+            layers per block, if list is passed, it has to be of length equal
+            to n_layers.
+        stride (Union[int, List[int]]): The stride of the last convolutional
+            layers per block, if list is passed, it has to be of length equal
+            to n_layers.
+        out_channels (Union[int, List[int]]): The channels size of the
+            convolutional layers per block, if list is passed, it has to be of
+            length equal to n_layers.
+        kernel_size (int): The convolutional layers kernel size.
+        reduction_factor (int): The feature reduction size of the
+            Squeeze-and-excitation module.
+        rnn_type (str): The RNN type.
+    """
+    in_features: int
+    emb_dim: int
+    n_layers: int
+    n_sub_layers: Union[int, List[int]]
+    stride: Union[int, List[int]]
+    out_channels: Union[int, List[int]]
+    kernel_size: int
+    reduction_factor: int
+    rnn_type: str
+    _name = 'context_net'
+    _type = TRANSDUCER_TYPE
