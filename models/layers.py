@@ -1809,7 +1809,7 @@ class ContextNetConvLayer(nn.Module):
             stride: int = 1
     ) -> None:
         super().__init__()
-        self.conv = nn.Conv1D(
+        self.conv = nn.Conv1d(
             in_channels=in_channels,
             out_channels=out_channels,
             kernel_size=kernel_size,
@@ -1857,7 +1857,7 @@ class ContextNetResidual(nn.Module):
             stride: int
     ) -> None:
         super().__init__()
-        self.conv = nn.Conv1D(
+        self.conv = nn.Conv1d(
             in_channels=in_channels,
             out_channels=out_channels,
             kernel_size=kernel_size,
