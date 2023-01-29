@@ -6,7 +6,7 @@ from torch import Tensor
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 
 from models.activations import Sigmax
-from utils.utils import add_pos_enc, calc_data_len, get_positional_encoding
+from utils.utils import add_pos_enc, calc_data_len, get_mask_from_lens, get_positional_encoding
 
 
 class PackedRNN(nn.Module):
@@ -1746,3 +1746,43 @@ class SqueezeformerBlock(nn.Module):
         out = self.add_and_norm3(self.conv(out), out)
         out = self.add_and_norm4(self.ff2(out), out)
         return out
+
+
+class SqueezeAndExcit1D(nn.Module):
+    """Implements the squeeze and excite module
+    proposed in https://arxiv.org/abs/1709.01507 and used
+    in https://arxiv.org/abs/2005.03191
+
+    Args:
+        in_feature (int): The number of channels or feature size.
+        reduction_factor (int): The feature reduction size.
+    """
+
+    def __init__(
+            self,
+            in_feature: int,
+            reduction_factor: int
+    ) -> None:
+        super().__init__()
+        self.swish = nn.SiLU()
+        self.fc1 = nn.Linear(
+            in_features=in_feature, out_features=in_feature // reduction_factor
+        )
+        self.fc2 = nn.Linear(
+            in_features=in_feature // reduction_factor, out_features=in_feature
+        )
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x: Tensor, mask: Tensor):
+        # x of shape [B, d, M]
+        # mask of shape [B, M]
+        lengths = mask.sum(dim=-1)  # [B]
+        x = mask.unsqueeze(dim=1) * x  # zeroing out padded values
+        x_pooled = x.sum(dim=-1)  # [B, d]
+        x_pooled = x_pooled / lengths.unsqueeze(dim=1)
+        x_pooled = self.fc1(x_pooled)
+        x_pooled = self.swish(x_pooled)
+        x_pooled = self.fc2(x_pooled)
+        x_pooled = self.sigmoid(x_pooled)
+        x_pooled = x_pooled.unsqueeze(dim=-1)  # [B, d, 1]
+        return x_pooled * x
