@@ -6,7 +6,8 @@ from torch import Tensor
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 
 from models.activations import Sigmax
-from utils.utils import add_pos_enc, calc_data_len, get_mask_from_lens, get_positional_encoding
+from utils.utils import (add_pos_enc, calc_data_len, get_mask_from_lens,
+                         get_positional_encoding)
 
 
 class PackedRNN(nn.Module):
@@ -1834,3 +1835,42 @@ class ContextNetConvLayer(nn.Module):
                 stride=self.conv.stride[0]
             )
         return out, lengths
+
+
+class ContextNetResidual(nn.Module):
+    """Implements the residual branch of the ContextNet block
+    as proposed in https://arxiv.org/abs/2005.03191
+
+    Args:
+        in_channels (int): The number of channels in the input.
+        out_channels (int): The number of output channels.
+        kernel_size (int): The convolution kernel size.
+        stride (int): The convolution stride size.
+
+    """
+
+    def __init__(
+            self,
+            in_channels: int,
+            out_channels: int,
+            kernel_size: int,
+            stride: int
+    ) -> None:
+        super().__init__()
+        self.conv = nn.Conv1D(
+            in_channels=in_channels,
+            out_channels=out_channels,
+            kernel_size=kernel_size,
+            stride=stride,
+            padding='same' if stride == 1 else 0
+        )
+        self.bnorm = nn.BatchNorm1d(
+            num_features=out_channels
+        )
+
+    def forward(self, x: Tensor, out: Tensor) -> Tensor:
+        # x of shape [B, d, M]
+        # out of shape [B, d/s, M]  s=1 if the block has no stride
+        x = self.conv(x)
+        x = self.bnorm(x)
+        return x + out
