@@ -387,7 +387,7 @@ class Wav2Letter(CTCModel):
         )
 
 
-class QuartzNet(Jasper):
+class QuartzNet(CTCModel):
     """Implements QuartzNet model architecture proposed
     in https://arxiv.org/abs/1910.10261
 
