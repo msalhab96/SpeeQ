@@ -1786,3 +1786,51 @@ class SqueezeAndExcit1D(nn.Module):
         x_pooled = self.sigmoid(x_pooled)
         x_pooled = x_pooled.unsqueeze(dim=-1)  # [B, d, 1]
         return x_pooled * x
+
+
+class ContextNetConvLayer(nn.Module):
+    """Implements the convolution layer of the ContextNet
+    model proposed in https://arxiv.org/abs/2005.03191
+    f(x) = Act(BN(Conv(x))
+
+    Args:
+        in_channels (int): The input's channel size.
+        out_channels (int): The number of output channels.
+        kernel_size (int): The convolution kernel size.
+        stride (int): The convolution stride size. Default 1.
+    """
+
+    def __init__(
+            self,
+            in_channels: int,
+            out_channels: int,
+            kernel_size: int,
+            stride: int = 1
+    ) -> None:
+        super().__init__()
+        self.conv = nn.Conv1D(
+            in_channels=in_channels,
+            out_channels=out_channels,
+            kernel_size=kernel_size,
+            stride=stride,
+            padding='same' if stride == 1 else 0,
+            groups=in_channels
+        )
+        self.bnorm = nn.BatchNorm1d(
+            num_features=out_channels
+        )
+        self.swish = nn.SiLU()
+
+    def forward(self, x: Tensor, lengths: Tensor) -> Tuple[Tensor, Tensor]:
+        out = self.conv(x)
+        out = self.bnorm(out)
+        out = self.swish(out)
+        if self.conv.stride[0] != 1:
+            lengths = calc_data_len(
+                result_len=out.shape[-1],
+                pad_len=x.shape[-1] - lengths,
+                data_len=lengths,
+                kernel_size=self.conv.kernel_size[0],
+                stride=self.conv.stride[0]
+            )
+        return out, lengths
