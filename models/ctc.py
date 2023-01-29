@@ -324,7 +324,7 @@ class Jasper(CTCModel):
         self.pred_net = ConvPredModule(
             in_features=prelog_n_channels + channel_inc * (2 + num_blocks),
             n_classes=n_classes,
-            activation=nn.LogSoftmax(dim=-2)
+            activation=nn.LogSoftmax(dim=-1)
         )
 
 
@@ -383,7 +383,7 @@ class Wav2Letter(CTCModel):
         self.pred_net = ConvPredModule(
             in_features=post_conv_channels_size,
             n_classes=n_classes,
-            activation=nn.LogSoftmax(dim=-2)
+            activation=nn.LogSoftmax(dim=-1)
         )
 
 
@@ -450,7 +450,7 @@ class QuartzNet(Jasper):
         self.pred_net = ConvPredModule(
             in_features=epilog_channel_size[1],
             n_classes=n_classes,
-            activation=nn.LogSoftmax(dim=-2)
+            activation=nn.LogSoftmax(dim=-1)
         )
 
 
