@@ -1874,3 +1874,64 @@ class ContextNetResidual(nn.Module):
         x = self.conv(x)
         x = self.bnorm(x)
         return x + out
+
+
+class ContextNetBlock(nn.Module):
+    """Implements the convolution block of the ContextNet
+    model proposd in https://arxiv.org/abs/2005.03191
+
+    Args:
+        n_layers (int): The number of convolution layers.
+        in_channels (int): The number of channels in the input.
+        out_channels (int): The number of output channels.
+        kernel_size (int): The convolution kernel size.
+        reduction_factor (int): The feature reduction size of the
+            Squeeze-and-excitation module.
+        add_residual (bool): A flag to include a residual connection or not.
+        last_layer_stride (int): The last convolution layer stride size.
+    """
+
+    def __init__(
+            self,
+            n_layers: int,
+            in_channels: int,
+            out_channels: int,
+            kernel_size: int,
+            reduction_factor: int,
+            add_residual: bool,
+            last_layer_stride: int = 1
+    ) -> None:
+        super().__init__()
+        self.conv_layers = nn.ModuleList([
+            ContextNetConvLayer(
+                in_channels=in_channels if i == 0 else out_channels,
+                out_channels=out_channels,
+                kernel_size=kernel_size,
+                stride=1 if i < n_layers - 1 else last_layer_stride
+            )
+            for i in range(n_layers)
+        ])
+        self.squeeze_and_excite = SqueezeAndExcit1D(
+            in_feature=out_channels,
+            reduction_factor=reduction_factor
+        )
+        if add_residual is True:
+            self.residual = ContextNetResidual(
+                in_channels=in_channels,
+                out_channels=out_channels,
+                kernel_size=kernel_size,
+                stride=last_layer_stride
+            )
+        self.swish = nn.SiLU()
+        self.add_residual = add_residual
+
+    def forward(self, x: Tensor, lengths: Tensor) -> Tuple[Tensor, Tensor]:
+        out = x
+        for layer in self.conv_layers:
+            out, lengths = layer(out, lengths)
+        mask = get_mask_from_lens(lengths=lengths, max_len=out.shape[-1])
+        out = self.squeeze_and_excite(out, mask)
+        if self.add_residual is True:
+            out = self.residual(x, out)
+        out = self.swish(out)
+        return out, lengths
