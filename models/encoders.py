@@ -322,6 +322,7 @@ class JasperEncoder(nn.Module):
         out = self.blocks(out)
         out = self.epilog1(out)
         out = self.epilog2(out)
+        out = out.transpose(-1, -2)  # [B, M, d']
         return out, lengths
 
 
@@ -438,6 +439,7 @@ class Wav2LetterEncoder(nn.Module):
         out = self.post_conv(out)
         out = torch.tanh(out)
         out = self.dropout(out)
+        out = out.transpose(-1, -2)  # [B, M, d]
         return out, lengths
 
 
