@@ -198,7 +198,8 @@ class ContextNet(BaseTransducer):
             reduction_factor: int,
             rnn_type: str
     ) -> None:
-        super().__init__(in_features, n_classes)
+        super().__init__(out_channels[-1] if isinstance(
+            out_channels, list) else out_channels, n_classes)
         self.encoder = ContextNetEncoder(
             in_features=in_features,
             n_layers=n_layers,
