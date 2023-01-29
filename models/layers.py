@@ -155,10 +155,11 @@ class ConvPredModule(nn.Module):
         )
 
     def forward(self, x: Tensor) -> Tensor:
-        # B, d, M
+        # x of shape [B, M, d]
+        x = x.transpose(-1, -2)
         out = self.conv(x)
-        out = self.activation(out)
         out = out.transpose(-1, -2)
+        out = self.activation(out)
         return out
 
 
