@@ -33,7 +33,9 @@ class CTCSkeleton(CTCModel):
             feat_size: Union[int, None] = None,
             n_classes: Union[int, None] = None
     ) -> None:
-        assert not (feat_size is None and pred_net is None)
+        assert (feat_size is None) ^ (pred_net is None)
+        if feat_size is not None:
+            assert n_classes is not None
         args = [1, 1]
         if feat_size is not None:
             args[0] = feat_size
