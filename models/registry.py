@@ -5,6 +5,7 @@ from torch import nn
 from constants import CTC_TYPE, SEQ2SEQ_TYPE, TRANSDUCER_TYPE
 from models.seq2seq import (LAS, BasicAttSeq2SeqRNN, RNNWithLocationAwareAtt,
                             SpeechTransformer)
+from models.skeletons import CTCSkeleton, TransducerSkeleton
 from models.transducers import ConformerTransducer, ContextNet, RNNTransducer
 
 from .ctc import (BERT, Conformer, DeepSpeechV1, DeepSpeechV2, Jasper,
@@ -45,6 +46,11 @@ TRANSDUCER_MODELS = {
     'rnn-t': RNNTransducer,
     'conformer': ConformerTransducer,
     'context_net': ContextNet
+}
+
+MODELS_BUILDER = {
+    CTC_TYPE: CTCSkeleton,
+    TRANSDUCER_TYPE: TransducerSkeleton
 }
 
 
