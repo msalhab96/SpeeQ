@@ -200,6 +200,7 @@ class ContextNet(BaseTransducer):
     ) -> None:
         super().__init__(out_channels[-1] if isinstance(
             out_channels, list) else out_channels, n_classes)
+        self.has_bnorm = True
         self.encoder = ContextNetEncoder(
             in_features=in_features,
             n_layers=n_layers,
