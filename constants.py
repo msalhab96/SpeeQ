@@ -1,10 +1,15 @@
 from enum import Enum
 
-OPTIMIZER_STATE_KEY = 'optimizer'
-SCHEDULER_TYPE_KEY = 'scheduler'
+# %% Tempaltes types
 CTC_TYPE = 'ctc'
 SEQ2SEQ_TYPE = 'seq2seq'
 TRANSDUCER_TYPE = 'transducer'
+MODEL_BUILDER_TYPE = 'model_builder'
+# %%
+
+# %% constant keys
+OPTIMIZER_STATE_KEY = 'optimizer'
+SCHEDULER_TYPE_KEY = 'scheduler'
 HIDDEN_STATE_KEY = 'h'
 ENC_OUT_KEY = 'enc_out'
 PREDS_KEY = 'preds'
@@ -13,6 +18,7 @@ TERMINATION_STATE_KEY = 'is_term'
 SPEECH_IDX_KEY = 'speech_idx'
 DECODER_OUT_KEY = 'decoder_out'
 PREV_HIDDEN_STATE_KEY = 'prev_h'
+# %%
 
 
 class FileKeys(Enum):
