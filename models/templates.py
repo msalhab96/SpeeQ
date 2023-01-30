@@ -1,7 +1,10 @@
 from dataclasses import asdict, dataclass
 from typing import List, Optional, Tuple, Union
 
-from constants import CTC_TYPE, SEQ2SEQ_TYPE, TRANSDUCER_TYPE
+from troch.nn import Module
+
+from constants import (CTC_TYPE, MODEL_BUILDER_TYPE, SEQ2SEQ_TYPE,
+                       TRANSDUCER_TYPE)
 from interfaces import ITemplate
 
 
@@ -522,3 +525,60 @@ class ContextNetTemp(BaseTemplate):
     rnn_type: str
     _name = 'context_net'
     _type = TRANSDUCER_TYPE
+
+
+@dataclass
+class CTCModelBuilderTemp(BaseTemplate):
+    """CTC-based model builder template
+
+    Args:
+        encoder (Module): The speech encoder (acoustic model), such that
+            the forward of the encoder returns a tuple of the encoded speech
+            tensor and a length tensor of the encoded speech.
+        has_bnorm (bool): A flag indicates whether the encoder or the decoder
+            has batch normalization.
+        pred_net (Union[Module, None]): The prediction network. if provided
+            the forward of the prediction network expected to have log softmax
+            as an activation function, and the predictions of shape [T, B, C]
+            where T is the sequence length, B the batch size, and C the number
+            of classes. Default None.
+        feat_size (Union[Module, None]): Used if pred_net parameter is not None
+            where it's the encoder's output feature size. Default None.
+    """
+    encoder: Module
+    has_bnorm: bool
+    pred_net: Union[Module, None]
+    enc_out_size: Union[int, None] = None
+    _name = CTC_TYPE
+    _type = MODEL_BUILDER_TYPE
+
+
+@dataclass
+class TransducerBuilderTemp(BaseTemplate):
+    """Transducer-based model builder template
+
+    Args:
+        encoder (Module): The speech encoder (acoustic model), such that
+            the forward method of the encoder returns a tuple of the encoded
+            speech tensor and a length tensor for the encoded speech.
+        decoder (Module): The text decoder such that
+            the forward method of the decoder returns a tuple of the encoded
+            text tensor and a length tensor for the encoded text.
+        has_bnorm (bool): A flag indicates whether the encoder, the decoder, or
+            the join network has batch normalization.
+        join_net (Union[Module, None]): The join network. if provided
+            the forward of the join network expected to have no activation
+            function, and the results of shape [B, Ts, Tt, C], where B the
+            batch size, Ts is the speech sequence length, Tt is the text
+            sequence length, and C the number of classes. Default None.
+        feat_size (Union[Module, None]): Used if join_net parameter is not None
+            where it's the encoder and the decoder's output feature size.
+            Default None.
+    """
+    encoder: Module
+    decoder: Module
+    has_bnorm: bool
+    join_net: Union[Module, None]
+    feat_size: Union[None, int] = None
+    _name = TRANSDUCER_TYPE
+    _type = MODEL_BUILDER_TYPE
