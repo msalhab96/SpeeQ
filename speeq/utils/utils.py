@@ -65,6 +65,8 @@ def load_csv(
 
 
 def get_pad_mask(seq_len: int, pad_len: int):
+    if seq_len <= 0:
+        raise ValueError('seq_len must be greater than 0!')
     mask = [i < seq_len for i in range(seq_len + pad_len)]
     return torch.BoolTensor(mask)
 
