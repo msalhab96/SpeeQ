@@ -578,7 +578,7 @@ class TransducerBuilderTemp(BaseTemplate):
     encoder: Module
     decoder: Module
     has_bnorm: bool
-    join_net: Union[Module, None]
+    join_net: Union[Module, None] = None
     feat_size: Union[None, int] = None
     _name = TRANSDUCER_TYPE
     _type = MODEL_BUILDER_TYPE

@@ -94,6 +94,6 @@ class TransducerSkeleton(BaseTransducer):
         super().__init__(*args)
         self.has_bnorm = has_bnorm
         self.encoder = encoder
-        self.deocder = decoder
+        self.decoder = decoder
         if join_net is not None:
             self.join_net = join_net
