@@ -729,7 +729,7 @@ class ConformerRelativeMHSA(MultiHeadAtt):
             mask: Union[None, Tensor]
     ) -> Tensor:
         out = self.lnrom(x)
-        out = add_pos_enc(out, self.d_model)
+        out = add_pos_enc(out)
         out = super().forward(
             key=out, query=out,
             value=out, query_mask=mask,
@@ -1653,7 +1653,7 @@ class SqueezeformerRelativeMHSA(MultiHeadAtt):
             mask: Union[None, Tensor]
     ) -> Tensor:
         out = self.scaler(x)
-        out = add_pos_enc(out, self.d_model)
+        out = add_pos_enc(out)
         out = super().forward(
             key=out, query=out,
             value=out, query_mask=mask,
