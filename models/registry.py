@@ -2,7 +2,8 @@ from typing import List
 
 from torch import nn
 
-from constants import CTC_TYPE, SEQ2SEQ_TYPE, TRANSDUCER_TYPE
+from constants import (CTC_TYPE, MODEL_BUILDER_TYPE, SEQ2SEQ_TYPE,
+                       TRANSDUCER_TYPE)
 from models.seq2seq import (LAS, BasicAttSeq2SeqRNN, RNNWithLocationAwareAtt,
                             SpeechTransformer)
 from models.skeletons import CTCSkeleton, TransducerSkeleton
@@ -86,5 +87,9 @@ def get_model(model_config, n_classes):
         )
     if model_config.template.type == TRANSDUCER_TYPE:
         return TRANSDUCER_MODELS[model_config.template.name](
+            **model_config.template.get_dict(), n_classes=n_classes
+        )
+    if model_config.template.type == MODEL_BUILDER_TYPE:
+        return MODELS_BUILDER[model_config.template.name](
             **model_config.template.get_dict(), n_classes=n_classes
         )
