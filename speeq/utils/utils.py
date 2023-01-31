@@ -186,6 +186,8 @@ def get_positional_encoding(max_length: int, d_model: int) -> Tensor:
     Returns:
         Tensor: Positional tensor of shape [1, max_length, d_model]
     """
+    if d_model % 2 == 1:
+        raise ValueError('Even number is expected for d_model, but odd is given!')
     result = torch.zeros(max_length, d_model, dtype=torch.float)
     feat_range = torch.arange(0, d_model // 2)
     time_range = torch.arange(0, max_length)
