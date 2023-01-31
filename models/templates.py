@@ -1,7 +1,7 @@
 from dataclasses import asdict, dataclass
 from typing import List, Optional, Tuple, Union
 
-from troch.nn import Module
+from torch.nn import Module
 
 from constants import (CTC_TYPE, MODEL_BUILDER_TYPE, SEQ2SEQ_TYPE,
                        TRANSDUCER_TYPE)
@@ -547,8 +547,8 @@ class CTCModelBuilderTemp(BaseTemplate):
     """
     encoder: Module
     has_bnorm: bool
-    pred_net: Union[Module, None]
-    enc_out_size: Union[int, None] = None
+    pred_net: Union[Module, None] = None
+    feat_size: Union[int, None] = None
     _name = CTC_TYPE
     _type = MODEL_BUILDER_TYPE
 
