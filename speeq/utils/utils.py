@@ -156,6 +156,11 @@ def calc_data_len(
     Returns:
         Union[Tensor, int]: The new data portion length.
     """
+    if type(pad_len) != type(data_len):
+        raise ValueError(
+            f'''expected both pad_len and data_len to be of the same type
+            but {type(pad_len)}, and {type(data_len)} passed'''
+            )
     inp_len = data_len + pad_len
     new_pad_len = 0
     # if padding size less than the kernel size
@@ -182,7 +187,7 @@ def get_positional_encoding(max_length: int, d_model: int) -> Tensor:
         Tensor: Positional tensor of shape [1, max_length, d_model]
     """
     result = torch.zeros(max_length, d_model, dtype=torch.float)
-    feat_range = torch.arange(0, d_model, 2)
+    feat_range = torch.arange(0, d_model // 2)
     time_range = torch.arange(0, max_length)
     denominator = pow(10000, 2 * feat_range / d_model)
     result[:, 0::2] = torch.sin(time_range[:, None] / denominator)
