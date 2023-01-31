@@ -18,7 +18,7 @@ class CTCSkeleton(CTCModel):
             has batch normalization.
         pred_net (Union[Module, None]): The prediction network. if provided
             the forward of the prediction network expected to have log softmax
-            as an activation function, and the predictions of shape [T, B, C]
+            as an activation function, and the predictions of shape [B, T, C]
             where T is the sequence length, B the batch size, and C the number
             of classes. Default None.
         feat_size (Union[Module, None]): Used if pred_net parameter is not None
