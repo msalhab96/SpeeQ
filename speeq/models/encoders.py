@@ -742,7 +742,7 @@ class SpeechTransformerEncoder(nn.Module):
             x = self.relu(x)
         x = x.squeeze(dim=1)
         x = self.fc(x)
-        x = add_pos_enc(x, self.d_model)
+        x = add_pos_enc(x)
         mask = get_mask_from_lens(lengths=lengths, max_len=x.shape[1])
         mask = mask.to(x.device)
         return x, mask

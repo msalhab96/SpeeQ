@@ -21,7 +21,7 @@ def clear():
 
 
 def get_text_list(data: List[dict]) -> List[str]:
-    return [item[FileKeys.text_key] for item in data]
+    return [item[FileKeys.text_key.value] for item in data]
 
 
 def load_json(file_path, encoding='utf-8'):
@@ -65,6 +65,8 @@ def load_csv(
 
 
 def get_pad_mask(seq_len: int, pad_len: int):
+    if seq_len <= 0:
+        raise ValueError('seq_len must be greater than 0!')
     mask = [i < seq_len for i in range(seq_len + pad_len)]
     return torch.BoolTensor(mask)
 
@@ -154,6 +156,11 @@ def calc_data_len(
     Returns:
         Union[Tensor, int]: The new data portion length.
     """
+    if type(pad_len) != type(data_len):
+        raise ValueError(
+            f'''expected both pad_len and data_len to be of the same type
+            but {type(pad_len)}, and {type(data_len)} passed'''
+            )
     inp_len = data_len + pad_len
     new_pad_len = 0
     # if padding size less than the kernel size
@@ -179,8 +186,10 @@ def get_positional_encoding(max_length: int, d_model: int) -> Tensor:
     Returns:
         Tensor: Positional tensor of shape [1, max_length, d_model]
     """
+    if d_model % 2 == 1:
+        raise ValueError('Even number is expected for d_model, but odd is given!')
     result = torch.zeros(max_length, d_model, dtype=torch.float)
-    feat_range = torch.arange(0, d_model, 2)
+    feat_range = torch.arange(0, d_model // 2)
     time_range = torch.arange(0, max_length)
     denominator = pow(10000, 2 * feat_range / d_model)
     result[:, 0::2] = torch.sin(time_range[:, None] / denominator)
@@ -205,17 +214,16 @@ def get_mask_from_lens(lengths: Tensor, max_len: int) -> Tensor:
     return indices < lengths.unsqueeze(dim=1)
 
 
-def add_pos_enc(x: Tensor, d_model: int) -> Tensor:
-    # TODO: remove d_model paramter
+def add_pos_enc(x: Tensor) -> Tensor:
     """Adds positional encodings to the input tensor x.
 
     Args:
         x (Tensor): The input tensor of shape [B, M, d].
-        d_model (int): The model dimensionality.
 
     Returns:
         Tensor: The input added to at the positional encoding.
     """
+    d_model = x.shape[-1]
     pe = get_positional_encoding(
         x.shape[1], d_model
     )
