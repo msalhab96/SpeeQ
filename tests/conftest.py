@@ -23,11 +23,11 @@ def text():
 def dict_csv_data():
     return [
         {
-            FileKeys.speech_key.value: 'tests/files/1.mp3',
+            FileKeys.speech_key.value: 'tests/files/1.wav',
             FileKeys.text_key.value: 'be at prudence\'s to night at eight'
         },
         {
-            FileKeys.speech_key.value: 'tests/files/2.mp3',
+            FileKeys.speech_key.value: 'tests/files/2.wav',
             FileKeys.text_key.value: 'in the course of the day i received this note'
         },
     ]
