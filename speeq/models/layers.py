@@ -163,26 +163,6 @@ class ConvPredModule(nn.Module):
         return out
 
 
-class CReLu(nn.Module):
-    """clipped rectified-linear unit, can be described as
-    min{max{0, x}, max_value}
-
-    as described in: https://arxiv.org/abs/1412.5567
-
-    Args:
-        max_val (int): the maximum clipping value.
-    """
-
-    def __init__(self, max_val: int) -> None:
-        super().__init__()
-        self.max_val = max_val
-
-    def forward(self, x: Tensor) -> Tensor:
-        return torch.clamp(
-            x, min=0, max=self.max_val
-        )
-
-
 class FeedForwardModule(nn.Module):
     """Implements the feed-forward module
     described in https://arxiv.org/abs/1706.03762

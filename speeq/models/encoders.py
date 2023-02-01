@@ -3,11 +3,12 @@ from typing import List, Optional, Tuple, Union
 import torch
 from torch import Tensor, nn
 
-from .layers import (ConformerBlock, ConformerPreNet, ContextNetBlock,
-                           Conv1DLayers, CReLu, JasperBlocks, JasperSubBlock,
-                           QuartzBlocks, RowConv1D, SpeechTransformerEncLayer,
-                           SqueezeformerBlock)
 from speeq.utils.utils import add_pos_enc, calc_data_len, get_mask_from_lens
+
+from .activations import CReLu
+from .layers import (ConformerBlock, ConformerPreNet, ContextNetBlock,
+                     Conv1DLayers, JasperBlocks, JasperSubBlock, QuartzBlocks,
+                     RowConv1D, SpeechTransformerEncLayer, SqueezeformerBlock)
 
 
 class DeepSpeechV1Encoder(nn.Module):
