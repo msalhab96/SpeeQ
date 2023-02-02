@@ -315,7 +315,7 @@ class MultiHeadAtt(nn.Module):
 
 
 class MaskedMultiHeadAtt(MultiHeadAtt):
-    """Implements the multi-head attention module
+    """Implements the masked multi-head attention module
     described in https://arxiv.org/abs/1706.03762
 
     Args:
@@ -334,20 +334,27 @@ class MaskedMultiHeadAtt(MultiHeadAtt):
             d_model=d_model, h=h, masking_value=masking_value
         )
 
+    def get_looking_ahead_mask(self, key_mask: Tensor) -> Tensor:
+        batch_size, max_len = key_mask.shape
+        query_mask = torch.tril(torch.ones(batch_size, max_len, max_len))
+        query_mask = query_mask.bool()
+        query_mask = query_mask.to(key_mask.device)
+        query_mask &= key_mask.unsqueeze(dim=-1) & query_mask
+        return query_mask
+
     def forward(
             self,
             key: Tensor,
             query: Tensor,
             value: Tensor,
             key_mask: Union[Tensor, None],
-            query_mask: Union[Tensor, None]
     ) -> Tensor:
+        # if key_mask is not passed, it will act as a normal
+        # Multi-head attention, other wise, it will build don't
+        # look ahead mask
+        query_mask = None
         if key_mask is not None:
-            batch_size, max_len = key_mask.shape
-            query_mask = torch.tril(torch.ones(batch_size, max_len, max_len))
-            query_mask = query_mask.bool()
-            query_mask = query_mask.to(key_mask.device)
-            query_mask &= key_mask.unsqueeze(dim=-1) & query_mask
+            query_mask = self.get_looking_ahead_mask(key_mask=key_mask)
         return super().forward(
             key=key,
             query=query,
@@ -1304,8 +1311,7 @@ class TransformerDecLayer(nn.Module):
             key=dec_inp,
             query=dec_inp,
             value=dec_inp,
-            key_mask=dec_mask,
-            query_mask=dec_mask
+            key_mask=dec_mask
         )
         out = self.add_and_norm1(out, dec_inp)
         out = self.add_and_norm2(
