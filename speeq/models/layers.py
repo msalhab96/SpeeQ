@@ -399,7 +399,7 @@ class TransformerEncLayer(nn.Module):
     def forward(
             self,
             x: Tensor,
-            mask: Tensor
+            mask: Union[Tensor, None] = None
     ) -> Tensor:
         out = self.mhsa(
             key=x, query=x,
