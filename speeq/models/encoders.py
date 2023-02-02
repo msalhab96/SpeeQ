@@ -145,7 +145,7 @@ class DeepSpeechV2Encoder(nn.Module):
         )
         self.crelu = CReLu(max_val=max_clip_value)
         self.context_conv = RowConv1D(
-            tau=tau, hidden_size=hidden_size
+            tau=tau, feat_size=hidden_size
         )
         self.hidden_size = hidden_size
         self.bidirectional = bidirectional

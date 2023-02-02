@@ -419,19 +419,19 @@ class RowConv1D(nn.Module):
 
     Args:
         tau (int): The size of future context.
-        hidden_size (int): The input feature size.
+        feat_size (int): The input feature size.
     """
 
     def __init__(
             self,
             tau: int,
-            hidden_size: int
+            feat_size: int
     ) -> None:
         super().__init__()
         self.tau = tau
         self.conv = nn.Conv1d(
-            in_channels=hidden_size,
-            out_channels=hidden_size,
+            in_channels=feat_size,
+            out_channels=feat_size,
             kernel_size=tau, stride=1,
             padding=0, dilation=1
         )
