@@ -467,22 +467,42 @@ class RowConv1D(nn.Module):
 
 
 class Conv1DLayers(nn.Module):
+    """Implements stack of Conv1d layers.
+
+    Args:
+        in_size (int): The input feature size.
+        out_size (Union[List[int], int]): The output feature size of each
+            layer. if a list is passed it has to be of length
+            equal to n_layers.
+        kernel_size (Union[List[int], int]): The kernel size of the conv
+            layers, if a list is passed it has to be of length
+            equal to n_layers.
+        stride (Union[List[int], int]): The stride size of the conv
+            layers, if a list is passed it has to be of length
+            equal to n_layers.
+        n_layers (int): The number of conv layers.
+        p_dropout (float): The dropout rate.
+    """
+
     def __init__(
             self,
             in_size: int,
-            out_size: int,
-            kernel_size: int,
-            stride: int,
+            out_size: Union[List[int], int],
+            kernel_size: Union[List[int], int],
+            stride: Union[List[int], int],
             n_layers: int,
             p_dropout: float
     ) -> None:
         super().__init__()
         self.layers = nn.ModuleList([
             nn.Conv1d(
-                in_channels=in_size if i == 0 else out_size,
-                out_channels=out_size,
-                kernel_size=kernel_size,
-                stride=stride
+                in_channels=in_size if i == 0 else out_size[i - 1] if
+                isinstance(out_size, list) else out_size,
+                out_channels=out_size[i] if isinstance(out_size, list)
+                else out_size,
+                kernel_size=kernel_size[i] if isinstance(kernel_size, list)
+                else kernel_size,
+                stride=stride[i] if isinstance(stride, list) else stride
             )
             for i in range(n_layers)
         ])
