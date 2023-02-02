@@ -5,9 +5,10 @@ import torch.nn as nn
 from torch import Tensor
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 
-from .activations import Sigmax
 from speeq.utils.utils import (add_pos_enc, calc_data_len, get_mask_from_lens,
                                get_positional_encoding)
+
+from .activations import Sigmax
 
 
 class PackedRNN(nn.Module):
@@ -163,48 +164,28 @@ class ConvPredModule(nn.Module):
         return out
 
 
-class CReLu(nn.Module):
-    """clipped rectified-linear unit, can be described as
-    min{max{0, x}, max_value}
-
-    as described in: https://arxiv.org/abs/1412.5567
-
-    Args:
-        max_val (int): the maximum clipping value.
-    """
-
-    def __init__(self, max_val: int) -> None:
-        super().__init__()
-        self.max_val = max_val
-
-    def forward(self, x: Tensor) -> Tensor:
-        return torch.clamp(
-            x, min=0, max=self.max_val
-        )
-
-
 class FeedForwardModule(nn.Module):
     """Implements the feed-forward module
     described in https://arxiv.org/abs/1706.03762
 
     Args:
         d_model (int): The model dimensionality.
-        hidden_size (int): The inner layer's dimensionality.
+        ff_size (int): The inner layer's dimensionality.
     """
 
     def __init__(
             self,
             d_model: int,
-            hidden_size: int
+            ff_size: int
     ) -> None:
         super().__init__()
         self.fc1 = nn.Linear(
             in_features=d_model,
-            out_features=hidden_size
+            out_features=ff_size
         )
         self.relu = nn.ReLU()
         self.fc2 = nn.Linear(
-            in_features=hidden_size,
+            in_features=ff_size,
             out_features=d_model
         )
 
@@ -292,8 +273,8 @@ class MultiHeadAtt(nn.Module):
             key: Tensor,
             query: Tensor,
             value: Tensor,
-            key_mask: Union[Tensor, None],
-            query_mask: Union[Tensor, None]
+            key_mask: Union[Tensor, None] = None,
+            query_mask: Union[Tensor, None] = None
     ) -> Tensor:
         key = self._reshape(key)  # B, M, h, dk
         query = self._reshape(query)  # B, M, h, dk
@@ -322,8 +303,8 @@ class MultiHeadAtt(nn.Module):
             key: Tensor,
             query: Tensor,
             value: Tensor,
-            key_mask: Union[Tensor, None],
-            query_mask: Union[Tensor, None]
+            key_mask: Union[Tensor, None] = None,
+            query_mask: Union[Tensor, None] = None
     ) -> Tensor:
         key = self.key_fc(key)
         query = self.query_fc(query)
@@ -335,7 +316,7 @@ class MultiHeadAtt(nn.Module):
 
 
 class MaskedMultiHeadAtt(MultiHeadAtt):
-    """Implements the multi-head attention module
+    """Implements the masked multi-head attention module
     described in https://arxiv.org/abs/1706.03762
 
     Args:
@@ -354,20 +335,27 @@ class MaskedMultiHeadAtt(MultiHeadAtt):
             d_model=d_model, h=h, masking_value=masking_value
         )
 
+    def get_looking_ahead_mask(self, key_mask: Tensor) -> Tensor:
+        batch_size, max_len = key_mask.shape
+        query_mask = torch.tril(torch.ones(batch_size, max_len, max_len))
+        query_mask = query_mask.bool()
+        query_mask = query_mask.to(key_mask.device)
+        query_mask &= key_mask.unsqueeze(dim=-1) & query_mask
+        return query_mask
+
     def forward(
             self,
             key: Tensor,
             query: Tensor,
             value: Tensor,
             key_mask: Union[Tensor, None],
-            query_mask: Union[Tensor, None]
     ) -> Tensor:
+        # if key_mask is not passed, it will act as a normal
+        # Multi-head attention, other wise, it will build don't
+        # look ahead mask
+        query_mask = None
         if key_mask is not None:
-            batch_size, max_len = key_mask.shape
-            query_mask = torch.tril(torch.ones(batch_size, max_len, max_len))
-            query_mask = query_mask.bool()
-            query_mask = query_mask.to(key_mask.device)
-            query_mask &= key_mask.unsqueeze(dim=-1) & query_mask
+            query_mask = self.get_looking_ahead_mask(key_mask=key_mask)
         return super().forward(
             key=key,
             query=query,
@@ -383,7 +371,7 @@ class TransformerEncLayer(nn.Module):
 
     Args:
         d_model (int): The model dimensionality.
-        hidden_size (int): The feed forward inner layer dimensionality.
+        ff_size (int): The feed forward inner layer dimensionality.
         h (int): The number of heads.
         masking_value (int): The masking value. Default -1e15
     """
@@ -391,7 +379,7 @@ class TransformerEncLayer(nn.Module):
     def __init__(
             self,
             d_model: int,
-            hidden_size: int,
+            ff_size: int,
             h: int,
             masking_value: int = -1e15
     ) -> None:
@@ -403,7 +391,7 @@ class TransformerEncLayer(nn.Module):
             d_model=d_model
         )
         self.ff = FeedForwardModule(
-            d_model=d_model, hidden_size=hidden_size
+            d_model=d_model, ff_size=ff_size
         )
         self.add_and_norm2 = AddAndNorm(
             d_model=d_model
@@ -412,7 +400,7 @@ class TransformerEncLayer(nn.Module):
     def forward(
             self,
             x: Tensor,
-            mask: Tensor
+            mask: Union[Tensor, None] = None
     ) -> Tensor:
         out = self.mhsa(
             key=x, query=x,
@@ -432,19 +420,19 @@ class RowConv1D(nn.Module):
 
     Args:
         tau (int): The size of future context.
-        hidden_size (int): The input feature size.
+        feat_size (int): The input feature size.
     """
 
     def __init__(
             self,
             tau: int,
-            hidden_size: int
+            feat_size: int
     ) -> None:
         super().__init__()
         self.tau = tau
         self.conv = nn.Conv1d(
-            in_channels=hidden_size,
-            out_channels=hidden_size,
+            in_channels=feat_size,
+            out_channels=feat_size,
             kernel_size=tau, stride=1,
             padding=0, dilation=1
         )
@@ -480,22 +468,47 @@ class RowConv1D(nn.Module):
 
 
 class Conv1DLayers(nn.Module):
+    """Implements stack of Conv1d layers.
+
+    Args:
+        in_size (int): The input feature size.
+        out_size (Union[List[int], int]): The output feature size of each
+            layer. if a list is passed it has to be of length
+            equal to n_layers.
+        kernel_size (Union[List[int], int]): The kernel size of the conv
+            layers, if a list is passed it has to be of length
+            equal to n_layers.
+        stride (Union[List[int], int]): The stride size of the conv
+            layers, if a list is passed it has to be of length
+            equal to n_layers.
+        n_layers (int): The number of conv layers.
+        p_dropout (float): The dropout rate.
+        groups (Union[List[int], int]): The groups size of the conv
+            layers, if a list is passed it has to be of length
+            equal to n_layers. Default 1.
+    """
+
     def __init__(
             self,
             in_size: int,
-            out_size: int,
-            kernel_size: int,
-            stride: int,
+            out_size: Union[List[int], int],
+            kernel_size: Union[List[int], int],
+            stride: Union[List[int], int],
             n_layers: int,
-            p_dropout: float
+            p_dropout: float,
+            groups: Union[List[int], int] = 1
     ) -> None:
         super().__init__()
         self.layers = nn.ModuleList([
             nn.Conv1d(
-                in_channels=in_size if i == 0 else out_size,
-                out_channels=out_size,
-                kernel_size=kernel_size,
-                stride=stride
+                in_channels=in_size if i == 0 else out_size[i - 1] if
+                isinstance(out_size, list) else out_size,
+                out_channels=out_size[i] if isinstance(out_size, list)
+                else out_size,
+                kernel_size=kernel_size[i] if isinstance(kernel_size, list)
+                else kernel_size,
+                stride=stride[i] if isinstance(stride, list) else stride,
+                groups=groups[i] if isinstance(groups, list) else groups
             )
             for i in range(n_layers)
         ])
@@ -529,6 +542,7 @@ class GlobalMulAttention(nn.Module):
     attention mechanism as described in
     https://arxiv.org/abs/1508.04025 with direct
     dot product for scoring.
+
     Args:
         enc_feat_size (int): The encoder feature size.
         dec_feat_size (int): The decoder feature size.
@@ -569,7 +583,7 @@ class GlobalMulAttention(nn.Module):
             self,
             key: Tensor,
             query: Tensor,
-            mask=None
+            mask: Union[None, Tensor] = None
     ) -> Tensor:
         # key of shape [B, M, feat_size]
         # query of shape [B, 1, feat_size]
@@ -726,7 +740,7 @@ class ConformerRelativeMHSA(MultiHeadAtt):
     def forward(
             self,
             x: Tensor,
-            mask: Union[None, Tensor]
+            mask: Union[None, Tensor] = None
     ) -> Tensor:
         out = self.lnrom(x)
         out = add_pos_enc(out)
@@ -786,7 +800,9 @@ class ConformerBlock(nn.Module):
         )
         self.res_scaling = res_scaling
 
-    def forward(self, x: Tensor, mask: Union[None, Tensor]) -> Tensor:
+    def forward(
+            self, x: Tensor, mask: Union[None, Tensor] = None
+            ) -> Tensor:
         out = self.ff1(x)
         out = x + self.res_scaling * out
         out = out + self.mhsa(out, mask)
@@ -808,7 +824,7 @@ class ConformerPreNet(nn.Module):
         n_conv_layers (int): The number of convolutional layers.
         d_model (int): The model dimension.
         p_dropout (float): The dropout rate.
-        groups (Union[int, List[int]]): The convolution groups size.
+        groups (Union[int, List[int]]): The convolution groups size. Default 1.
     """
 
     def __init__(
@@ -822,18 +838,15 @@ class ConformerPreNet(nn.Module):
             groups: Union[int, List[int]] = 1
     ) -> None:
         super().__init__()
-        self.layers = nn.ModuleList([
-            nn.Conv1d(
-                in_channels=in_features if i == 0 else d_model,
-                out_channels=d_model,
-                kernel_size=kernel_size if isinstance(kernel_size, int)
-                else kernel_size[i],
-                stride=stride if isinstance(stride, int) else stride[i],
-                groups=groups if isinstance(groups, int) else groups[i]
-            )
-            for i in range(n_conv_layers)
-        ])
-
+        self.layers = Conv1DLayers(
+            in_size=in_features,
+            out_size=d_model,
+            kernel_size=kernel_size,
+            stride=stride,
+            n_layers=n_conv_layers,
+            p_dropout=p_dropout,
+            groups=groups
+        )
         self.fc = nn.Linear(
             in_features=d_model,
             out_features=d_model
@@ -844,31 +857,19 @@ class ConformerPreNet(nn.Module):
             self, x: Tensor, lengths: Tensor
     ) -> Tuple[Tensor, Tensor]:
         # x of shape [B, M, d]
-        out = x.transpose(-1, -2)  # [B, d, M]
-        for conv in self.layers:
-            length = out.shape[-1]
-            out = conv(out)
-            lengths = calc_data_len(
-                result_len=out.shape[-1],
-                pad_len=length - lengths,
-                data_len=lengths,
-                kernel_size=conv.kernel_size[0],
-                stride=conv.stride[0]
-            )
-        out = out.transpose(-1, -2)
+        out, lengths = self.layers(x, lengths)
         out = self.fc(out)
         out = self.drpout(out)
         return out, lengths
 
 
 class JasperSubBlock(nn.Module):
-    """Implements the subblock of the
-    Jasper model as described in
+    """Implements the subblock of the Jasper model as described in
     https://arxiv.org/abs/1904.03288
 
     Args:
         in_channels (int): The number of the input's channels.
-        out_channels (int): The number of the output's channels.
+        out_channels (int): The number of the output channels.
         kernel_size (int): The convolution layer's kernel size.
         p_dropout (float): The dropout rate.
         stride (int): The convolution layer's stride. Default 1.
@@ -902,7 +903,8 @@ class JasperSubBlock(nn.Module):
             self, x: Tensor,
             residual: Union[Tensor, None] = None
     ) -> Tensor:
-        # x and residual of shape [B, d, M]
+        # x of shape [B, d, M]
+        # residual of shape [B, out_channels, M]
         out = self.conv(x)
         out = self.bnorm(out)
         if residual is not None:
@@ -1175,6 +1177,7 @@ class MultiHeadAtt2d(MultiHeadAtt):
             in_features=2 * out_channels,
             out_features=d_model
         )
+        del self.query_fc, self.key_fc, self.value_fc
 
     def perform_frequency_attention(
             self,
@@ -1204,7 +1207,7 @@ class MultiHeadAtt2d(MultiHeadAtt):
             key: Tensor,
             query: Tensor,
             value: Tensor,
-            mask: Union[Tensor, None]
+            mask: Union[Tensor, None] = None
     ) -> Tensor:
         key = key.transpose(-1, -2)
         query = query.transpose(-1, -2)
@@ -1235,7 +1238,7 @@ class SpeechTransformerEncLayer(TransformerEncLayer):
 
     Args:
         d_model (int): The model dimensionality.
-        hidden_size (int): The feed-forward inner layer dimensionality.
+        ff_size (int): The feed-forward inner layer dimensionality.
         h (int): The number of heads.
         out_channels (int): The number of output channels of the convolution
         kernel_size (int): The convolutional layers' kernel size.
@@ -1244,7 +1247,7 @@ class SpeechTransformerEncLayer(TransformerEncLayer):
     def __init__(
             self,
             d_model: int,
-            hidden_size: int,
+            ff_size: int,
             h: int,
             out_channels: int,
             kernel_size: int
@@ -1253,7 +1256,7 @@ class SpeechTransformerEncLayer(TransformerEncLayer):
         # TODO: rename hidden size to ff_size
         super().__init__(
             d_model=d_model,
-            hidden_size=hidden_size,
+            ff_size=ff_size,
             h=h
         )
         self.mhsa = MultiHeadAtt2d(
@@ -1280,7 +1283,7 @@ class TransformerDecLayer(nn.Module):
 
     Args:
         d_model (int): The model dimensionality.
-        hidden_size (int): The feed forward inner layer dimensionality.
+        ff_size (int): The feed forward inner layer dimensionality.
         h (int): The number of heads.
         masking_value (int): The masking value. Default -1e15
     """
@@ -1288,7 +1291,7 @@ class TransformerDecLayer(nn.Module):
     def __init__(
             self,
             d_model: int,
-            hidden_size: int,
+            ff_size: int,
             h: int,
             masking_value: int = -1e15
     ) -> None:
@@ -1307,7 +1310,7 @@ class TransformerDecLayer(nn.Module):
             d_model=d_model
         )
         self.ff = FeedForwardModule(
-            d_model=d_model, hidden_size=hidden_size
+            d_model=d_model, ff_size=ff_size
         )
         self.add_and_norm3 = AddAndNorm(
             d_model=d_model
@@ -1324,8 +1327,7 @@ class TransformerDecLayer(nn.Module):
             key=dec_inp,
             query=dec_inp,
             value=dec_inp,
-            key_mask=dec_mask,
-            query_mask=dec_mask
+            key_mask=dec_mask
         )
         out = self.add_and_norm1(out, dec_inp)
         out = self.add_and_norm2(

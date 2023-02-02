@@ -73,3 +73,10 @@ mask_from_lens_mark = pytest.mark.parametrize(
         (LongTensor([1, 2]), 4),
     )
 )
+
+
+@fixture
+def batcher():
+    def func(batch_size, seq_len, feat_size, *args, **kwargs):
+        return torch.randn(batch_size, seq_len, feat_size)
+    return func

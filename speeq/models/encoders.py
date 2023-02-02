@@ -3,11 +3,12 @@ from typing import List, Optional, Tuple, Union
 import torch
 from torch import Tensor, nn
 
-from .layers import (ConformerBlock, ConformerPreNet, ContextNetBlock,
-                           Conv1DLayers, CReLu, JasperBlocks, JasperSubBlock,
-                           QuartzBlocks, RowConv1D, SpeechTransformerEncLayer,
-                           SqueezeformerBlock)
 from speeq.utils.utils import add_pos_enc, calc_data_len, get_mask_from_lens
+
+from .activations import CReLu
+from .layers import (ConformerBlock, ConformerPreNet, ContextNetBlock,
+                     Conv1DLayers, JasperBlocks, JasperSubBlock, QuartzBlocks,
+                     RowConv1D, SpeechTransformerEncLayer, SqueezeformerBlock)
 
 
 class DeepSpeechV1Encoder(nn.Module):
@@ -144,7 +145,7 @@ class DeepSpeechV2Encoder(nn.Module):
         )
         self.crelu = CReLu(max_val=max_clip_value)
         self.context_conv = RowConv1D(
-            tau=tau, hidden_size=hidden_size
+            tau=tau, feat_size=hidden_size
         )
         self.hidden_size = hidden_size
         self.bidirectional = bidirectional
@@ -717,7 +718,7 @@ class SpeechTransformerEncoder(nn.Module):
             [
                 SpeechTransformerEncLayer(
                     d_model=d_model,
-                    hidden_size=ff_size,
+                    ff_size=ff_size,
                     h=h, out_channels=att_out_channels,
                     kernel_size=att_kernel_size
                 )
