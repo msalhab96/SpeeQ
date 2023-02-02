@@ -482,6 +482,9 @@ class Conv1DLayers(nn.Module):
             equal to n_layers.
         n_layers (int): The number of conv layers.
         p_dropout (float): The dropout rate.
+        groups (Union[List[int], int]): The groups size of the conv
+            layers, if a list is passed it has to be of length
+            equal to n_layers. Default 1.
     """
 
     def __init__(
@@ -491,7 +494,8 @@ class Conv1DLayers(nn.Module):
             kernel_size: Union[List[int], int],
             stride: Union[List[int], int],
             n_layers: int,
-            p_dropout: float
+            p_dropout: float,
+            groups: Union[List[int], int] = 1
     ) -> None:
         super().__init__()
         self.layers = nn.ModuleList([
@@ -502,7 +506,8 @@ class Conv1DLayers(nn.Module):
                 else out_size,
                 kernel_size=kernel_size[i] if isinstance(kernel_size, list)
                 else kernel_size,
-                stride=stride[i] if isinstance(stride, list) else stride
+                stride=stride[i] if isinstance(stride, list) else stride,
+                groups=groups[i] if isinstance(groups, list) else groups
             )
             for i in range(n_layers)
         ])
@@ -832,18 +837,15 @@ class ConformerPreNet(nn.Module):
             groups: Union[int, List[int]] = 1
     ) -> None:
         super().__init__()
-        self.layers = nn.ModuleList([
-            nn.Conv1d(
-                in_channels=in_features if i == 0 else d_model,
-                out_channels=d_model,
-                kernel_size=kernel_size if isinstance(kernel_size, int)
-                else kernel_size[i],
-                stride=stride if isinstance(stride, int) else stride[i],
-                groups=groups if isinstance(groups, int) else groups[i]
-            )
-            for i in range(n_conv_layers)
-        ])
-
+        self.layers = Conv1DLayers(
+            in_size=in_features,
+            out_size=d_model,
+            kernel_size=kernel_size,
+            stride=stride,
+            n_layers=n_conv_layers,
+            p_dropout=p_dropout,
+            groups=groups
+        )
         self.fc = nn.Linear(
             in_features=d_model,
             out_features=d_model
@@ -854,18 +856,7 @@ class ConformerPreNet(nn.Module):
             self, x: Tensor, lengths: Tensor
     ) -> Tuple[Tensor, Tensor]:
         # x of shape [B, M, d]
-        out = x.transpose(-1, -2)  # [B, d, M]
-        for conv in self.layers:
-            length = out.shape[-1]
-            out = conv(out)
-            lengths = calc_data_len(
-                result_len=out.shape[-1],
-                pad_len=length - lengths,
-                data_len=lengths,
-                kernel_size=conv.kernel_size[0],
-                stride=conv.stride[0]
-            )
-        out = out.transpose(-1, -2)
+        out, lengths = self.layers(x, lengths)
         out = self.fc(out)
         out = self.drpout(out)
         return out, lengths
