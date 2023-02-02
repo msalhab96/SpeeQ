@@ -536,6 +536,7 @@ class GlobalMulAttention(nn.Module):
     attention mechanism as described in
     https://arxiv.org/abs/1508.04025 with direct
     dot product for scoring.
+
     Args:
         enc_feat_size (int): The encoder feature size.
         dec_feat_size (int): The decoder feature size.
@@ -576,7 +577,7 @@ class GlobalMulAttention(nn.Module):
             self,
             key: Tensor,
             query: Tensor,
-            mask=None
+            mask: Union[None, Tensor] = None
     ) -> Tensor:
         # key of shape [B, M, feat_size]
         # query of shape [B, 1, feat_size]
