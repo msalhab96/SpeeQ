@@ -734,7 +734,7 @@ class ConformerRelativeMHSA(MultiHeadAtt):
     def forward(
             self,
             x: Tensor,
-            mask: Union[None, Tensor]
+            mask: Union[None, Tensor] = None
     ) -> Tensor:
         out = self.lnrom(x)
         out = add_pos_enc(out)
@@ -794,7 +794,9 @@ class ConformerBlock(nn.Module):
         )
         self.res_scaling = res_scaling
 
-    def forward(self, x: Tensor, mask: Union[None, Tensor]) -> Tensor:
+    def forward(
+            self, x: Tensor, mask: Union[None, Tensor] = None
+            ) -> Tensor:
         out = self.ff1(x)
         out = x + self.res_scaling * out
         out = out + self.mhsa(out, mask)
