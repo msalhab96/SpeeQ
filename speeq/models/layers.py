@@ -5,9 +5,10 @@ import torch.nn as nn
 from torch import Tensor
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 
-from .activations import Sigmax
 from speeq.utils.utils import (add_pos_enc, calc_data_len, get_mask_from_lens,
                                get_positional_encoding)
+
+from .activations import Sigmax
 
 
 class PackedRNN(nn.Module):
@@ -823,7 +824,7 @@ class ConformerPreNet(nn.Module):
         n_conv_layers (int): The number of convolutional layers.
         d_model (int): The model dimension.
         p_dropout (float): The dropout rate.
-        groups (Union[int, List[int]]): The convolution groups size.
+        groups (Union[int, List[int]]): The convolution groups size. Default 1.
     """
 
     def __init__(
@@ -863,13 +864,12 @@ class ConformerPreNet(nn.Module):
 
 
 class JasperSubBlock(nn.Module):
-    """Implements the subblock of the
-    Jasper model as described in
+    """Implements the subblock of the Jasper model as described in
     https://arxiv.org/abs/1904.03288
 
     Args:
         in_channels (int): The number of the input's channels.
-        out_channels (int): The number of the output's channels.
+        out_channels (int): The number of the output channels.
         kernel_size (int): The convolution layer's kernel size.
         p_dropout (float): The dropout rate.
         stride (int): The convolution layer's stride. Default 1.
@@ -903,7 +903,8 @@ class JasperSubBlock(nn.Module):
             self, x: Tensor,
             residual: Union[Tensor, None] = None
     ) -> Tensor:
-        # x and residual of shape [B, d, M]
+        # x of shape [B, d, M]
+        # residual of shape [B, out_channels, M]
         out = self.conv(x)
         out = self.bnorm(out)
         if residual is not None:
@@ -1176,6 +1177,7 @@ class MultiHeadAtt2d(MultiHeadAtt):
             in_features=2 * out_channels,
             out_features=d_model
         )
+        del self.query_fc, self.key_fc, self.value_fc
 
     def perform_frequency_attention(
             self,
@@ -1205,7 +1207,7 @@ class MultiHeadAtt2d(MultiHeadAtt):
             key: Tensor,
             query: Tensor,
             value: Tensor,
-            mask: Union[Tensor, None]
+            mask: Union[Tensor, None] = None
     ) -> Tensor:
         key = key.transpose(-1, -2)
         query = query.transpose(-1, -2)
