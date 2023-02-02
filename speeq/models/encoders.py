@@ -718,7 +718,7 @@ class SpeechTransformerEncoder(nn.Module):
             [
                 SpeechTransformerEncLayer(
                     d_model=d_model,
-                    hidden_size=ff_size,
+                    ff_size=ff_size,
                     h=h, out_channels=att_out_channels,
                     kernel_size=att_kernel_size
                 )

@@ -351,7 +351,7 @@ class TransformerDecoder(nn.Module):
             [
                 TransformerDecLayer(
                     d_model=d_model,
-                    hidden_size=ff_size,
+                    ff_size=ff_size,
                     h=h, masking_value=masking_value
                 )
                 for _ in range(n_layers)

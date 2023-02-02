@@ -169,22 +169,22 @@ class FeedForwardModule(nn.Module):
 
     Args:
         d_model (int): The model dimensionality.
-        hidden_size (int): The inner layer's dimensionality.
+        ff_size (int): The inner layer's dimensionality.
     """
 
     def __init__(
             self,
             d_model: int,
-            hidden_size: int
+            ff_size: int
     ) -> None:
         super().__init__()
         self.fc1 = nn.Linear(
             in_features=d_model,
-            out_features=hidden_size
+            out_features=ff_size
         )
         self.relu = nn.ReLU()
         self.fc2 = nn.Linear(
-            in_features=hidden_size,
+            in_features=ff_size,
             out_features=d_model
         )
 
@@ -272,8 +272,8 @@ class MultiHeadAtt(nn.Module):
             key: Tensor,
             query: Tensor,
             value: Tensor,
-            key_mask: Union[Tensor, None],
-            query_mask: Union[Tensor, None]
+            key_mask: Union[Tensor, None] = None,
+            query_mask: Union[Tensor, None] = None
     ) -> Tensor:
         key = self._reshape(key)  # B, M, h, dk
         query = self._reshape(query)  # B, M, h, dk
@@ -302,8 +302,8 @@ class MultiHeadAtt(nn.Module):
             key: Tensor,
             query: Tensor,
             value: Tensor,
-            key_mask: Union[Tensor, None],
-            query_mask: Union[Tensor, None]
+            key_mask: Union[Tensor, None] = None,
+            query_mask: Union[Tensor, None] = None
     ) -> Tensor:
         key = self.key_fc(key)
         query = self.query_fc(query)
@@ -363,7 +363,7 @@ class TransformerEncLayer(nn.Module):
 
     Args:
         d_model (int): The model dimensionality.
-        hidden_size (int): The feed forward inner layer dimensionality.
+        ff_size (int): The feed forward inner layer dimensionality.
         h (int): The number of heads.
         masking_value (int): The masking value. Default -1e15
     """
@@ -371,7 +371,7 @@ class TransformerEncLayer(nn.Module):
     def __init__(
             self,
             d_model: int,
-            hidden_size: int,
+            ff_size: int,
             h: int,
             masking_value: int = -1e15
     ) -> None:
@@ -383,7 +383,7 @@ class TransformerEncLayer(nn.Module):
             d_model=d_model
         )
         self.ff = FeedForwardModule(
-            d_model=d_model, hidden_size=hidden_size
+            d_model=d_model, ff_size=ff_size
         )
         self.add_and_norm2 = AddAndNorm(
             d_model=d_model
@@ -1215,7 +1215,7 @@ class SpeechTransformerEncLayer(TransformerEncLayer):
 
     Args:
         d_model (int): The model dimensionality.
-        hidden_size (int): The feed-forward inner layer dimensionality.
+        ff_size (int): The feed-forward inner layer dimensionality.
         h (int): The number of heads.
         out_channels (int): The number of output channels of the convolution
         kernel_size (int): The convolutional layers' kernel size.
@@ -1224,7 +1224,7 @@ class SpeechTransformerEncLayer(TransformerEncLayer):
     def __init__(
             self,
             d_model: int,
-            hidden_size: int,
+            ff_size: int,
             h: int,
             out_channels: int,
             kernel_size: int
@@ -1233,7 +1233,7 @@ class SpeechTransformerEncLayer(TransformerEncLayer):
         # TODO: rename hidden size to ff_size
         super().__init__(
             d_model=d_model,
-            hidden_size=hidden_size,
+            ff_size=ff_size,
             h=h
         )
         self.mhsa = MultiHeadAtt2d(
@@ -1260,7 +1260,7 @@ class TransformerDecLayer(nn.Module):
 
     Args:
         d_model (int): The model dimensionality.
-        hidden_size (int): The feed forward inner layer dimensionality.
+        ff_size (int): The feed forward inner layer dimensionality.
         h (int): The number of heads.
         masking_value (int): The masking value. Default -1e15
     """
@@ -1268,7 +1268,7 @@ class TransformerDecLayer(nn.Module):
     def __init__(
             self,
             d_model: int,
-            hidden_size: int,
+            ff_size: int,
             h: int,
             masking_value: int = -1e15
     ) -> None:
@@ -1287,7 +1287,7 @@ class TransformerDecLayer(nn.Module):
             d_model=d_model
         )
         self.ff = FeedForwardModule(
-            d_model=d_model, hidden_size=hidden_size
+            d_model=d_model, ff_size=ff_size
         )
         self.add_and_norm3 = AddAndNorm(
             d_model=d_model
