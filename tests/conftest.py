@@ -80,3 +80,12 @@ def batcher():
     def func(batch_size, seq_len, feat_size, *args, **kwargs):
         return torch.randn(batch_size, seq_len, feat_size)
     return func
+
+
+@fixture
+def int_batcher():
+    def func(batch_size, seq_len, max_val, min_val=0):
+        return torch.randint(
+            min_val, max_val, size=(batch_size, seq_len)
+            )
+    return func
