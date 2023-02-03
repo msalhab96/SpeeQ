@@ -16,7 +16,8 @@ body:
   - type: textarea
     id: reproducible-code
     attributes:
-      label: What the code you used and failed
+      label: What the code you used and failed?
+      render: python
       description: Write the code you used, to help us reproduce the bug
     validations:
       required: true
