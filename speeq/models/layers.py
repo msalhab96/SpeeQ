@@ -5,8 +5,7 @@ import torch.nn as nn
 from torch import Tensor
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 
-from speeq.utils.utils import (add_pos_enc, calc_data_len, get_mask_from_lens,
-                               get_positional_encoding)
+from speeq.utils.utils import (add_pos_enc, calc_data_len, get_mask_from_lens)
 
 from .activations import Sigmax
 
@@ -1369,12 +1368,9 @@ class PositionalEmbedding(nn.Module):
         self.d_model = embed_dim
 
     def forward(self, x: Tensor) -> Tensor:
-        max_len = x.shape[-1]
-        pe = get_positional_encoding(
-            max_length=max_len, d_model=self.d_model
-        )
-        pe = pe.to(x.device)
-        return self.emb(x) + pe
+        out = self.emb(x)
+        out = add_pos_enc(out)
+        return out
 
 
 class GroupsShuffle(nn.Module):
