@@ -1253,7 +1253,6 @@ class SpeechTransformerEncLayer(TransformerEncLayer):
             kernel_size: int
     ) -> None:
         # TODO: pass masking value
-        # TODO: rename hidden size to ff_size
         super().__init__(
             d_model=d_model,
             ff_size=ff_size,
@@ -1266,7 +1265,9 @@ class SpeechTransformerEncLayer(TransformerEncLayer):
             kernel_size=kernel_size
         )
 
-    def forward(self, x: Tensor, mask: Tensor) -> Tensor:
+    def forward(
+            self, x: Tensor, mask: Union[None, Tensor] = None
+            ) -> Tensor:
         out = self.mhsa(
             key=x, query=x, value=x, mask=mask
         )
