@@ -3,7 +3,7 @@ import torch
 from torch import LongTensor
 
 from speeq.models import layers
-from tests.helpers import IGNORE_USERWARNING, check_grad
+from tests.helpers import IGNORE_USERWARNING, check_grad, get_mask
 
 
 class TestPackedRNN:
@@ -929,3 +929,450 @@ class TestSpeechTransformerEncLayer:
         result = model(input, mask=mask)
         assert shape == result.shape
         check_grad(model=model, result=result)
+
+
+class TestTransformerDecLayer:
+    @pytest.mark.parametrize(
+        (
+            'd_model', 'ff_size', 'h', 'enc_seq_len', 'dec_seq_len',
+            'batch_size', 'enc_pad_lens', 'dec_pad_lens'
+        ),
+        (
+            (16, 32, 2, 8, 3, 3, [3, 5, 8], [3, 2, 1]),
+            (16, 32, 2, 8, 3, 3, None, [3, 2, 1]),
+            (16, 32, 2, 8, 3, 3, [3, 5, 8], None),
+            (16, 32, 2, 8, 3, 3, None, None),
+            (16, 32, 2, 8, 3, 1, None, None),
+            (16, 32, 2, 8, 3, 1, [8], [3]),
+        )
+    )
+    def test_forward(
+            self, batcher, d_model, ff_size, h, enc_seq_len,
+            dec_seq_len, batch_size, enc_pad_lens, dec_pad_lens
+    ):
+        """Tests the returned shape and the gradients of the model's forward
+        """
+        shape = (batch_size, dec_seq_len, d_model)
+        enc_mask = None
+        dec_mask = None
+        model = layers.TransformerDecLayer(
+            d_model=d_model, ff_size=ff_size, h=h
+        )
+        if enc_pad_lens is not None:
+            enc_mask = get_mask(enc_seq_len, enc_pad_lens)
+        if dec_pad_lens is not None:
+            dec_mask = get_mask(dec_seq_len, dec_pad_lens)
+        enc = batcher(batch_size, enc_seq_len, d_model)
+        dec = batcher(*shape)
+        result = model(
+            enc_out=enc, enc_mask=enc_mask, dec_inp=dec, dec_mask=dec_mask
+        )
+        assert result.shape == shape
+        check_grad(result=result, model=model)
+
+
+class TestPositionalEmbedding:
+    @pytest.mark.parametrize(
+        ('vocab_size', 'batch_size', 'embed_dim', 'seq_len'),
+        (
+            (10, 2, 8, 4),
+            (10, 1, 8, 1),
+        )
+    )
+    def test_forward(
+            self, int_batcher, vocab_size, batch_size, embed_dim, seq_len
+    ):
+        """Tests the returned shape and the gradients of the model's forward
+        """
+        expected_shape = (batch_size, seq_len, embed_dim)
+        model = layers.PositionalEmbedding(
+            vocab_size=vocab_size, embed_dim=embed_dim
+        )
+        input = int_batcher(batch_size, seq_len, vocab_size)
+        result = model(input)
+        assert result.shape == expected_shape
+        check_grad(result=result, model=model)
+
+
+class TestGroupsShuffle:
+    @pytest.mark.parametrize(
+        ('groups', 'n_channels', 'batch_size', 'seq_len'),
+        (
+            (8, 16, 3, 5),
+            (2, 32, 1, 3)
+        )
+    )
+    def test_forward(self, batcher, groups, n_channels, batch_size, seq_len):
+        """Tests the returned shape and the gradients of the model's forward
+        """
+        shape = (batch_size, n_channels, seq_len)
+        input = batcher(*shape)
+        model = layers.GroupsShuffle(groups=groups)
+        result = model(input)
+        assert result.shape == shape
+
+
+class TestQuartzSubBlock:
+    @pytest.mark.parametrize(
+        (
+            'in_channels', 'out_channels', 'kernel_size',
+            'p_dropout', 'groups', 'batch_size', 'seq_len', 'add_residual'
+        ),
+        (
+            (16, 8, 4, 0.01, 2, 3, 5, False),
+            (16, 8, 4, 0.01, 2, 3, 5, True),
+        )
+    )
+    def test_forward(
+            self, batcher, in_channels, out_channels, kernel_size,
+            p_dropout, groups, batch_size, seq_len, add_residual
+    ):
+        """Tests the returned shape and the gradients of the model's forward 
+        """
+        input = batcher(batch_size, in_channels, seq_len)
+        expected_shape = (batch_size, out_channels, seq_len)
+        model = layers.QuartzSubBlock(
+            in_channels=in_channels, out_channels=out_channels,
+            kernel_size=kernel_size, p_dropout=p_dropout, groups=groups
+        )
+        residual = None
+        if add_residual:
+            residual = batcher(batch_size, out_channels, seq_len)
+        result = model(input, residual)
+        assert result.shape == expected_shape
+        check_grad(result=result, model=model)
+
+
+class TestQuartzBlock:
+    @pytest.mark.parametrize(
+        (
+            'num_sub_blocks', 'in_channels', 'out_channels',
+            'kernel_size', 'groups', 'p_dropout', 'batch_size', 'seq_len'
+        ),
+        (
+            (3, 8, 16, 4, 2, 0.0, 3, 10),
+            (1, 8, 16, 4, 2, 0.0, 3, 10),
+            (1, 8, 16, 10, 4, 0.0, 3, 10),
+        )
+    )
+    def test_forward(
+            self, batcher, num_sub_blocks, in_channels, out_channels,
+            kernel_size, groups, p_dropout, batch_size, seq_len
+    ):
+        """Tests the returned shape and the gradients of the model's forward
+        """
+        input = batcher(batch_size, in_channels, seq_len)
+        expected_shape = (batch_size, out_channels, seq_len)
+        model = layers.QuartzBlock(
+            num_sub_blocks=num_sub_blocks,
+            in_channels=in_channels,
+            out_channels=out_channels,
+            kernel_size=kernel_size,
+            groups=groups,
+            p_dropout=p_dropout
+        )
+        result = model(input)
+        assert result.shape == expected_shape
+        check_grad(result=result, model=model)
+
+
+class TestQuartzBlocks:
+    @pytest.mark.parametrize(
+        (
+            'num_blocks', 'block_repetition', 'num_sub_blocks',
+            'in_channels', 'channels_size', 'kernel_size', 'groups',
+            'p_dropout', 'batch_size', 'seq_len'
+        ),
+        (
+            (1, 3, 2, 8, [16], 4, 2, 0.0, 3, 10),
+            (1, 1, 1, 8, [16], 4, 2, 0.0, 3, 10),
+            (3, 3, 2, 8, [8, 12, 16], 4, 2, 0.0, 3, 10),
+            (3, 3, 2, 8, [8, 12, 16], [1, 2, 3], 2, 0.0, 3, 10),
+        )
+    )
+    def test_forward(
+            self, batcher, num_blocks, block_repetition, num_sub_blocks,
+            in_channels, channels_size, kernel_size, groups, p_dropout,
+            batch_size, seq_len
+    ):
+        """Tests the returned shape and the gradients of the model's forward
+        """
+        out_channels = channels_size[-1]
+        input = batcher(batch_size, in_channels, seq_len)
+        expected_shape = (batch_size, out_channels, seq_len)
+        model = layers.QuartzBlocks(
+            num_blocks=num_blocks,
+            block_repetition=block_repetition,
+            num_sub_blocks=num_sub_blocks,
+            in_channels=in_channels,
+            channels_size=channels_size,
+            kernel_size=kernel_size,
+            groups=groups,
+            p_dropout=p_dropout
+        )
+        result = model(input)
+        assert result.shape == expected_shape
+        check_grad(result=result, model=model)
+
+
+class TestScaling1d:
+    @pytest.mark.parametrize(
+        ('d_model', 'batch_size', 'seq_len'),
+        (
+            (8, 1, 15),
+            (8, 1, 1),
+            (1, 1, 1),
+        )
+    )
+    def test_forward(self, batcher, d_model, batch_size, seq_len):
+        """Tests the returned shape and the gradients of the model's forward
+        """
+        shape = (batch_size, seq_len, d_model)
+        input = batcher(*shape)
+        model = layers.Scaling1d(d_model=d_model)
+        result = model(input)
+        assert result.shape == shape
+        check_grad(result=result, model=model)
+
+
+class TestSqueezeformerConvModule:
+    @pytest.mark.parametrize(
+        (
+            'd_model', 'kernel_size', 'p_dropout', 'batch_size', 'seq_len'
+        ),
+        (
+            (8, 4, 0.01, 3, 2),
+            (8, 4, 0.01, 1, 2),
+            (16, 1, 0.01, 1, 2),
+        )
+    )
+    def test_forward(
+            self, batcher, d_model, kernel_size,
+            p_dropout, batch_size, seq_len
+    ):
+        shape = (batch_size, seq_len, d_model)
+        input = batcher(*shape)
+        model = layers.SqueezeformerConvModule(
+            d_model=d_model, kernel_size=kernel_size, p_dropout=p_dropout
+        )
+        result = model(input)
+        assert result.shape == shape
+        check_grad(result=result, model=model)
+
+
+class TestSqueezeformerRelativeMHSA:
+    @pytest.mark.parametrize(
+        (
+            'd_model', 'h', 'p_dropout', 'batch_size', 'seq_len', 'pad_lens'
+        ),
+        (
+            (4, 2, 0.1, 2, 10, None),
+            (4, 2, 0.1, 2, 10, [8, 10]),
+            (4, 2, 0.1, 2, 10, [8, 4])
+        )
+    )
+    def test_forward(
+            self, batcher, d_model, h, p_dropout, batch_size, seq_len, pad_lens
+    ):
+        shape = (batch_size, seq_len, d_model)
+        input = batcher(*shape)
+        mask = None
+        if pad_lens is not None:
+            mask = get_mask(seq_len=seq_len, pad_lens=pad_lens)
+        model = layers.SqueezeformerRelativeMHSA(
+            d_model=d_model, h=h, p_dropout=p_dropout
+        )
+        result = model(input, mask=mask)
+        assert result.shape == shape
+        check_grad(result=result, model=model)
+
+
+class TestSqueezeformerFeedForward:
+    @pytest.mark.parametrize(
+        (
+            'd_model', 'expansion_factor', 'p_dropout', 'batch_size', 'seq_len'
+        ),
+        (
+            (4, 2, 0.1, 2, 10),
+            (4, 4, 0.1, 1, 10),
+            (4, 4, 0.1, 2, 1),
+        )
+    )
+    def test_forward(
+            self, batcher, d_model, expansion_factor, p_dropout,
+            batch_size, seq_len
+    ):
+        shape = (batch_size, seq_len, d_model)
+        input = batcher(*shape)
+        model = layers.SqueezeformerFeedForward(
+            d_model=d_model,
+            expansion_factor=expansion_factor,
+            p_dropout=p_dropout
+        )
+        result = model(input)
+        assert result.shape == shape
+        check_grad(result=result, model=model)
+
+
+class TestSqueezeformerBlock:
+    @pytest.mark.parametrize(
+        (
+            'd_model', 'ff_expansion_factor', 'h', 'kernel_size',
+            'p_dropout', 'batch_size', 'seq_len', 'pad_lens'
+        ),
+        (
+            (4, 2, 2, 3, 0.1, 2, 10, None),
+            (4, 2, 2, 3, 0.1, 1, 10, None),
+            (4, 2, 2, 3, 0.1, 2, 10, [5, 6]),
+        )
+    )
+    def test_forward(
+            self, batcher, d_model, ff_expansion_factor, h, kernel_size,
+            p_dropout, batch_size, seq_len, pad_lens
+    ):
+        mask = None
+        if pad_lens is not None:
+            mask = get_mask(seq_len=seq_len, pad_lens=pad_lens)
+        shape = (batch_size, seq_len, d_model)
+        input = batcher(*shape)
+        model = layers.SqueezeformerBlock(
+            d_model=d_model,
+            ff_expansion_factor=ff_expansion_factor,
+            h=h, kernel_size=kernel_size, p_dropout=p_dropout
+        )
+        result = model(input, mask=mask)
+        assert result.shape == shape
+        check_grad(result=result, model=model)
+
+
+class TestSqueezeAndExcit1D:
+    @pytest.mark.parametrize(
+        (
+            'in_feature', 'reduction_factor', 'batch_size',
+            'seq_len', 'pad_lens'
+        ),
+        (
+            (16, 2, 3, 7, [5, 2, 0]),
+            (16, 1, 3, 7, [5, 2, 0]),
+            (16, 1, 3, 7, [0, 0, 0]),
+        )
+    )
+    def test_forward(
+            self, batcher, in_feature, reduction_factor,
+            batch_size, seq_len, pad_lens
+    ):
+        shape = (batch_size, in_feature, seq_len)
+        input = batcher(*shape)
+        model = layers.SqueezeAndExcit1D(
+            in_feature=in_feature, reduction_factor=reduction_factor
+        )
+        mask = get_mask(seq_len=seq_len, pad_lens=pad_lens)
+        result = model(input, mask)
+        assert result.shape == shape
+        check_grad(result=result, model=model)
+
+
+class TestContextNetConvLayer:
+    @pytest.mark.parametrize(
+        (
+            'in_channels', 'out_channels', 'kernel_size', 'stride',
+            'batch_size', 'seq_len', 'lengths', 'expected_lens',
+            'expected_shape'
+        ),
+        (
+            (
+                16, 32, 3, 1, 3, 10,
+                torch.LongTensor([10, 8, 5]),
+                torch.LongTensor([10, 8, 5]),
+                (3, 32, 10)
+            ),
+            (
+                16, 32, 3, 2, 3, 10,
+                torch.LongTensor([10, 8, 5]),
+                torch.LongTensor([4, 4, 3]),
+                (3, 32, 4)
+            ),
+        )
+    )
+    def test_forward(
+            self, batcher, in_channels, out_channels, kernel_size, stride,
+            batch_size, seq_len, lengths, expected_lens, expected_shape
+    ):
+        input = batcher(batch_size, in_channels, seq_len)
+        model = layers.ContextNetConvLayer(
+            in_channels=in_channels, out_channels=out_channels,
+            kernel_size=kernel_size, stride=stride
+        )
+        result, lengths = model(input, lengths)
+        assert result.shape == expected_shape
+        assert torch.all(lengths == expected_lens).item()
+        check_grad(result=result, model=model)
+
+
+class TestContextNetResidual:
+    @pytest.mark.parametrize(
+        (
+            'in_channels', 'out_channels', 'kernel_size', 'stride',
+            'batch_size', 'seq_len', 'res_len'
+        ),
+        (
+            (8, 16, 4, 1, 3, 10, 10),
+            (8, 16, 4, 2, 3, 4, 10),
+            (8, 16, 1, 2, 3, 4, 7),
+        )
+    )
+    def test_forward(
+            self, batcher, in_channels,
+            out_channels, kernel_size, stride,
+            batch_size, seq_len, res_len
+    ):
+        shape = (batch_size, out_channels, seq_len)
+        input = batcher(*shape)
+        residual = batcher(batch_size, in_channels, res_len)
+        model = layers.ContextNetResidual(
+            in_channels=in_channels, out_channels=out_channels,
+            kernel_size=kernel_size, stride=stride
+        )
+        result = model(residual, input)
+        assert result.shape == shape
+
+
+class TestContextNetBlock:
+    @pytest.mark.parametrize(
+        (
+            'n_layers', 'in_channels', 'out_channels', 'kernel_size',
+            'reduction_factor', 'add_residual', 'last_layer_stride',
+            'seq_len', 'batch_size', 'lengths', 'expected_lengths',
+            'expected_shape'
+        ),
+        (
+            (
+                3, 8, 16, 3, 2, False, 1, 10, 3,
+                torch.LongTensor([10, 8, 5]),
+                torch.LongTensor([10, 8, 5]),
+                (3, 16, 10)
+            ),
+            (
+                3, 8, 16, 3, 2, False, 2, 10, 3,
+                torch.LongTensor([10, 8, 5]),
+                torch.LongTensor([4, 4, 3]),
+                (3, 16, 4)
+            ),
+        )
+    )
+    def test_forward(
+            self, batcher, n_layers, in_channels, out_channels, kernel_size,
+            reduction_factor, add_residual, last_layer_stride, seq_len,
+            batch_size, lengths, expected_lengths, expected_shape
+    ):
+        input = batcher(batch_size, in_channels, seq_len)
+        model = layers.ContextNetBlock(
+            n_layers=n_layers, in_channels=in_channels,
+            out_channels=out_channels, kernel_size=kernel_size,
+            reduction_factor=reduction_factor, add_residual=add_residual,
+            last_layer_stride=last_layer_stride
+        )
+        result, lengths = model(input, lengths)
+        assert result.shape == expected_shape
+        assert torch.all(lengths == expected_lengths)
+        check_grad(result=result, model=model)
