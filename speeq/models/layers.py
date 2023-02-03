@@ -1649,7 +1649,7 @@ class SqueezeformerRelativeMHSA(MultiHeadAtt):
     def forward(
             self,
             x: Tensor,
-            mask: Union[None, Tensor]
+            mask: Union[None, Tensor] = None
     ) -> Tensor:
         out = self.scaler(x)
         out = add_pos_enc(out)
