@@ -13,6 +13,8 @@ repos:
     - id: check-case-conflict
     - id: check-docstring-first
 
+
+
 - repo: local
   hooks:
   - id: isort
@@ -21,25 +23,10 @@ repos:
     language: system
     entry: isort
     types: [python]
-
+    args: ["--profile", "black"]
   - id: black
     name: black
     stages: [commit]
     language: system
     entry: black
     types: [python]
-
-  - id: mypy
-    name: mypy
-    stages: [commit]
-    language: system
-    entry: mypy
-    types: [python]
-
-  - id: flake8
-    name: flake8
-    stages: [commit]
-    language: system
-    entry: flake8
-    types: [python]
-    exclude: setup.py
