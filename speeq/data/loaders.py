@@ -21,20 +21,11 @@ class CSVDataset(IDataset):
         encoding (str): The file encoding. Default "utf-8".
     """
 
-    def __init__(
-            self,
-            data_path: Union[str, Path],
-            sep: str,
-            encoding='utf-8'
-    ) -> None:
+    def __init__(self, data_path: Union[str, Path], sep: str, encoding="utf-8") -> None:
         super().__init__()
         self.data_path = data_path
         self.sep = sep
-        self.data = load_csv(
-            file_path=data_path,
-            encoding=encoding,
-            sep=sep
-        )
+        self.data = load_csv(file_path=data_path, encoding=encoding, sep=sep)
 
     def __getitem__(self, idx: int) -> dict:
         return self.data[idx]
@@ -61,19 +52,17 @@ class SpeechTextDataset(CSVDataset):
     """
 
     def __init__(
-            self,
-            data_path: Union[str, Path],
-            tokenizer: ITokenizer,
-            speech_processor: IProcessor,
-            text_processor: IProcessor,
-            sep: str,
-            add_sos=False,
-            add_eos=False,
-            encoding='utf-8'
+        self,
+        data_path: Union[str, Path],
+        tokenizer: ITokenizer,
+        speech_processor: IProcessor,
+        text_processor: IProcessor,
+        sep: str,
+        add_sos=False,
+        add_eos=False,
+        encoding="utf-8",
     ) -> None:
-        super().__init__(
-            data_path, sep, encoding
-        )
+        super().__init__(data_path, sep, encoding)
         self.tokenizer = tokenizer
         self.speech_processor = speech_processor
         self.text_processor = text_processor
@@ -83,15 +72,11 @@ class SpeechTextDataset(CSVDataset):
     def process_text(self, text: str) -> Tuple[Tensor, int]:
         text = self.text_processor.execute(text)
         tokens = self.tokenizer.tokenize(
-            text,
-            add_sos=self.add_sos,
-            add_eos=self.add_eos
+            text, add_sos=self.add_sos, add_eos=self.add_eos
         )
         return torch.LongTensor(tokens), len(tokens)
 
-    def process_speech(
-            self, file_path: Union[Path, str]
-    ) -> Tensor:
+    def process_speech(self, file_path: Union[Path, str]) -> Tensor:
         speech = self.speech_processor.execute(file_path)
         # FIX: handle MONO and STEREO issue
         return speech, speech.shape[-2]
@@ -99,9 +84,7 @@ class SpeechTextDataset(CSVDataset):
     def __getitem__(self, idx: int) -> dict:
         item = super().__getitem__(idx)
         text, text_len = self.process_text(item[FileKeys.text_key.value])
-        speech, speech_len = self.process_speech(
-            item[FileKeys.speech_key.value]
-        )
+        speech, speech_len = self.process_speech(item[FileKeys.speech_key.value])
         return speech, speech_len, text, text_len
 
 
@@ -116,18 +99,12 @@ class DataLoader(IDataLoader):
     """
 
     def __init__(
-            self,
-            dataset: object,
-            rank: int,
-            world_size: int,
-            batch_size: int
+        self, dataset: object, rank: int, world_size: int, batch_size: int
     ) -> None:
         self.rank = rank
         self.world_size = world_size
         self.data = dataset
-        self.indices = [
-            *range(rank, len(self.data), self.world_size)
-        ]
+        self.indices = [*range(rank, len(self.data), self.world_size)]
         self.length = len(self.indices)
         self._counter = 0
         self.batch_size = batch_size
@@ -139,10 +116,7 @@ class DataLoader(IDataLoader):
 
     @property
     def end_idx(self):
-        return min(
-            self.length,
-            (1 + self._counter) * self.batch_size
-        )
+        return min(self.length, (1 + self._counter) * self.batch_size)
 
     def __len__(self):
         return self.n_batches
@@ -161,34 +135,27 @@ class SpeechTextLoader(DataLoader):
     """
 
     def __init__(
-            self,
-            dataset: object,
-            rank: int,
-            world_size: int,
-            batch_size: int,
-            text_padder: IPadder,
-            speech_padder: IPadder,
+        self,
+        dataset: object,
+        rank: int,
+        world_size: int,
+        batch_size: int,
+        text_padder: IPadder,
+        speech_padder: IPadder,
     ) -> None:
-        super().__init__(
-            dataset, rank, world_size, batch_size
-        )
+        super().__init__(dataset, rank, world_size, batch_size)
         self.text_padder = text_padder
         self.speech_padder = speech_padder
 
     def _stack_padded(self, batch: List[Tuple[Tensor, int]]) -> Tensor:
-        return torch.vstack(
-            list(map(lambda x: x[0], batch))
-        )
+        return torch.vstack(list(map(lambda x: x[0], batch)))
 
-    def _get_mask(
-            self, batch: List[Tuple[Tensor, int]], max_len_dim: int
-    ) -> Tensor:
+    def _get_mask(self, batch: List[Tuple[Tensor, int]], max_len_dim: int) -> Tensor:
         def get_mask(x: Tuple[Tensor, int]):
             (example, pad_len) = x
             seq_len = example.shape[max_len_dim]
-            return get_pad_mask(
-                seq_len=seq_len - pad_len, pad_len=pad_len
-            )
+            return get_pad_mask(seq_len=seq_len - pad_len, pad_len=pad_len)
+
         masks = list(map(get_mask, batch))
         return torch.vstack(masks)
 
@@ -198,7 +165,7 @@ class SpeechTextLoader(DataLoader):
         max_text_len = 0
         speeches = []
         texts = []
-        for idx in self.indices[self.start_idx: self.end_idx]:
+        for idx in self.indices[self.start_idx : self.end_idx]:
             speech, speech_len, text, text_len = self.data[idx]
             max_speech_len = max(max_speech_len, speech_len)
             max_text_len = max(max_text_len, text_len)
@@ -208,10 +175,7 @@ class SpeechTextLoader(DataLoader):
             self.speech_padder.pad(speech, max_len=max_speech_len)
             for speech in speeches
         ]
-        text = [
-            self.text_padder.pad(text, max_text_len)
-            for text in texts
-        ]
+        text = [self.text_padder.pad(text, max_text_len) for text in texts]
         speech_mask = self._get_mask(speech, max_len_dim=-2)
         speech = self._stack_padded(speech)
         text_mask = self._get_mask(text, max_len_dim=0)

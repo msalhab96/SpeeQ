@@ -17,11 +17,12 @@ class DynamicPadder(IPadder):
     """
 
     def __init__(
-            self,
-            dim: int,
-            pad_val: Union[int, Tensor, float],
-            left_pad=False,
-            *args, **kwargs
+        self,
+        dim: int,
+        pad_val: Union[int, Tensor, float],
+        left_pad=False,
+        *args,
+        **kwargs
     ) -> None:
         super().__init__()
         self.dim = dim
@@ -35,10 +36,7 @@ class DynamicPadder(IPadder):
         if pad_len == 0:
             return x, pad_len
         pad = torch.zeros(
-            *x.shape[:self.dim],
-            pad_len,
-            *x.shape[1 + self.dim:],
-            dtype=x.dtype
+            *x.shape[: self.dim], pad_len, *x.shape[1 + self.dim :], dtype=x.dtype
         ).to(x.device)
         pad = pad + self.pad_val
         if self.left_pad:
@@ -60,12 +58,13 @@ class StaticPadder(DynamicPadder):
     """
 
     def __init__(
-            self,
-            dim: int,
-            pad_val: Union[int, Tensor, float],
-            max_len: int,
-            left_pad=False,
-            *args, **kwargs
+        self,
+        dim: int,
+        pad_val: Union[int, Tensor, float],
+        max_len: int,
+        left_pad=False,
+        *args,
+        **kwargs
     ) -> None:
         super().__init__(dim, pad_val, left_pad)
         self.max_len = max_len

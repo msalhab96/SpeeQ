@@ -9,10 +9,10 @@ from speeq.utils.utils import load_json, save_json
 
 from .decorators import check_token
 
-PAD = '<PAD>'
-SOS = '<SOS>'
-EOS = '<EOS>'
-BLANK = '<BLANK>'
+PAD = "<PAD>"
+SOS = "<SOS>"
+EOS = "<EOS>"
+BLANK = "<BLANK>"
 
 
 @dataclass
@@ -64,12 +64,12 @@ class SpecialTokens:
 
 
 class BaseTokenizer(ITokenizer):
-    _pad_key = 'pad'
-    _sos_key = 'sos'
-    _eos_key = 'eos'
-    _blank_key = 'blank'
-    _token_to_id_key = 'token_to_id'
-    _special_tokens_key = 'special_tokens'
+    _pad_key = "pad"
+    _sos_key = "sos"
+    _eos_key = "eos"
+    _blank_key = "blank"
+    _token_to_id_key = "token_to_id"
+    _special_tokens_key = "special_tokens"
 
     def __init__(self) -> None:
         super().__init__()
@@ -112,10 +112,9 @@ class BaseTokenizer(ITokenizer):
         return self
 
     def _reset_id_to_token(self) -> None:
-        self._id_to_token = dict(zip(
-            self._token_to_id.values(),
-            self._token_to_id.keys()
-        ))
+        self._id_to_token = dict(
+            zip(self._token_to_id.values(), self._token_to_id.keys())
+        )
 
     def __set_special_tokens_dict(self, data: dict) -> None:
         if self._pad_key in data:
@@ -140,10 +139,7 @@ class BaseTokenizer(ITokenizer):
         return data
 
     def load_tokenizer(
-            self,
-            tokenizer_path: Union[str, Path],
-            *args,
-            **kwargs
+        self, tokenizer_path: Union[str, Path], *args, **kwargs
     ) -> ITokenizer:
         data = load_json(tokenizer_path)
         self._token_to_id = data[self._token_to_id_key]
@@ -158,42 +154,29 @@ class BaseTokenizer(ITokenizer):
         self._reset_id_to_token()
         return self
 
-    def save_tokenizer(
-            self,
-            save_path: Union[str, Path],
-            *args,
-            **kwargs
-    ) -> None:
+    def save_tokenizer(self, save_path: Union[str, Path], *args, **kwargs) -> None:
         data = {
             self._token_to_id_key: self._token_to_id,
-            self._special_tokens_key: self.__get_special_tokens_dict()
+            self._special_tokens_key: self.__get_special_tokens_dict(),
         }
         save_json(save_path, data)
 
     def ids2tokens(self, ids: List[str]) -> List[str]:
         return list(map(lambda x: self._id_to_token[x], ids))
 
-    def tokenize(
-            self, sentence: str, add_sos=False, add_eos=False
-    ) -> List[int]:
+    def tokenize(self, sentence: str, add_sos=False, add_eos=False) -> List[int]:
         results = []
         if add_sos is True:
             results.append(self.special_tokens.sos_id)
-        results.extend(map(
-            lambda x: self._token_to_id[x],
-            sentence)
-        )
+        results.extend(map(lambda x: self._token_to_id[x], sentence))
         if add_eos is True:
             results.append(self.special_tokens.eos_id)
         return results
 
-    def batch_tokenizer(
-            self, data: List[str], add_sos=False, add_eos=False
-    ) -> list:
+    def batch_tokenizer(self, data: List[str], add_sos=False, add_eos=False) -> list:
         def func(sentence):
-            return self.tokenize(
-                sentence=sentence, add_sos=add_sos, add_eos=add_eos
-            )
+            return self.tokenize(sentence=sentence, add_sos=add_sos, add_eos=add_eos)
+
         return list(map(func, data))
 
     def batch_detokenizer(self, data: List[int]) -> list:
@@ -205,7 +188,7 @@ class CharTokenizer(BaseTokenizer):
         super().__init__()
 
     def get_tokens(self, data: List[str]):
-        return set(''.join(data))
+        return set("".join(data))
 
     def preprocess_tokens(self, sentence: str) -> List[str]:
         return list(sentence)

@@ -14,103 +14,78 @@ from speeq.constants import FileKeys, StateKeys
 
 
 def clear():
-    if platform.system() == 'Windows':
-        os.system('cls')
+    if platform.system() == "Windows":
+        os.system("cls")
     else:
-        os.system('clear')
+        os.system("clear")
 
 
 def get_text_list(data: List[dict]) -> List[str]:
     return [item[FileKeys.text_key.value] for item in data]
 
 
-def load_json(file_path, encoding='utf-8'):
-    with open(file_path, 'r', encoding=encoding) as f:
+def load_json(file_path, encoding="utf-8"):
+    with open(file_path, "r", encoding=encoding) as f:
         data = json.load(f)
     return data
 
 
-def load_text(file_path, encoding='utf-8'):
-    with open(file_path, 'r', encoding=encoding) as f:
+def load_text(file_path, encoding="utf-8"):
+    with open(file_path, "r", encoding=encoding) as f:
         data = f.read()
     return data
 
 
-def save_json(
-    file_path,
-    data: Union[dict, list],
-    encoding='utf-8'
-) -> None:
-    with open(file_path, 'w', encoding=encoding) as f:
+def save_json(file_path, data: Union[dict, list], encoding="utf-8") -> None:
+    with open(file_path, "w", encoding=encoding) as f:
         json.dump(data, f)
 
 
-def save_text(
-        file_path,
-        data: str,
-        encoding='utf-8'
-) -> None:
-    with open(file_path, 'w', encoding=encoding) as f:
+def save_text(file_path, data: str, encoding="utf-8") -> None:
+    with open(file_path, "w", encoding=encoding) as f:
         f.write(data)
 
 
-def load_csv(
-        file_path,
-        encoding='utf-8',
-        sep=','
-):
-    with open(file_path, 'r', encoding=encoding) as f:
+def load_csv(file_path, encoding="utf-8", sep=","):
+    with open(file_path, "r", encoding=encoding) as f:
         data = [*DictReader(f, delimiter=sep)]
     return data
 
 
 def get_pad_mask(seq_len: int, pad_len: int):
     if seq_len <= 0:
-        raise ValueError('seq_len must be greater than 0!')
+        raise ValueError("seq_len must be greater than 0!")
     mask = [i < seq_len for i in range(seq_len + pad_len)]
     return torch.BoolTensor(mask)
 
 
 def get_state_dict(
-        model: Module,
-        optimizer: Optimizer,
-        step: int,
-        history: dict
+    model: Module, optimizer: Optimizer, step: int, history: dict
 ) -> dict:
     model = {
-        key.replace('module.', ''): value
-        for key, value in model.state_dict().items()
+        key.replace("module.", ""): value for key, value in model.state_dict().items()
     }
     return {
         StateKeys.model.value: model,
         StateKeys.optimizer.value: optimizer.state_dict(),
         StateKeys.step.value: step,
-        StateKeys.history.value: history
+        StateKeys.history.value: history,
     }
 
 
 def save_state_dict(
-        model_name: str,
-        outdir: Union[str, Path],
-        model: Module,
-        optimizer: Optimizer,
-        step: int,
-        history: dict
+    model_name: str,
+    outdir: Union[str, Path],
+    model: Module,
+    optimizer: Optimizer,
+    step: int,
+    history: dict,
 ) -> None:
-    ckpt_path = '{}_{}.pt'.format(
-        model_name, step
-    )
-    ckpt_path = os.path.join(
-        outdir, ckpt_path
-    )
-    state = get_state_dict(
-        model=model,
-        optimizer=optimizer,
-        step=step,
-        history=history
-    )
+    ckpt_path = "{}_{}.pt".format(model_name, step)
+    ckpt_path = os.path.join(outdir, ckpt_path)
+    state = get_state_dict(model=model, optimizer=optimizer, step=step, history=history)
     torch.save(state, ckpt_path)
-    print(f'checkpoint save to {ckpt_path}!')
+    print(f"checkpoint save to {ckpt_path}!")
 
 
 def load_state_dict(state_path: Union[str, Path]) -> tuple:
@@ -132,15 +107,15 @@ def set_state_dict(model, optimizer, state_path):
 
 
 def get_key_tag(key: str, category: str) -> str:
-    return f'{key}_key_{category}'
+    return f"{key}_key_{category}"
 
 
 def calc_data_len(
-        result_len: int,
-        pad_len: Union[Tensor, int],
-        data_len: Union[Tensor, int],
-        kernel_size: int,
-        stride: int
+    result_len: int,
+    pad_len: Union[Tensor, int],
+    data_len: Union[Tensor, int],
+    kernel_size: int,
+    stride: int,
 ) -> Union[Tensor, int]:
     """Calculates the new data portion size
     after applying convolution on a padded tensor
@@ -158,9 +133,9 @@ def calc_data_len(
     """
     if type(pad_len) != type(data_len):
         raise ValueError(
-            f'''expected both pad_len and data_len to be of the same type
-            but {type(pad_len)}, and {type(data_len)} passed'''
-            )
+            f"""expected both pad_len and data_len to be of the same type
+            but {type(pad_len)}, and {type(data_len)} passed"""
+        )
     inp_len = data_len + pad_len
     new_pad_len = 0
     # if padding size less than the kernel size
@@ -187,7 +162,7 @@ def get_positional_encoding(max_length: int, d_model: int) -> Tensor:
         Tensor: Positional tensor of shape [1, max_length, d_model]
     """
     if d_model % 2 == 1:
-        raise ValueError('Even number is expected for d_model, but odd is given!')
+        raise ValueError("Even number is expected for d_model, but odd is given!")
     result = torch.zeros(max_length, d_model, dtype=torch.float)
     feat_range = torch.arange(0, d_model // 2)
     time_range = torch.arange(0, max_length)
@@ -224,8 +199,6 @@ def add_pos_enc(x: Tensor) -> Tensor:
         Tensor: The input added to at the positional encoding.
     """
     d_model = x.shape[-1]
-    pe = get_positional_encoding(
-        x.shape[1], d_model
-    )
+    pe = get_positional_encoding(x.shape[1], d_model)
     pe = pe.to(x.device)
     return pe + x

@@ -34,6 +34,7 @@ class TrainerConfig:
         Default None.
         grad_clip_norm_type (float): type of the used p-norm. Default 2.0.
     """
+
     name: str
     batch_size: int
     epochs: int
@@ -45,8 +46,8 @@ class TrainerConfig:
     optim_args: dict
     scheduler_template: Union[ITemplate, None] = None
     dist_config: Union[object, None] = None
-    device: str = 'cuda'
-    logger: str = 'tb'
+    device: str = "cuda"
+    logger: str = "tb"
     n_logs: int = 5
     clear_screen: bool = False
     criterion_args: dict = field(default_factory=dict)
@@ -82,14 +83,15 @@ class ASRDataConfig:
         use_blank_as_pad (bool): A flag if the blank id to be used as padding.
             Default False.
     """
+
     training_path: Union[str, Path]
     testing_path: Union[str, Path]
     speech_processor: IProcessor
     text_processor: IProcessor
     tokenizer_path: Union[str, Path]
-    sep: str = ','
-    type: str = 'csv'
-    padding_type: str = 'dynamic'
+    sep: str = ","
+    type: str = "csv"
+    padding_type: str = "dynamic"
     text_pad_max_len: int = -1
     speech_pad_max_len: int = -1
     add_sos_token: bool = True
@@ -106,8 +108,9 @@ class ModelConfig:
         model_path (Union[str, Path]): The pre-trained checkpoint
             to load the weights from. Default ''.
     """
+
     template: ITemplate
-    model_path: Union[str, Path] = ''
+    model_path: Union[str, Path] = ""
 
 
 @dataclass
@@ -120,6 +123,7 @@ class DistConfig:
         address (str): The master node address.
         backend (str): The backend to be used for DDP.
     """
+
     port: int
     n_gpus: int
     address: str

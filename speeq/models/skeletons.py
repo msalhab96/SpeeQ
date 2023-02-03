@@ -2,9 +2,8 @@ from typing import Union
 
 from torch.nn import Module
 
-from .transducers import BaseTransducer
-
 from .ctc import CTCModel
+from .transducers import BaseTransducer
 
 
 class CTCSkeleton(CTCModel):
@@ -28,12 +27,12 @@ class CTCSkeleton(CTCModel):
     """
 
     def __init__(
-            self,
-            encoder: Module,
-            has_bnorm: bool,
-            pred_net: Union[Module, None] = None,
-            feat_size: Union[int, None] = None,
-            n_classes: Union[int, None] = None
+        self,
+        encoder: Module,
+        has_bnorm: bool,
+        pred_net: Union[Module, None] = None,
+        feat_size: Union[int, None] = None,
+        n_classes: Union[int, None] = None,
     ) -> None:
         assert (feat_size is None) ^ (pred_net is None)
         if feat_size is not None:
@@ -75,13 +74,13 @@ class TransducerSkeleton(BaseTransducer):
     """
 
     def __init__(
-            self,
-            encoder: Module,
-            decoder: Module,
-            has_bnorm: bool,
-            join_net: Union[Module, None] = None,
-            feat_size: Union[int, None] = None,
-            n_classes: Union[int, None] = None
+        self,
+        encoder: Module,
+        decoder: Module,
+        has_bnorm: bool,
+        join_net: Union[Module, None] = None,
+        feat_size: Union[int, None] = None,
+        n_classes: Union[int, None] = None,
     ) -> None:
         assert (feat_size is None) ^ (join_net is None)
         if feat_size is not None:

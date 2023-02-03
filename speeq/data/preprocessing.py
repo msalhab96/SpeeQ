@@ -13,19 +13,13 @@ SAMPLER_CACHE_SIZE = 5
 
 
 class AudioLoader(IProcess):
-    def __init__(
-            self,
-            sample_rate: int
-    ) -> None:
+    def __init__(self, sample_rate: int) -> None:
         super().__init__()
         self.sample_rate = sample_rate
 
     @functools.lru_cache(SAMPLER_CACHE_SIZE)
     def _get_resampler(self, original_sr: int):
-        return transforms.Resample(
-            orig_freq=original_sr,
-            new_freq=self.sample_rate
-        )
+        return transforms.Resample(orig_freq=original_sr, new_freq=self.sample_rate)
 
     def run(self, file_path: Union[Path, str]):
         x, sr = torchaudio.load(file_path)
@@ -33,20 +27,15 @@ class AudioLoader(IProcess):
 
 
 class FeatExtractor(IProcess):
-    __feat_extractor = {
-        'mfcc': transforms.MFCC,
-        'melspec': transforms.MelSpectrogram
-    }
+    __feat_extractor = {"mfcc": transforms.MFCC, "melspec": transforms.MelSpectrogram}
 
     def __init__(
-            self,
-            feat_ext_name: str,
-            feat_ext_args: dict,
+        self,
+        feat_ext_name: str,
+        feat_ext_args: dict,
     ) -> None:
         super().__init__()
-        self.feat_extractor = self.__feat_extractor[feat_ext_name](
-            **feat_ext_args
-        )
+        self.feat_extractor = self.__feat_extractor[feat_ext_name](**feat_ext_args)
 
     def run(self, x: Tensor):
         x = self.feat_extractor(x)
@@ -77,11 +66,7 @@ class FeatStacker(IProcess):
             size[1] = self.feat_stack_factor - residual
             zeros = torch.zeros(*size).to(x.device)
             x = torch.cat([x, zeros])
-        x = x.view(
-            *x.shape[:-2],
-            x.shape[-2] // self.feat_stack_factor,
-            -1
-        )
+        x = x.view(*x.shape[:-2], x.shape[-2] // self.feat_stack_factor, -1)
         return x
 
 
@@ -102,7 +87,7 @@ class FrameContextualizer(IProcess):
             in_channels=1,
             out_channels=self.win_size,
             kernel_size=self.win_size,
-            bias=False
+            bias=False,
         )
         self.conv.weight.data = torch.eye(self.win_size).view(
             self.win_size, 1, self.win_size
@@ -112,9 +97,7 @@ class FrameContextualizer(IProcess):
     def run(self, x: Tensor) -> Tensor:
         # x of shape [1, T, F]
         x = x.permute(2, 0, 1)  # [F, 1, T]
-        zeros = torch.zeros(
-            x.shape[0], 1, self.contex_size
-        )
+        zeros = torch.zeros(x.shape[0], 1, self.contex_size)
         x = torch.cat([zeros, x, zeros], dim=-1)
         x = self.conv(x)  # [F, W, T]
         x = x.permute(2, 1, 0).contiguous()  # [T, W, F]

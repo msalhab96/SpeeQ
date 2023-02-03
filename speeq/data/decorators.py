@@ -7,11 +7,14 @@ def check_token(token: str) -> Callable:
     Args:
         token ([type]): the token to be checked
     """
+
     def decorator(func):
         @wraps(func)
         def wrapper(obj, token=token):
             if token in obj._token_to_id:
                 return obj._token_to_id[token]
             return func(obj, token)
+
         return wrapper
+
     return decorator

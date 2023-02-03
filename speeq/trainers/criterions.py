@@ -6,23 +6,14 @@ from torchaudio import transforms
 
 class CTCLoss(nn.CTCLoss):
     def __init__(
-            self,
-            blank_id: int,
-            reduction='mean',
-            zero_infinity=False,
-            *args,
-            **kwargs
+        self, blank_id: int, reduction="mean", zero_infinity=False, *args, **kwargs
     ):
         super().__init__(
-            blank=blank_id,
-            reduction=reduction,
-            zero_infinity=zero_infinity
+            blank=blank_id, reduction=reduction, zero_infinity=zero_infinity
         )
 
 
-def remove_positionals(
-        input: Tensor, target: Tensor
-) -> Tuple[Tensor, Tensor]:
+def remove_positionals(input: Tensor, target: Tensor) -> Tuple[Tensor, Tensor]:
     """Removes the SOS from the target and EOS
     prediction from the input
 
@@ -40,9 +31,7 @@ def remove_positionals(
     return input, target
 
 
-def get_flatten_results(
-        input: Tensor, target: Tensor
-) -> Tuple[Tensor, Tensor]:
+def get_flatten_results(input: Tensor, target: Tensor) -> Tuple[Tensor, Tensor]:
     target = target.view(-1)
     input = input.view(-1, input.shape[-1])
     return input, target
@@ -50,16 +39,10 @@ def get_flatten_results(
 
 class CrossEntropyLoss(nn.CrossEntropyLoss):
     def __init__(
-            self,
-            pad_id: int,
-            reduction='mean',
-            label_smoothing=0.0,
-            *args, **kwargs
+        self, pad_id: int, reduction="mean", label_smoothing=0.0, *args, **kwargs
     ) -> None:
         super().__init__(
-            ignore_index=pad_id,
-            reduction=reduction,
-            label_smoothing=label_smoothing
+            ignore_index=pad_id, reduction=reduction, label_smoothing=label_smoothing
         )
 
     def forward(self, input, target, *args, **kwargs):
@@ -71,16 +54,8 @@ class CrossEntropyLoss(nn.CrossEntropyLoss):
 
 
 class NLLLoss(nn.NLLLoss):
-    def __init__(
-            self,
-            pad_id: int,
-            reduction='mean',
-            *args, **kwargs
-    ) -> None:
-        super().__init__(
-            ignore_index=pad_id,
-            reduction=reduction
-        )
+    def __init__(self, pad_id: int, reduction="mean", *args, **kwargs) -> None:
+        super().__init__(ignore_index=pad_id, reduction=reduction)
 
     def forward(self, input, target, *args, **kwargs):
         # input of shape [B, M, C]
@@ -91,17 +66,11 @@ class NLLLoss(nn.NLLLoss):
 
 
 class RNNTLoss(transforms.RNNTLoss):
-    def __init__(
-            self, blank_id: int, reduction='mean', *args, **kwargs
-    ) -> None:
+    def __init__(self, blank_id: int, reduction="mean", *args, **kwargs) -> None:
         super().__init__(blank=blank_id, reduction=reduction)
 
     def forward(
-            self,
-            logits: Tensor,
-            logits_len: Tensor,
-            targets: Tensor,
-            target_len: Tensor
+        self, logits: Tensor, logits_len: Tensor, targets: Tensor, target_len: Tensor
     ) -> Tensor:
         # logits of shape [B, Ts, Tt, C]
         # target of shape [B, Tt] and start with SOS
@@ -112,5 +81,5 @@ class RNNTLoss(transforms.RNNTLoss):
             logits=logits,
             logit_lengths=logits_len,
             targets=targets,
-            target_lengths=target_len
+            target_lengths=target_len,
         )

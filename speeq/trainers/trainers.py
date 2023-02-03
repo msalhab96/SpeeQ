@@ -16,9 +16,10 @@ from tqdm import tqdm
 
 from speeq.constants import HistoryKeys, LogCategories
 from speeq.interfaces import IDataLoader, IScheduler, ITrainer
-from .decorators import export_ckpt, step_log
 from speeq.utils.loggers import ILogger
 from speeq.utils.utils import get_key_tag
+
+from .decorators import export_ckpt, step_log
 
 
 class BaseTrainer(ITrainer):
@@ -46,19 +47,19 @@ class BaseTrainer(ITrainer):
     """
 
     def __init__(
-            self,
-            optimizer: Union[Optimizer, IScheduler],
-            criterion: Module,
-            model: Module,
-            train_loader: IDataLoader,
-            test_loader: IDataLoader,
-            epochs: int,
-            log_steps_frequency: int,
-            logger: ILogger,
-            outdir: Union[str, Path],
-            grad_clip_thresh: Union[None, float] = None,
-            grad_clip_norm_type: float = 2.0,
-            history: dict = {}
+        self,
+        optimizer: Union[Optimizer, IScheduler],
+        criterion: Module,
+        model: Module,
+        train_loader: IDataLoader,
+        test_loader: IDataLoader,
+        epochs: int,
+        log_steps_frequency: int,
+        logger: ILogger,
+        outdir: Union[str, Path],
+        grad_clip_thresh: Union[None, float] = None,
+        grad_clip_norm_type: float = 2.0,
+        history: dict = {},
     ) -> None:
         super().__init__()
         self.optimizer = optimizer
@@ -81,7 +82,7 @@ class BaseTrainer(ITrainer):
             torch.nn.utils.clip_grad_norm_(
                 self.model,
                 max_norm=self.grad_clip_thresh,
-                norm_type=self.grad_clip_norm_type
+                norm_type=self.grad_clip_norm_type,
             )
         loss.backward()
         self.optimizer.step()
@@ -100,19 +101,13 @@ class BaseTrainer(ITrainer):
             self.history[tag] = [value]
         self.logger.log_step(key, category, value)
 
-    @step_log(
-        key=HistoryKeys.train_loss.value,
-        category=LogCategories.batches.value
-    )
+    @step_log(key=HistoryKeys.train_loss.value, category=LogCategories.batches.value)
     def train_step(self, batch: Tuple[Tensor]) -> float:
         loss = self.forward_pass(batch)
         self.backward_pass(loss)
         return loss.item()
 
-    @step_log(
-        key=HistoryKeys.train_loss.value,
-        category=LogCategories.epochs.value
-    )
+    @step_log(key=HistoryKeys.train_loss.value, category=LogCategories.epochs.value)
     def train(self) -> float:
         self.model.train()
         total_loss = 0.0
@@ -125,19 +120,13 @@ class BaseTrainer(ITrainer):
                 self.inline_log(
                     key=HistoryKeys.train_loss.value,
                     category=LogCategories.steps.value,
-                    value=total_loss / (i + 1)
+                    value=total_loss / (i + 1),
                 )
             self.counter += 1
         return total_loss / len(self.train_loader)
 
-    @export_ckpt(
-        key=HistoryKeys.test_loss.value,
-        category=LogCategories.steps.value
-    )
-    @step_log(
-        key=HistoryKeys.test_loss.value,
-        category=LogCategories.steps.value
-    )
+    @export_ckpt(key=HistoryKeys.test_loss.value, category=LogCategories.steps.value)
+    @step_log(key=HistoryKeys.test_loss.value, category=LogCategories.steps.value)
     @torch.no_grad()
     def test(self) -> float:
         self.model.eval()
@@ -183,24 +172,24 @@ class BaseDistTrainer(BaseTrainer):
     """
 
     def __init__(
-            self,
-            optimizer: Union[Optimizer, IScheduler],
-            criterion: Module,
-            model: Module,
-            train_loader: IDataLoader,
-            test_loader: IDataLoader,
-            epochs: int,
-            log_steps_frequency: int,
-            logger: ILogger,
-            outdir: Union[str, Path],
-            rank: int,
-            world_size: int,
-            dist_address: str,
-            dist_port: int,
-            dist_backend: str,
-            grad_clip_thresh: Union[None, float] = None,
-            grad_clip_norm_type: float = 2.0,
-            history={}
+        self,
+        optimizer: Union[Optimizer, IScheduler],
+        criterion: Module,
+        model: Module,
+        train_loader: IDataLoader,
+        test_loader: IDataLoader,
+        epochs: int,
+        log_steps_frequency: int,
+        logger: ILogger,
+        outdir: Union[str, Path],
+        rank: int,
+        world_size: int,
+        dist_address: str,
+        dist_port: int,
+        dist_backend: str,
+        grad_clip_thresh: Union[None, float] = None,
+        grad_clip_norm_type: float = 2.0,
+        history={},
     ) -> None:
         BaseTrainer.__init__(
             self,
@@ -215,7 +204,7 @@ class BaseDistTrainer(BaseTrainer):
             outdir=outdir,
             grad_clip_thresh=grad_clip_thresh,
             grad_clip_norm_type=grad_clip_norm_type,
-            history=history
+            history=history,
         )
         self.rank = rank
         self.world_size = world_size
@@ -224,39 +213,30 @@ class BaseDistTrainer(BaseTrainer):
         self.dist_backend = dist_backend
         self.init_dist()
         self.has_bnorm = self.model.has_bnorm
-        self.model.to(f'cuda:{rank}')
-        self.model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(
-            self.model
-        )
-        self.model = DistributedDataParallel(
-            self.model, device_ids=[self.rank]
-        )
+        self.model.to(f"cuda:{rank}")
+        self.model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(self.model)
+        self.model = DistributedDataParallel(self.model, device_ids=[self.rank])
 
     def init_dist(self):
-        os.environ['MASTER_ADDR'] = self.dist_address
-        os.environ['MASTER_PORT'] = str(self.dist_port)
+        os.environ["MASTER_ADDR"] = self.dist_address
+        os.environ["MASTER_PORT"] = str(self.dist_port)
         init_process_group(
             backend=self.dist_backend,
             init_method=self.dist_address,
             world_size=self.world_size,
-            rank=self.rank
+            rank=self.rank,
         )
 
     @property
     def is_master(self):
         return self.rank == 0
 
-    def _all_reduce_loss(
-            self, total_loss: float, counter: int
-    ) -> Tensor:
-        total = torch.tensor([total_loss/counter]).cuda(self.rank)
+    def _all_reduce_loss(self, total_loss: float, counter: int) -> Tensor:
+        total = torch.tensor([total_loss / counter]).cuda(self.rank)
         all_reduce(total, op=ReduceOp.SUM)
         return total / self.world_size
 
-    @step_log(
-        key=HistoryKeys.train_loss.value,
-        category=LogCategories.epochs.value
-    )
+    @step_log(key=HistoryKeys.train_loss.value, category=LogCategories.epochs.value)
     def train(self) -> float:
         self.model.train()
         total_loss = 0.0
@@ -275,7 +255,7 @@ class BaseDistTrainer(BaseTrainer):
                     self.inline_log(
                         key=HistoryKeys.train_loss.value,
                         category=LogCategories.steps.value,
-                        value=total.item()
+                        value=total.item(),
                     )
                     self.test()
                     self.model.train()
@@ -299,20 +279,20 @@ class BaseDistTrainer(BaseTrainer):
 
 class CTCTrainer(BaseTrainer):
     def __init__(
-            self,
-            optimizer: Union[Optimizer, IScheduler],
-            criterion: Module,
-            model: Module,
-            train_loader: IDataLoader,
-            test_loader: IDataLoader,
-            epochs: int,
-            log_steps_frequency: int,
-            device: str,
-            logger: ILogger,
-            outdir: Union[str, Path],
-            grad_clip_thresh: Union[None, float] = None,
-            grad_clip_norm_type: float = 2.0,
-            history: dict = {}
+        self,
+        optimizer: Union[Optimizer, IScheduler],
+        criterion: Module,
+        model: Module,
+        train_loader: IDataLoader,
+        test_loader: IDataLoader,
+        epochs: int,
+        log_steps_frequency: int,
+        device: str,
+        logger: ILogger,
+        outdir: Union[str, Path],
+        grad_clip_thresh: Union[None, float] = None,
+        grad_clip_norm_type: float = 2.0,
+        history: dict = {},
     ) -> None:
         BaseTrainer.__init__(
             self,
@@ -327,45 +307,40 @@ class CTCTrainer(BaseTrainer):
             outdir=outdir,
             grad_clip_thresh=grad_clip_thresh,
             grad_clip_norm_type=grad_clip_norm_type,
-            history=history
+            history=history,
         )
         self.device = device
         self.model.to(device)
 
-    def forward_pass(
-            self, batch: Tuple[Tensor]) -> Tensor:
-        batch = [
-            item.to(self.device) for item in batch
-        ]
+    def forward_pass(self, batch: Tuple[Tensor]) -> Tensor:
+        batch = [item.to(self.device) for item in batch]
         [speech, speech_mask, text, text_mask] = batch
         preds, lengths = self.model(speech, speech_mask)
         # preds of shape [T, B, C]
-        loss = self.criterion(
-            preds, text, lengths, text_mask.sum(dim=-1)
-        )
+        loss = self.criterion(preds, text, lengths, text_mask.sum(dim=-1))
         return loss
 
 
 class DistCTCTrainer(BaseDistTrainer, CTCTrainer):
     def __init__(
-            self,
-            optimizer: Union[Optimizer, IScheduler],
-            criterion: Module,
-            model: Module,
-            train_loader: IDataLoader,
-            test_loader: IDataLoader,
-            epochs: int,
-            logger: ILogger,
-            outdir: Union[str, Path],
-            log_steps_frequency: int,
-            rank: int,
-            world_size: int,
-            dist_address: int,
-            dist_port: int,
-            dist_backend: str,
-            grad_clip_thresh: Union[None, float] = None,
-            grad_clip_norm_type: float = 2.0,
-            history: dict = {}
+        self,
+        optimizer: Union[Optimizer, IScheduler],
+        criterion: Module,
+        model: Module,
+        train_loader: IDataLoader,
+        test_loader: IDataLoader,
+        epochs: int,
+        logger: ILogger,
+        outdir: Union[str, Path],
+        log_steps_frequency: int,
+        rank: int,
+        world_size: int,
+        dist_address: int,
+        dist_port: int,
+        dist_backend: str,
+        grad_clip_thresh: Union[None, float] = None,
+        grad_clip_norm_type: float = 2.0,
+        history: dict = {},
     ) -> None:
         CTCTrainer.__init__(
             self,
@@ -376,12 +351,12 @@ class DistCTCTrainer(BaseDistTrainer, CTCTrainer):
             test_loader=test_loader,
             epochs=epochs,
             log_steps_frequency=log_steps_frequency,
-            device=f'cuda:{rank}',
+            device=f"cuda:{rank}",
             logger=logger,
             outdir=outdir,
             grad_clip_thresh=grad_clip_thresh,
             grad_clip_norm_type=grad_clip_norm_type,
-            history=history
+            history=history,
         )
         BaseDistTrainer.__init__(
             self,
@@ -401,26 +376,26 @@ class DistCTCTrainer(BaseDistTrainer, CTCTrainer):
             dist_backend=dist_backend,
             grad_clip_thresh=grad_clip_thresh,
             grad_clip_norm_type=grad_clip_norm_type,
-            history=history
+            history=history,
         )
 
 
 class Seq2SeqTrainer(BaseTrainer):
     def __init__(
-            self,
-            optimizer: Union[Optimizer, IScheduler],
-            criterion: Module,
-            model: Module,
-            train_loader: IDataLoader,
-            test_loader: IDataLoader,
-            epochs: int,
-            log_steps_frequency: int,
-            device: str,
-            logger: ILogger,
-            outdir: Union[str, Path],
-            grad_clip_thresh: Union[None, float] = None,
-            grad_clip_norm_type: float = 2.0,
-            history: dict = {}
+        self,
+        optimizer: Union[Optimizer, IScheduler],
+        criterion: Module,
+        model: Module,
+        train_loader: IDataLoader,
+        test_loader: IDataLoader,
+        epochs: int,
+        log_steps_frequency: int,
+        device: str,
+        logger: ILogger,
+        outdir: Union[str, Path],
+        grad_clip_thresh: Union[None, float] = None,
+        grad_clip_norm_type: float = 2.0,
+        history: dict = {},
     ) -> None:
         BaseTrainer.__init__(
             self,
@@ -435,16 +410,13 @@ class Seq2SeqTrainer(BaseTrainer):
             outdir=outdir,
             grad_clip_thresh=grad_clip_thresh,
             grad_clip_norm_type=grad_clip_norm_type,
-            history=history
+            history=history,
         )
         self.device = device
         self.model.to(device)
 
-    def forward_pass(
-            self, batch: Tuple[Tensor]) -> Tensor:
-        batch = [
-            item.to(self.device) for item in batch
-        ]
+    def forward_pass(self, batch: Tuple[Tensor]) -> Tensor:
+        batch = [item.to(self.device) for item in batch]
         [speech, speech_mask, text, text_mask] = batch
         preds = self.model(speech, speech_mask, text, text_mask)
         loss = self.criterion(preds, text, text_mask)
@@ -453,24 +425,24 @@ class Seq2SeqTrainer(BaseTrainer):
 
 class DistSeq2SeqTrainer(BaseDistTrainer, Seq2SeqTrainer):
     def __init__(
-            self,
-            optimizer: Union[Optimizer, IScheduler],
-            criterion: Module,
-            model: Module,
-            train_loader: IDataLoader,
-            test_loader: IDataLoader,
-            epochs: int,
-            logger: ILogger,
-            outdir: Union[str, Path],
-            log_steps_frequency: int,
-            rank: int,
-            world_size: int,
-            dist_address: int,
-            dist_port: int,
-            dist_backend: str,
-            grad_clip_thresh: Union[None, float] = None,
-            grad_clip_norm_type: float = 2.0,
-            history: dict = {}
+        self,
+        optimizer: Union[Optimizer, IScheduler],
+        criterion: Module,
+        model: Module,
+        train_loader: IDataLoader,
+        test_loader: IDataLoader,
+        epochs: int,
+        logger: ILogger,
+        outdir: Union[str, Path],
+        log_steps_frequency: int,
+        rank: int,
+        world_size: int,
+        dist_address: int,
+        dist_port: int,
+        dist_backend: str,
+        grad_clip_thresh: Union[None, float] = None,
+        grad_clip_norm_type: float = 2.0,
+        history: dict = {},
     ) -> None:
         Seq2SeqTrainer.__init__(
             self,
@@ -481,12 +453,12 @@ class DistSeq2SeqTrainer(BaseDistTrainer, Seq2SeqTrainer):
             test_loader=test_loader,
             epochs=epochs,
             log_steps_frequency=log_steps_frequency,
-            device=f'cuda:{rank}',
+            device=f"cuda:{rank}",
             logger=logger,
             outdir=outdir,
             grad_clip_thresh=grad_clip_thresh,
             grad_clip_norm_type=grad_clip_norm_type,
-            history=history
+            history=history,
         )
         BaseDistTrainer.__init__(
             self,
@@ -506,26 +478,26 @@ class DistSeq2SeqTrainer(BaseDistTrainer, Seq2SeqTrainer):
             dist_backend=dist_backend,
             grad_clip_thresh=grad_clip_thresh,
             grad_clip_norm_type=grad_clip_norm_type,
-            history=history
+            history=history,
         )
 
 
 class TransducerTrainer(BaseTrainer):
     def __init__(
-            self,
-            optimizer: Union[Optimizer, IScheduler],
-            criterion: Module,
-            model: Module,
-            train_loader: IDataLoader,
-            test_loader: IDataLoader,
-            epochs: int,
-            log_steps_frequency: int,
-            device: str,
-            logger: ILogger,
-            outdir: Union[str, Path],
-            grad_clip_thresh: Union[None, float] = None,
-            grad_clip_norm_type: float = 2.0,
-            history: dict = {}
+        self,
+        optimizer: Union[Optimizer, IScheduler],
+        criterion: Module,
+        model: Module,
+        train_loader: IDataLoader,
+        test_loader: IDataLoader,
+        epochs: int,
+        log_steps_frequency: int,
+        device: str,
+        logger: ILogger,
+        outdir: Union[str, Path],
+        grad_clip_thresh: Union[None, float] = None,
+        grad_clip_norm_type: float = 2.0,
+        history: dict = {},
     ) -> None:
         BaseTrainer.__init__(
             self,
@@ -540,47 +512,40 @@ class TransducerTrainer(BaseTrainer):
             outdir=outdir,
             grad_clip_thresh=grad_clip_thresh,
             grad_clip_norm_type=grad_clip_norm_type,
-            history=history
+            history=history,
         )
         self.device = device
         self.model.to(device)
 
-    def forward_pass(
-            self, batch: Tuple[Tensor]) -> Tensor:
-        batch = [
-            item.to(self.device) for item in batch
-        ]
+    def forward_pass(self, batch: Tuple[Tensor]) -> Tensor:
+        batch = [item.to(self.device) for item in batch]
         [speech, speech_mask, text, text_mask] = batch
-        preds, speech_len, text_len = self.model(
-            speech, speech_mask, text, text_mask
-        )
-        text, speech_len, text_len = (
-            text.int(), speech_len.int(), text_len.int()
-        )
+        preds, speech_len, text_len = self.model(speech, speech_mask, text, text_mask)
+        text, speech_len, text_len = (text.int(), speech_len.int(), text_len.int())
         loss = self.criterion(preds, speech_len, text, text_len)
         return loss
 
 
 class DistTransducerTrainer(BaseDistTrainer, TransducerTrainer):
     def __init__(
-            self,
-            optimizer: Union[Optimizer, IScheduler],
-            criterion: Module,
-            model: Module,
-            train_loader: IDataLoader,
-            test_loader: IDataLoader,
-            epochs: int,
-            logger: ILogger,
-            outdir: Union[str, Path],
-            log_steps_frequency: int,
-            rank: int,
-            world_size: int,
-            dist_address: int,
-            dist_port: int,
-            dist_backend: str,
-            grad_clip_thresh: Union[None, float] = None,
-            grad_clip_norm_type: float = 2.0,
-            history: dict = {}
+        self,
+        optimizer: Union[Optimizer, IScheduler],
+        criterion: Module,
+        model: Module,
+        train_loader: IDataLoader,
+        test_loader: IDataLoader,
+        epochs: int,
+        logger: ILogger,
+        outdir: Union[str, Path],
+        log_steps_frequency: int,
+        rank: int,
+        world_size: int,
+        dist_address: int,
+        dist_port: int,
+        dist_backend: str,
+        grad_clip_thresh: Union[None, float] = None,
+        grad_clip_norm_type: float = 2.0,
+        history: dict = {},
     ) -> None:
         TransducerTrainer.__init__(
             self,
@@ -591,12 +556,12 @@ class DistTransducerTrainer(BaseDistTrainer, TransducerTrainer):
             test_loader=test_loader,
             epochs=epochs,
             log_steps_frequency=log_steps_frequency,
-            device=f'cuda:{rank}',
+            device=f"cuda:{rank}",
             logger=logger,
             outdir=outdir,
             grad_clip_thresh=grad_clip_thresh,
             grad_clip_norm_type=grad_clip_norm_type,
-            history=history
+            history=history,
         )
         BaseDistTrainer.__init__(
             self,
@@ -616,16 +581,12 @@ class DistTransducerTrainer(BaseDistTrainer, TransducerTrainer):
             dist_backend=dist_backend,
             grad_clip_thresh=grad_clip_thresh,
             grad_clip_norm_type=grad_clip_norm_type,
-            history=history
+            history=history,
         )
 
 
 def _run_trainer(
-        rank: int,
-        world_size: int,
-        trainer_config,
-        data_config,
-        model_config
+    rank: int, world_size: int, trainer_config, data_config, model_config
 ) -> None:
     if rank != 0:
         # To make sure the master node created any dependancies
@@ -633,19 +594,19 @@ def _run_trainer(
         # factories depend on the master node
         time.sleep(5)
     from .registry import get_asr_trainer
+
     trainer = get_asr_trainer(
-        rank=rank, world_size=world_size,
+        rank=rank,
+        world_size=world_size,
         trainer_config=trainer_config,
         data_config=data_config,
-        model_config=model_config
+        model_config=model_config,
     )
     trainer.fit()
 
 
 def launch_training_job(
-        trainer_config: object,
-        data_config: object,
-        model_config: object
+    trainer_config: object, data_config: object, model_config: object
 ) -> None:
     """Launches ASR training job by constructing
     a trainer from the passed configuration and run it
@@ -660,17 +621,14 @@ def launch_training_job(
         _run_trainer,
         trainer_config=trainer_config,
         data_config=data_config,
-        model_config=model_config
+        model_config=model_config,
     )
     if trainer_config.dist_config is None:
-        trainer_launcher(
-            rank=0,
-            world_size=1
-        )
+        trainer_launcher(rank=0, world_size=1)
     else:
         world_size = trainer_config.dist_config.n_gpus
         spawn(
             trainer_launcher,
             nprocs=trainer_config.dist_config.n_gpus,
-            args=(world_size,)
+            args=(world_size,),
         )

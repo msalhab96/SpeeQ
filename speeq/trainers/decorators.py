@@ -12,6 +12,7 @@ def step_log(key: str, category: str):
         key (str): The key will be used to log the value
         to.
     """
+
     def logger(func: Callable) -> Callable:
         @wraps(func)
         def wrapper(self, *args, **kwargs):
@@ -20,7 +21,9 @@ def step_log(key: str, category: str):
                 # Log only for the master node
                 self.inline_log(key, category, result)
             return result
+
         return wrapper
+
     return logger
 
 
@@ -39,13 +42,15 @@ def export_ckpt(key: str, category: str) -> Callable:
                 if loss < trainer.min_loss:
                     trainer.min_loss = loss
                     save_state_dict(
-                        model_name='checkpoint',
+                        model_name="checkpoint",
                         outdir=trainer.outdir,
                         model=trainer.model,
                         optimizer=trainer.optimizer,
                         step=trainer.counter,
-                        history=trainer.history
+                        history=trainer.history,
                     )
             return results
+
         return wrapper
+
     return exporter

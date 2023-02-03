@@ -26,9 +26,10 @@ class NoamSchedulerTemp(BaseSchedulerTemplate):
         warmup_staps (int): The warmup steps.
         d_model (int): The model dimension.
     """
+
     warmup_staps: int
     d_model: int
-    _name = 'noam'
+    _name = "noam"
 
 
 @dataclass
@@ -42,8 +43,9 @@ class SqueezeformerNoamSchedulerTemp(BaseSchedulerTemplate):
         t_peak (Number): The number of steps to keep the peak learning
             rate for.
     """
+
     warmup_staps: int
     lr_peak: Number
     decay_rate: Number
     t_peak: int
-    _name = 'squeezeformer_noam'
+    _name = "squeezeformer_noam"

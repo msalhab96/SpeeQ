@@ -1,45 +1,37 @@
-from abc import (
-    ABC, abstractmethod, abstractproperty
-    )
+from abc import ABC, abstractmethod, abstractproperty
 
 
 class IProcessor(ABC):
-
     @abstractmethod
     def execute():
         pass
 
 
 class IProcess(ABC):
-
     @abstractmethod
     def run():
         pass
 
 
 class IPadder(ABC):
-
     @abstractmethod
     def pad():
         pass
 
 
 class IChecker(ABC):
-
     @abstractmethod
     def check():
         pass
 
 
 class IFilter(ABC):
-
     @abstractmethod
     def filter():
         pass
 
 
 class ITokenizer(ABC):
-
     @abstractmethod
     def ids2tokens(self):
         pass
@@ -82,7 +74,6 @@ class ITokenizer(ABC):
 
 
 class IDataset(ABC):
-
     @abstractmethod
     def __getitem__(self):
         pass
@@ -93,7 +84,6 @@ class IDataset(ABC):
 
 
 class IDataLoader(ABC):
-
     @abstractmethod
     def __next__(self):
         pass
@@ -104,7 +94,6 @@ class IDataLoader(ABC):
 
 
 class ITrainer(ABC):
-
     @abstractmethod
     def train():
         pass
@@ -127,7 +116,6 @@ class ITrainer(ABC):
 
 
 class IScheduler(ABC):
-
     @abstractmethod
     def state_dict(self):
         pass
@@ -146,7 +134,6 @@ class IScheduler(ABC):
 
 
 class ILogger(ABC):
-
     @abstractmethod
     def log_step(self):
         pass
@@ -157,7 +144,6 @@ class ILogger(ABC):
 
 
 class ITemplate(ABC):
-
     @abstractproperty
     def name(self):
         pass

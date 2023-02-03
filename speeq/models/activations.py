@@ -32,6 +32,4 @@ class CReLu(nn.Module):
         self.max_val = max_val
 
     def forward(self, x: Tensor) -> Tensor:
-        return torch.clamp(
-            x, min=0, max=self.max_val
-        )
+        return torch.clamp(x, min=0, max=self.max_val)

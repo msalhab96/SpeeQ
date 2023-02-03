@@ -3,43 +3,43 @@ from typing import List, Tuple, Union
 import torch
 from torch import Tensor, nn
 
-from speeq.constants import (DECODER_OUT_KEY, ENC_OUT_KEY, HIDDEN_STATE_KEY,
-                             PREDS_KEY, PREV_HIDDEN_STATE_KEY, SPEECH_IDX_KEY)
+from speeq.constants import (
+    DECODER_OUT_KEY,
+    ENC_OUT_KEY,
+    HIDDEN_STATE_KEY,
+    PREDS_KEY,
+    PREV_HIDDEN_STATE_KEY,
+    SPEECH_IDX_KEY,
+)
+
 from .decoders import RNNDecoder
 from .encoders import ConformerEncoder, ContextNetEncoder, RNNEncoder
 
 
 class BaseTransducer(nn.Module):
-    def __init__(
-            self,
-            feat_size: int,
-            n_classes: int
-    ) -> None:
+    def __init__(self, feat_size: int, n_classes: int) -> None:
         super().__init__()
         self.has_bnorm = False
-        self.join_net = nn.Linear(
-            in_features=feat_size,
-            out_features=n_classes
-        )
+        self.join_net = nn.Linear(in_features=feat_size, out_features=n_classes)
 
     def forward(
-            self, speech: Tensor,
-            speech_mask: Tensor, text: Tensor,
-            text_mask: Tensor,
-            *args, **kwargs
+        self,
+        speech: Tensor,
+        speech_mask: Tensor,
+        text: Tensor,
+        text_mask: Tensor,
+        *args,
+        **kwargs
     ) -> Tuple[Tensor, Tensor, Tensor]:
-        speech, speech_len = self.encoder(
-            speech, speech_mask
-        )
-        text, text_len = self.decoder(
-            text, text_mask
-        )
+        speech, speech_len = self.encoder(speech, speech_mask)
+        text, text_len = self.decoder(text, text_mask)
         speech = speech.unsqueeze(-2)
         text = text.unsqueeze(1)
         result = speech + text
         result = self.join_net(result)
         speech_len, text_len = (
-            speech_len.to(speech.device), text_len.to(speech.device)
+            speech_len.to(speech.device),
+            text_len.to(speech.device),
         )
         return result, speech_len, text_len
 
@@ -51,8 +51,10 @@ class BaseTransducer(nn.Module):
         last_hidden_state = state[HIDDEN_STATE_KEY]
         state = self.decoder.predict(state)
         speech_idx = state[SPEECH_IDX_KEY]
-        out = state[DECODER_OUT_KEY] + \
-            state[ENC_OUT_KEY][:, speech_idx: speech_idx + 1, :]
+        out = (
+            state[DECODER_OUT_KEY]
+            + state[ENC_OUT_KEY][:, speech_idx : speech_idx + 1, :]
+        )
         out = self.join_net(out)
         out = torch.nn.functional.log_softmax(out, dim=-1)
         out = torch.argmax(out, dim=-1)
@@ -77,32 +79,30 @@ class RNNTransducer(BaseTransducer):
     """
 
     def __init__(
-            self,
-            in_features: int,
-            n_classes: int,
-            emb_dim: int,
-            n_layers: int,
-            hidden_size: int,
-            bidirectional: bool,
-            rnn_type: str,
-            p_dropout: float
+        self,
+        in_features: int,
+        n_classes: int,
+        emb_dim: int,
+        n_layers: int,
+        hidden_size: int,
+        bidirectional: bool,
+        rnn_type: str,
+        p_dropout: float,
     ) -> None:
-        super().__init__(
-            feat_size=hidden_size, n_classes=n_classes
-        )
+        super().__init__(feat_size=hidden_size, n_classes=n_classes)
         self.encoder = RNNEncoder(
             in_features=in_features,
             hidden_size=hidden_size,
             bidirectional=bidirectional,
             n_layers=n_layers,
             p_dropout=p_dropout,
-            rnn_type=rnn_type
+            rnn_type=rnn_type,
         )
         self.decoder = RNNDecoder(
             vocab_size=n_classes,
             emb_dim=emb_dim,
             hidden_size=hidden_size,
-            rnn_type=rnn_type
+            rnn_type=rnn_type,
         )
 
 
@@ -128,24 +128,25 @@ class ConformerTransducer(RNNTransducer):
     """
 
     def __init__(
-            self,
-            d_model: int,
-            n_conf_layers: int,
-            ff_expansion_factor: int,
-            h: int,
-            kernel_size: int,
-            ss_kernel_size: int,
-            ss_stride: int,
-            ss_num_conv_layers: int,
-            in_features: int,
-            res_scaling: float,
-            n_classes: int,
-            emb_dim: int,
-            rnn_type: str,
-            p_dropout: float
+        self,
+        d_model: int,
+        n_conf_layers: int,
+        ff_expansion_factor: int,
+        h: int,
+        kernel_size: int,
+        ss_kernel_size: int,
+        ss_stride: int,
+        ss_num_conv_layers: int,
+        in_features: int,
+        res_scaling: float,
+        n_classes: int,
+        emb_dim: int,
+        rnn_type: str,
+        p_dropout: float,
     ) -> None:
-        super().__init__(in_features, n_classes, emb_dim, 1,
-                         d_model, False, rnn_type, p_dropout)
+        super().__init__(
+            in_features, n_classes, emb_dim, 1, d_model, False, rnn_type, p_dropout
+        )
         self.encoder = ConformerEncoder(
             d_model=d_model,
             n_conf_layers=n_conf_layers,
@@ -157,7 +158,7 @@ class ConformerTransducer(RNNTransducer):
             ss_num_conv_layers=ss_num_conv_layers,
             in_features=in_features,
             res_scaling=res_scaling,
-            p_dropout=p_dropout
+            p_dropout=p_dropout,
         )
 
 
@@ -186,20 +187,22 @@ class ContextNet(BaseTransducer):
     """
 
     def __init__(
-            self,
-            in_features: int,
-            n_classes: int,
-            emb_dim: int,
-            n_layers: int,
-            n_sub_layers: Union[int, List[int]],
-            stride: Union[int, List[int]],
-            out_channels: Union[int, List[int]],
-            kernel_size: int,
-            reduction_factor: int,
-            rnn_type: str
+        self,
+        in_features: int,
+        n_classes: int,
+        emb_dim: int,
+        n_layers: int,
+        n_sub_layers: Union[int, List[int]],
+        stride: Union[int, List[int]],
+        out_channels: Union[int, List[int]],
+        kernel_size: int,
+        reduction_factor: int,
+        rnn_type: str,
     ) -> None:
-        super().__init__(out_channels[-1] if isinstance(
-            out_channels, list) else out_channels, n_classes)
+        super().__init__(
+            out_channels[-1] if isinstance(out_channels, list) else out_channels,
+            n_classes,
+        )
         self.has_bnorm = True
         self.encoder = ContextNetEncoder(
             in_features=in_features,
@@ -208,12 +211,13 @@ class ContextNet(BaseTransducer):
             stride=stride,
             out_channels=out_channels,
             kernel_size=kernel_size,
-            reduction_factor=reduction_factor
+            reduction_factor=reduction_factor,
         )
         self.decoder = RNNDecoder(
             vocab_size=n_classes,
             emb_dim=emb_dim,
-            hidden_size=out_channels[-1] if isinstance(
-                out_channels, list) else out_channels,
-            rnn_type=rnn_type
+            hidden_size=out_channels[-1]
+            if isinstance(out_channels, list)
+            else out_channels,
+            rnn_type=rnn_type,
         )

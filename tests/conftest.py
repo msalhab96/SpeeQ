@@ -23,35 +23,29 @@ def text():
 def dict_csv_data():
     return [
         {
-            FileKeys.speech_key.value: 'tests/files/1.wav',
-            FileKeys.text_key.value: 'be at prudence\'s to night at eight'
+            FileKeys.speech_key.value: "tests/files/1.wav",
+            FileKeys.text_key.value: "be at prudence's to night at eight",
         },
         {
-            FileKeys.speech_key.value: 'tests/files/2.wav',
-            FileKeys.text_key.value: 'in the course of the day i received this note'
+            FileKeys.speech_key.value: "tests/files/2.wav",
+            FileKeys.text_key.value: "in the course of the day i received this note",
         },
     ]
 
 
 masking_params_mark = pytest.mark.parametrize(
-    ('seq_len', 'pad_len'),
-    (
-        (1, 0),
-        (1, 1),
-        (5, 4),
-        (3, 5)
-    )
-    )
+    ("seq_len", "pad_len"), ((1, 0), (1, 1), (5, 4), (3, 5))
+)
 
 
 @fixture
 def positional_enc_1_5_4():
     x = [
-        [0.,      1.,       0.,       1.0],
-        [0.8415,  0.5403,   0.0100,   0.9999],
-        [0.9093,  -0.4161,  0.0200,   0.9998],
-        [0.1411,  -0.9900,  0.0300,   0.9996],
-        [-0.7568, -0.6536,  0.0400,   0.9992]
+        [0.0, 1.0, 0.0, 1.0],
+        [0.8415, 0.5403, 0.0100, 0.9999],
+        [0.9093, -0.4161, 0.0200, 0.9998],
+        [0.1411, -0.9900, 0.0300, 0.9996],
+        [-0.7568, -0.6536, 0.0400, 0.9992],
     ]
     x = torch.tensor(x)
     x = x.unsqueeze(dim=0)
@@ -62,16 +56,17 @@ def positional_enc_1_5_4():
 def batched_speech_feat():
     def func(batch_size, seq_len, feat_size):
         return torch.ones(batch_size, seq_len, feat_size)
+
     return func
 
 
 mask_from_lens_mark = pytest.mark.parametrize(
-    ('lengths', 'max_len'),
+    ("lengths", "max_len"),
     (
         (LongTensor([1, 2, 3]), 3),
         (LongTensor([1]), 1),
         (LongTensor([1, 2]), 4),
-    )
+    ),
 )
 
 
@@ -79,13 +74,13 @@ mask_from_lens_mark = pytest.mark.parametrize(
 def batcher():
     def func(batch_size, seq_len, feat_size, *args, **kwargs):
         return torch.randn(batch_size, seq_len, feat_size)
+
     return func
 
 
 @fixture
 def int_batcher():
     def func(batch_size, seq_len, max_val, min_val=0):
-        return torch.randint(
-            min_val, max_val, size=(batch_size, seq_len)
-            )
+        return torch.randint(min_val, max_val, size=(batch_size, seq_len))
+
     return func

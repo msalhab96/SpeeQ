@@ -3,11 +3,15 @@ from typing import List, Optional, Tuple, Union
 import torch
 from torch import Tensor, nn
 
-from .encoders import (ConformerEncoder, DeepSpeechV1Encoder,
-                             DeepSpeechV2Encoder, JasperEncoder,
-                             QuartzNetEncoder, SqueezeformerEncoder,
-                             Wav2LetterEncoder)
-
+from .encoders import (
+    ConformerEncoder,
+    DeepSpeechV1Encoder,
+    DeepSpeechV2Encoder,
+    JasperEncoder,
+    QuartzNetEncoder,
+    SqueezeformerEncoder,
+    Wav2LetterEncoder,
+)
 from .layers import ConvPredModule, PredModule, TransformerEncLayer
 
 
@@ -18,12 +22,10 @@ class CTCModel(nn.Module):
         self.pred_net = PredModule(
             in_features=pred_in_size,
             n_classes=n_classes,
-            activation=nn.LogSoftmax(dim=-1)
+            activation=nn.LogSoftmax(dim=-1),
         )
 
-    def forward(
-            self, x: Tensor, mask: Tensor, *args, **kwargs
-    ):
+    def forward(self, x: Tensor, mask: Tensor, *args, **kwargs):
         out, lengths = self.encoder(x, mask, *args, **kwargs)  # B, M, d
         preds = self.pred_net(out)  # B, M, C
         preds = preds.permute(1, 0, 2)  # M, B, C
@@ -46,20 +48,17 @@ class DeepSpeechV1(CTCModel):
     """
 
     def __init__(
-            self,
-            in_features: int,
-            hidden_size: int,
-            n_linear_layers: int,
-            bidirectional: bool,
-            n_classes: int,
-            max_clip_value: int,
-            rnn_type: str,
-            p_dropout: float
+        self,
+        in_features: int,
+        hidden_size: int,
+        n_linear_layers: int,
+        bidirectional: bool,
+        n_classes: int,
+        max_clip_value: int,
+        rnn_type: str,
+        p_dropout: float,
     ) -> None:
-        super().__init__(
-            pred_in_size=hidden_size,
-            n_classes=n_classes
-        )
+        super().__init__(pred_in_size=hidden_size, n_classes=n_classes)
         self.encoder = DeepSpeechV1Encoder(
             in_features=in_features,
             hidden_size=hidden_size,
@@ -67,7 +66,7 @@ class DeepSpeechV1(CTCModel):
             bidirectional=bidirectional,
             max_clip_value=max_clip_value,
             rnn_type=rnn_type,
-            p_dropout=p_dropout
+            p_dropout=p_dropout,
         )
 
     @torch.no_grad()
@@ -94,36 +93,30 @@ class BERT(nn.Module):
     """
 
     def __init__(
-            self,
-            max_len: int,
-            in_feature: int,
-            d_model: int,
-            h: int,
-            hidden_size: int,
-            n_layers: int,
-            n_classes: int,
-            p_dropout: float
+        self,
+        max_len: int,
+        in_feature: int,
+        d_model: int,
+        h: int,
+        hidden_size: int,
+        n_layers: int,
+        n_classes: int,
+        p_dropout: float,
     ) -> None:
         super().__init__()
         self.fc = nn.Linear(
             in_features=in_feature,
             out_features=d_model,
         )
-        self.pos_emb = nn.Parameter(
-            torch.randn(max_len, d_model)
+        self.pos_emb = nn.Parameter(torch.randn(max_len, d_model))
+        self.layers = nn.ModuleList(
+            [
+                TransformerEncLayer(d_model=d_model, hidden_size=hidden_size, h=h)
+                for _ in range(n_layers)
+            ]
         )
-        self.layers = nn.ModuleList([
-            TransformerEncLayer(
-                d_model=d_model,
-                hidden_size=hidden_size,
-                h=h
-            )
-            for _ in range(n_layers)
-        ])
         self.pred_module = PredModule(
-            in_features=d_model,
-            n_classes=n_classes,
-            activation=nn.LogSoftmax(dim=-1)
+            in_features=d_model, n_classes=n_classes, activation=nn.LogSoftmax(dim=-1)
         )
         self.dropout = nn.Dropout(p_dropout)
         self.has_bnorm = False
@@ -134,9 +127,7 @@ class BERT(nn.Module):
         max_len = mask.shape[-1]
         emb = self.pos_emb[:max_len]  # M, d
         emb = emb.unsqueeze(dim=0)  # 1, M, d
-        emb = emb.repeat(
-            mask.shape[0], 1, 1
-        )  # B, M , d
+        emb = emb.repeat(mask.shape[0], 1, 1)  # B, M , d
         mask = mask.unsqueeze(dim=-1)  # B, M, 1
         emb = mask * emb
         return emb + x
@@ -176,25 +167,22 @@ class DeepSpeechV2(CTCModel):
     """
 
     def __init__(
-            self,
-            n_conv: int,
-            kernel_size: int,
-            stride: int,
-            in_features: int,
-            hidden_size: int,
-            bidirectional: bool,
-            n_rnn: int,
-            n_linear_layers: int,
-            n_classes: int,
-            max_clip_value: int,
-            rnn_type: str,
-            tau: int,
-            p_dropout: float
+        self,
+        n_conv: int,
+        kernel_size: int,
+        stride: int,
+        in_features: int,
+        hidden_size: int,
+        bidirectional: bool,
+        n_rnn: int,
+        n_linear_layers: int,
+        n_classes: int,
+        max_clip_value: int,
+        rnn_type: str,
+        tau: int,
+        p_dropout: float,
     ) -> None:
-        super().__init__(
-            pred_in_size=hidden_size,
-            n_classes=n_classes
-        )
+        super().__init__(pred_in_size=hidden_size, n_classes=n_classes)
         self.encoder = DeepSpeechV2Encoder(
             n_conv=n_conv,
             kernel_size=kernel_size,
@@ -207,7 +195,7 @@ class DeepSpeechV2(CTCModel):
             max_clip_value=max_clip_value,
             rnn_type=rnn_type,
             tau=tau,
-            p_dropout=p_dropout
+            p_dropout=p_dropout,
         )
 
 
@@ -232,24 +220,21 @@ class Conformer(CTCModel):
     """
 
     def __init__(
-            self,
-            n_classes: int,
-            d_model: int,
-            n_conf_layers: int,
-            ff_expansion_factor: int,
-            h: int,
-            kernel_size: int,
-            ss_kernel_size: int,
-            ss_stride: int,
-            ss_num_conv_layers: int,
-            in_features: int,
-            res_scaling: float,
-            p_dropout: float
+        self,
+        n_classes: int,
+        d_model: int,
+        n_conf_layers: int,
+        ff_expansion_factor: int,
+        h: int,
+        kernel_size: int,
+        ss_kernel_size: int,
+        ss_stride: int,
+        ss_num_conv_layers: int,
+        in_features: int,
+        res_scaling: float,
+        p_dropout: float,
     ) -> None:
-        super().__init__(
-            pred_in_size=d_model,
-            n_classes=n_classes
-        )
+        super().__init__(pred_in_size=d_model, n_classes=n_classes)
         self.encoder = ConformerEncoder(
             d_model=d_model,
             n_conf_layers=n_conf_layers,
@@ -261,7 +246,7 @@ class Conformer(CTCModel):
             ss_num_conv_layers=ss_num_conv_layers,
             in_features=in_features,
             res_scaling=res_scaling,
-            p_dropout=p_dropout
+            p_dropout=p_dropout,
         )
         self.has_bnorm = True
 
@@ -290,18 +275,18 @@ class Jasper(CTCModel):
     """
 
     def __init__(
-            self,
-            n_classes: int,
-            in_features: int,
-            num_blocks: int,
-            num_sub_blocks: int,
-            channel_inc: int,
-            epilog_kernel_size: int,
-            prelog_kernel_size: int,
-            prelog_stride: int,
-            prelog_n_channels: int,
-            blocks_kernel_size: Union[int, List[int]],
-            p_dropout: float
+        self,
+        n_classes: int,
+        in_features: int,
+        num_blocks: int,
+        num_sub_blocks: int,
+        channel_inc: int,
+        epilog_kernel_size: int,
+        prelog_kernel_size: int,
+        prelog_stride: int,
+        prelog_n_channels: int,
+        blocks_kernel_size: Union[int, List[int]],
+        p_dropout: float,
     ) -> None:
         super().__init__(1, 1)
         # TODO: Add activation function options
@@ -319,12 +304,12 @@ class Jasper(CTCModel):
             prelog_stride=prelog_stride,
             prelog_n_channels=prelog_n_channels,
             blocks_kernel_size=blocks_kernel_size,
-            p_dropout=p_dropout
+            p_dropout=p_dropout,
         )
         self.pred_net = ConvPredModule(
             in_features=prelog_n_channels + channel_inc * (2 + num_blocks),
             n_classes=n_classes,
-            activation=nn.LogSoftmax(dim=-1)
+            activation=nn.LogSoftmax(dim=-1),
         )
 
 
@@ -352,19 +337,19 @@ class Wav2Letter(CTCModel):
     """
 
     def __init__(
-            self,
-            in_features: int,
-            n_classes: int,
-            n_conv_layers: int,
-            layers_kernel_size: int,
-            layers_channels_size: int,
-            pre_conv_stride: int,
-            pre_conv_kernel_size: int,
-            post_conv_channels_size: int,
-            post_conv_kernel_size: int,
-            p_dropout: float,
-            wav_kernel_size: Optional[int] = None,
-            wav_stride: Optional[int] = None
+        self,
+        in_features: int,
+        n_classes: int,
+        n_conv_layers: int,
+        layers_kernel_size: int,
+        layers_channels_size: int,
+        pre_conv_stride: int,
+        pre_conv_kernel_size: int,
+        post_conv_channels_size: int,
+        post_conv_kernel_size: int,
+        p_dropout: float,
+        wav_kernel_size: Optional[int] = None,
+        wav_stride: Optional[int] = None,
     ) -> None:
         super().__init__(1, 1)
         self.encoder = Wav2LetterEncoder(
@@ -378,12 +363,12 @@ class Wav2Letter(CTCModel):
             post_conv_kernel_size=post_conv_kernel_size,
             p_dropout=p_dropout,
             wav_kernel_size=wav_kernel_size,
-            wav_stride=wav_stride
+            wav_stride=wav_stride,
         )
         self.pred_net = ConvPredModule(
             in_features=post_conv_channels_size,
             n_classes=n_classes,
-            activation=nn.LogSoftmax(dim=-1)
+            activation=nn.LogSoftmax(dim=-1),
         )
 
 
@@ -415,21 +400,21 @@ class QuartzNet(CTCModel):
     """
 
     def __init__(
-            self,
-            n_classes: int,
-            in_features: int,
-            num_blocks: int,
-            block_repetition: int,
-            num_sub_blocks: int,
-            channels_size: List[int],
-            epilog_kernel_size: int,
-            epilog_channel_size: Tuple[int, int],
-            prelog_kernel_size: int,
-            prelog_stride: int,
-            prelog_n_channels: int,
-            groups: int,
-            blocks_kernel_size: Union[int, List[int]],
-            p_dropout: float
+        self,
+        n_classes: int,
+        in_features: int,
+        num_blocks: int,
+        block_repetition: int,
+        num_sub_blocks: int,
+        channels_size: List[int],
+        epilog_kernel_size: int,
+        epilog_channel_size: Tuple[int, int],
+        prelog_kernel_size: int,
+        prelog_stride: int,
+        prelog_n_channels: int,
+        groups: int,
+        blocks_kernel_size: Union[int, List[int]],
+        p_dropout: float,
     ) -> None:
         super().__init__(1, 1)
         self.encoder = QuartzNetEncoder(
@@ -445,12 +430,12 @@ class QuartzNet(CTCModel):
             prelog_n_channels=prelog_n_channels,
             groups=groups,
             blocks_kernel_size=blocks_kernel_size,
-            p_dropout=p_dropout
+            p_dropout=p_dropout,
         )
         self.pred_net = ConvPredModule(
             in_features=epilog_channel_size[1],
             n_classes=n_classes,
-            activation=nn.LogSoftmax(dim=-1)
+            activation=nn.LogSoftmax(dim=-1),
         )
 
 
@@ -479,27 +464,24 @@ class Squeezeformer(CTCModel):
     """
 
     def __init__(
-            self,
-            n_classes: int,
-            in_features: int,
-            n: int,
-            d_model: int,
-            ff_expansion_factor: int,
-            h: int,
-            kernel_size: int,
-            pooling_kernel_size: int,
-            pooling_stride: int,
-            ss_kernel_size: Union[int, List[int]],
-            ss_stride: Union[int, List[int]],
-            ss_n_conv_layers: int,
-            p_dropout: float,
-            ss_groups: Union[int, List[int]] = 1,
-            masking_value: int = -1e15
+        self,
+        n_classes: int,
+        in_features: int,
+        n: int,
+        d_model: int,
+        ff_expansion_factor: int,
+        h: int,
+        kernel_size: int,
+        pooling_kernel_size: int,
+        pooling_stride: int,
+        ss_kernel_size: Union[int, List[int]],
+        ss_stride: Union[int, List[int]],
+        ss_n_conv_layers: int,
+        p_dropout: float,
+        ss_groups: Union[int, List[int]] = 1,
+        masking_value: int = -1e15,
     ) -> None:
-        super().__init__(
-            pred_in_size=d_model,
-            n_classes=n_classes
-        )
+        super().__init__(pred_in_size=d_model, n_classes=n_classes)
         self.encoder = SqueezeformerEncoder(
             in_features=in_features,
             n=n,
@@ -514,6 +496,6 @@ class Squeezeformer(CTCModel):
             ss_n_conv_layers=ss_n_conv_layers,
             p_dropout=p_dropout,
             ss_groups=ss_groups,
-            masking_value=masking_value
+            masking_value=masking_value,
         )
         self.has_bnorm = True

@@ -15,17 +15,11 @@ class Scheduler(IScheduler):
         optimizer_args (dict): The optimizer's arguments.
     """
 
-    def __init__(
-            self,
-            params: Iterable,
-            optimizer: str,
-            optimizer_args: dict
-    ) -> None:
+    def __init__(self, params: Iterable, optimizer: str, optimizer_args: dict) -> None:
         super().__init__()
         from .registry import OPTIMIZERS
-        self.optimizer = OPTIMIZERS[optimizer](
-            params, **optimizer_args
-        )
+
+        self.optimizer = OPTIMIZERS[optimizer](params, **optimizer_args)
 
     def state_dict(self):
         return self.optimizer.state_dict()
@@ -37,7 +31,7 @@ class Scheduler(IScheduler):
         self.counter += 1
         lr = self.get_lr()
         for param_group in self.optimizer.param_groups:
-            param_group['lr'] = lr
+            param_group["lr"] = lr
 
     def step(self) -> None:
         self.optimizer.step()
@@ -62,18 +56,17 @@ class NoamScheduler(Scheduler):
     """
 
     def __init__(
-            self,
-            params,
-            optimizer: str,
-            optimizer_args: dict,
-            warmup_staps: int,
-            d_model: int,
-            *args, **kwargs
+        self,
+        params,
+        optimizer: str,
+        optimizer_args: dict,
+        warmup_staps: int,
+        d_model: int,
+        *args,
+        **kwargs
     ) -> None:
         super().__init__(
-            params=params,
-            optimizer=optimizer,
-            optimizer_args=optimizer_args
+            params=params, optimizer=optimizer, optimizer_args=optimizer_args
         )
         self.peak = 1 / sqrt(d_model)
         self.counter = 0
@@ -82,16 +75,15 @@ class NoamScheduler(Scheduler):
 
     def get_lr(self) -> float:
         return self.peak * min(
-            1 / sqrt(self.counter),
-            self.counter * pow(self.warmup_staps, -1.5)
+            1 / sqrt(self.counter), self.counter * pow(self.warmup_staps, -1.5)
         )
 
     def state_dict(self) -> dict:
         return {
-            'peak': self.peak,
-            'warmup_staps': self.warmup_staps,
-            'counter': self.counter,
-            OPTIMIZER_STATE_KEY: self.optimizer.state_dict()
+            "peak": self.peak,
+            "warmup_staps": self.warmup_staps,
+            "counter": self.counter,
+            OPTIMIZER_STATE_KEY: self.optimizer.state_dict(),
         }
 
 
@@ -110,15 +102,16 @@ class SqueezeformerNoamScheduler(NoamScheduler):
     """
 
     def __init__(
-            self,
-            params: Iterable,
-            optimizer: str,
-            optimizer_args: dict,
-            warmup_staps: int,
-            lr_peak: Number,
-            decay_rate: Number,
-            t_peak: int,
-            *args, **kwargs
+        self,
+        params: Iterable,
+        optimizer: str,
+        optimizer_args: dict,
+        warmup_staps: int,
+        lr_peak: Number,
+        decay_rate: Number,
+        t_peak: int,
+        *args,
+        **kwargs
     ) -> None:
         self.lr_peak = lr_peak
         self.decay_rate = decay_rate
@@ -129,7 +122,7 @@ class SqueezeformerNoamScheduler(NoamScheduler):
             optimizer=optimizer,
             optimizer_args=optimizer_args,
             warmup_staps=warmup_staps,
-            d_model=1  # not used
+            d_model=1,  # not used
         )
 
     def get_lr(self) -> float:
@@ -143,9 +136,9 @@ class SqueezeformerNoamScheduler(NoamScheduler):
 
     def state_dict(self) -> dict:
         args = {
-            'lr_peak': self.lr_peak,
-            'decay_rate': self.decay_rate,
-            't_peak': self.t_peak,
-            'plateau_region': self.plateau_region
+            "lr_peak": self.lr_peak,
+            "decay_rate": self.decay_rate,
+            "t_peak": self.t_peak,
+            "plateau_region": self.plateau_region,
         }
         return dict(**super().state_dict(), **args)

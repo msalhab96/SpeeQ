@@ -3,8 +3,7 @@ from typing import List, Optional, Tuple, Union
 
 from torch.nn import Module
 
-from speeq.constants import (CTC_TYPE, MODEL_BUILDER_TYPE, SEQ2SEQ_TYPE,
-                             TRANSDUCER_TYPE)
+from speeq.constants import CTC_TYPE, MODEL_BUILDER_TYPE, SEQ2SEQ_TYPE, TRANSDUCER_TYPE
 from speeq.interfaces import ITemplate
 
 
@@ -35,14 +34,15 @@ class DeepSpeechV1Temp(BaseTemplate):
         p_dropout (float): The dropout rate.
         rnn_type (str): rnn, gru or lstm. Default 'rnn'.
     """
+
     in_features: int
     hidden_size: int
     n_linear_layers: int
     bidirectional: bool
     max_clip_value: int
     p_dropout: float
-    rnn_type: str = 'rnn'
-    _name = 'deep_speech_v1'
+    rnn_type: str = "rnn"
+    _name = "deep_speech_v1"
     _type = CTC_TYPE
 
 
@@ -60,6 +60,7 @@ class BERTTemp(BaseTemplate):
         n_layers (int): The number of transformer encoders.
         p_dropout (float): The dropout rate.
     """
+
     max_len: int
     in_feature: int
     d_model: int
@@ -67,7 +68,7 @@ class BERTTemp(BaseTemplate):
     hidden_size: int
     n_layers: int
     p_dropout: float
-    _name = 'bert'
+    _name = "bert"
     _type = CTC_TYPE
 
 
@@ -90,6 +91,7 @@ class DeepSpeechV2Temp(BaseTemplate):
         p_dropout (float): The dropout rate.
         rnn_type (str): rnn, gru or lstm. Default 'rnn'.
     """
+
     n_conv: int
     kernel_size: int
     stride: int
@@ -101,8 +103,8 @@ class DeepSpeechV2Temp(BaseTemplate):
     max_clip_value: int
     tau: int
     p_dropout: float
-    rnn_type: str = 'rnn'
-    _name = 'deep_speech_v2'
+    rnn_type: str = "rnn"
+    _name = "deep_speech_v2"
     _type = CTC_TYPE
 
 
@@ -124,6 +126,7 @@ class ConformerCTCTemp(BaseTemplate):
         res_scaling (float): The residual connection multiplier.
         p_dropout (float): The dropout rate.
     """
+
     d_model: int
     n_conf_layers: int
     ff_expansion_factor: int
@@ -135,7 +138,7 @@ class ConformerCTCTemp(BaseTemplate):
     in_features: int
     res_scaling: float
     p_dropout: float
-    _name = 'conformer'
+    _name = "conformer"
     _type = CTC_TYPE
 
 
@@ -161,6 +164,7 @@ class JasperTemp(BaseTemplate):
             kernel size of each jasper block.
         p_dropout (float): The dropout rate.
     """
+
     in_features: int
     num_blocks: int
     num_sub_blocks: int
@@ -171,7 +175,7 @@ class JasperTemp(BaseTemplate):
     prelog_n_channels: int
     blocks_kernel_size: Union[int, List[int]]
     p_dropout: float
-    _name = 'jasper'
+    _name = "jasper"
     _type = CTC_TYPE
 
 
@@ -197,6 +201,7 @@ class Wav2LetterTemp(BaseTemplate):
             layer that process the wav samples directly if wav is modeled.
             Default None.
     """
+
     in_features: int
     n_conv_layers: int
     layers_kernel_size: int
@@ -208,7 +213,7 @@ class Wav2LetterTemp(BaseTemplate):
     p_dropout: float
     wav_kernel_size: Optional[int] = None
     wav_stride: Optional[int] = None
-    _name = 'wav2letter'
+    _name = "wav2letter"
     _type = CTC_TYPE
 
 
@@ -229,6 +234,7 @@ class LASTemp(BaseTemplate):
         teacher_forcing_rate (float): The teacher forcing rate. Default 0.0
         rnn_type (str): The rnn type. Default 'rnn'.
     """
+
     in_features: int
     hidden_size: int
     enc_num_layers: int
@@ -238,8 +244,8 @@ class LASTemp(BaseTemplate):
     emb_dim: int
     p_dropout: float
     teacher_forcing_rate: float = 0.0
-    rnn_type: str = 'rnn'
-    _name = 'las'
+    rnn_type: str = "rnn"
+    _name = "las"
     _type = SEQ2SEQ_TYPE
 
 
@@ -258,6 +264,7 @@ class BasicAttSeq2SeqRNNTemp(BaseTemplate):
         teacher_forcing_rate (float): The teacher forcing rate. Default 0.0
         rnn_type (str): The rnn type. Default 'rnn'.
     """
+
     in_features: int
     hidden_size: int
     enc_num_layers: int
@@ -266,8 +273,8 @@ class BasicAttSeq2SeqRNNTemp(BaseTemplate):
     emb_dim: int
     p_dropout: float
     teacher_forcing_rate: float = 0.0
-    rnn_type: str = 'rnn'
-    _name = 'basic_att_rnn'
+    rnn_type: str = "rnn"
+    _name = "basic_att_rnn"
     _type = SEQ2SEQ_TYPE
 
 
@@ -292,6 +299,7 @@ class RNNWithLocationAwareAttTemp(BaseTemplate):
         teacher_forcing_rate (float): The teacher forcing rate. Default 0.0
         rnn_type (str): The rnn type. default 'rnn'.
     """
+
     in_features: int
     hidden_size: int
     enc_num_layers: int
@@ -303,8 +311,8 @@ class RNNWithLocationAwareAttTemp(BaseTemplate):
     p_dropout: float
     inv_temperature: Union[float, int] = 1
     teacher_forcing_rate: float = 0.0
-    rnn_type: str = 'rnn'
-    _name = 'rnn_with_location_att'
+    rnn_type: str = "rnn"
+    _name = "rnn_with_location_att"
     _type = SEQ2SEQ_TYPE
 
 
@@ -329,6 +337,7 @@ class SpeechTransformerTemp(BaseTemplate):
             attentional convolution
         masking_value (int): The attentin masking value. Default -1e15
     """
+
     in_features: int
     n_conv_layers: int
     kernel_size: int
@@ -341,7 +350,7 @@ class SpeechTransformerTemp(BaseTemplate):
     att_kernel_size: int
     att_out_channels: int
     masking_value: int = -1e15
-    _name = 'speech_transformer'
+    _name = "speech_transformer"
     _type = SEQ2SEQ_TYPE
 
 
@@ -371,6 +380,7 @@ class QuartzNetTemp(BaseTemplate):
             kernel size of each jasper block.
         p_dropout (float): The dropout rate.
     """
+
     in_features: int
     num_blocks: int
     block_repetition: int
@@ -384,7 +394,7 @@ class QuartzNetTemp(BaseTemplate):
     groups: int
     blocks_kernel_size: Union[int, List[int]]
     p_dropout: float
-    _name = 'quartz_net'
+    _name = "quartz_net"
     _type = CTC_TYPE
 
 
@@ -411,6 +421,7 @@ class SqueezeformerCTCTemp(BaseTemplate):
             size.
         masking_value (int): The masking value. Default -1e15
     """
+
     in_features: int
     n: int
     d_model: int
@@ -425,7 +436,7 @@ class SqueezeformerCTCTemp(BaseTemplate):
     p_dropout: float
     ss_groups: Union[int, List[int]] = 1
     masking_value: int = -1e15
-    _name = 'squeezeformer'
+    _name = "squeezeformer"
     _type = CTC_TYPE
 
 
@@ -443,6 +454,7 @@ class RNNTTemp(BaseTemplate):
         rnn_type (str): The RNN type.
         p_dropout (float): The dropout rate.
     """
+
     in_features: int
     emb_dim: int
     n_layers: int
@@ -450,7 +462,7 @@ class RNNTTemp(BaseTemplate):
     bidirectional: bool
     rnn_type: str
     p_dropout: float
-    _name = 'rnn-t'
+    _name = "rnn-t"
     _type = TRANSDUCER_TYPE
 
 
@@ -474,6 +486,7 @@ class ConformerTransducerTemp(BaseTemplate):
         rnn_type (str): The RNN type.
         p_dropout (float): The dropout rate.
     """
+
     d_model: int
     n_conf_layers: int
     ff_expansion_factor: int
@@ -487,7 +500,7 @@ class ConformerTransducerTemp(BaseTemplate):
     emb_dim: int
     rnn_type: str
     p_dropout: float
-    _name = 'conformer'
+    _name = "conformer"
     _type = TRANSDUCER_TYPE
 
 
@@ -514,6 +527,7 @@ class ContextNetTemp(BaseTemplate):
             Squeeze-and-excitation module.
         rnn_type (str): The RNN type.
     """
+
     in_features: int
     emb_dim: int
     n_layers: int
@@ -523,7 +537,7 @@ class ContextNetTemp(BaseTemplate):
     kernel_size: int
     reduction_factor: int
     rnn_type: str
-    _name = 'context_net'
+    _name = "context_net"
     _type = TRANSDUCER_TYPE
 
 
@@ -545,6 +559,7 @@ class CTCModelBuilderTemp(BaseTemplate):
         feat_size (Union[Module, None]): Used if pred_net parameter is not None
             where it's the encoder's output feature size. Default None.
     """
+
     encoder: Module
     has_bnorm: bool
     pred_net: Union[Module, None] = None
@@ -575,6 +590,7 @@ class TransducerBuilderTemp(BaseTemplate):
             where it's the encoder and the decoder's output feature size.
             Default None.
     """
+
     encoder: Module
     decoder: Module
     has_bnorm: bool

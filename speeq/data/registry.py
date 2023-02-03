@@ -3,17 +3,14 @@ from pathlib import Path
 from typing import Tuple, Union
 
 from speeq.constants import FileKeys
-from .loaders import SpeechTextDataset, SpeechTextLoader
-from .padders import DynamicPadder, StaticPadder
 from speeq.interfaces import IDataLoader, IDataset, IPadder, ITokenizer
 from speeq.utils.utils import load_csv
 
+from .loaders import SpeechTextDataset, SpeechTextLoader
+from .padders import DynamicPadder, StaticPadder
 from .tokenizer import CharTokenizer
 
-PADDING_TYPES = {
-    'static': StaticPadder,
-    'dynamic': DynamicPadder
-}
+PADDING_TYPES = {"static": StaticPadder, "dynamic": DynamicPadder}
 
 
 def get_tokenizer(data_config: object) -> ITokenizer:
@@ -30,7 +27,7 @@ def get_tokenizer(data_config: object) -> ITokenizer:
     tokenizer = CharTokenizer()
     if os.path.exists(tokenizer_path) is True:
         tokenizer.load_tokenizer(tokenizer_path)
-        print(f'Tokenizer {tokenizer_path} loadded!')
+        print(f"Tokenizer {tokenizer_path} loadded!")
     else:
         tokenizer.add_pad_token().add_blank_token()
         tokenizer.add_sos_token().add_eos_token()
@@ -38,7 +35,7 @@ def get_tokenizer(data_config: object) -> ITokenizer:
         data = [item[FileKeys.text_key.value] for item in data]
         tokenizer.set_tokenizer(data)
         tokenizer.save_tokenizer(tokenizer_path)
-        print(f'Tokenizer saved to {tokenizer_path}!')
+        print(f"Tokenizer saved to {tokenizer_path}!")
     return tokenizer
 
 
@@ -47,8 +44,7 @@ def load_tokenizer(tokenizer_path: Union[Path, str]) -> ITokenizer:
 
 
 def get_asr_datasets(
-        data_config: object,
-        tokenizer: ITokenizer
+    data_config: object, tokenizer: ITokenizer
 ) -> Tuple[IDataset, IDataset]:
     """Creates a train and test dataset objects
 
@@ -66,7 +62,7 @@ def get_asr_datasets(
         text_processor=data_config.text_processor,
         sep=data_config.sep,
         add_eos=data_config.add_eos_token,
-        add_sos=data_config.add_sos_token
+        add_sos=data_config.add_sos_token,
     )
     test_dataset = SpeechTextDataset(
         data_path=data_config.testing_path,
@@ -75,36 +71,29 @@ def get_asr_datasets(
         text_processor=data_config.text_processor,
         sep=data_config.sep,
         add_eos=data_config.add_eos_token,
-        add_sos=data_config.add_sos_token
+        add_sos=data_config.add_sos_token,
     )
     return train_dataset, test_dataset
 
 
-def get_text_padder(
-        data_config: object,
-        pad_val: Union[float, int]
-) -> IPadder:
+def get_text_padder(data_config: object, pad_val: Union[float, int]) -> IPadder:
     return PADDING_TYPES[data_config.padding_type](
-        dim=0,
-        pad_val=pad_val,
-        max_len=data_config.text_pad_max_len
+        dim=0, pad_val=pad_val, max_len=data_config.text_pad_max_len
     )
 
 
 def get_speech_padder(data_config) -> IPadder:
     return PADDING_TYPES[data_config.padding_type](
-        dim=1,
-        pad_val=0.0,
-        max_len=data_config.speech_pad_max_len
+        dim=1, pad_val=0.0, max_len=data_config.speech_pad_max_len
     )
 
 
 def get_asr_loaders(
-        data_config: object,
-        tokenizer: ITokenizer,
-        batch_size: int,
-        world_size: int,
-        rank: int
+    data_config: object,
+    tokenizer: ITokenizer,
+    batch_size: int,
+    world_size: int,
+    rank: int,
 ) -> Tuple[IDataLoader, IDataLoader]:
     """Builds training and testing dataloaders.
 
@@ -121,8 +110,7 @@ def get_asr_loaders(
         loaders.
     """
     train_dataset, test_dataset = get_asr_datasets(
-        data_config=data_config,
-        tokenizer=tokenizer
+        data_config=data_config, tokenizer=tokenizer
     )
     if data_config.use_blank_as_pad is True:
         pad_id = tokenizer.special_tokens.blank_id
@@ -132,13 +120,18 @@ def get_asr_loaders(
     speech_padder = get_speech_padder(data_config)
     train_loader = SpeechTextLoader(
         dataset=train_dataset,
-        rank=rank, world_size=world_size,
-        batch_size=batch_size, text_padder=text_padder,
-        speech_padder=speech_padder
+        rank=rank,
+        world_size=world_size,
+        batch_size=batch_size,
+        text_padder=text_padder,
+        speech_padder=speech_padder,
     )
     test_loader = SpeechTextLoader(
-        dataset=test_dataset, rank=0,
-        world_size=1, batch_size=batch_size,
-        text_padder=text_padder, speech_padder=speech_padder
+        dataset=test_dataset,
+        rank=0,
+        world_size=1,
+        batch_size=batch_size,
+        text_padder=text_padder,
+        speech_padder=speech_padder,
     )
     return train_loader, test_loader

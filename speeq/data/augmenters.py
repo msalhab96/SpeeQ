@@ -39,12 +39,7 @@ class VolumeChanger(StochasticProcess):
         the signal.
     """
 
-    def __init__(
-            self,
-            min_gain: float,
-            max_gain: float,
-            ratio=1.0
-    ) -> None:
+    def __init__(self, min_gain: float, max_gain: float, ratio=1.0) -> None:
         super().__init__(ratio)
         self.min_gain = min_gain
         self.max_gain = max_gain
@@ -109,13 +104,7 @@ class Reverberation(StochasticProcess):
     """
 
     def __init__(
-            self,
-            ratio=1.0,
-            min_len=1000,
-            max_len=4000,
-            start_val=-10,
-            end_val=10,
-            eps=1e-3
+        self, ratio=1.0, min_len=1000, max_len=4000, start_val=-10, end_val=10, eps=1e-3
     ) -> None:
         super().__init__(ratio)
         self.min_len = min_len
@@ -144,11 +133,13 @@ class Reverberation(StochasticProcess):
         ir = ir.flip(dims=[-1])
         ir_length = ir.shape[-1]
         is_odd = int(ir_length % 2 != 0)
-        x = torch.cat([
-            torch.zeros(1, 1, ir_length//2).to(x.device),
-            x,
-            torch.zeros(1, 1, ir_length//2 + is_odd).to(x.device),
-        ])
+        x = torch.cat(
+            [
+                torch.zeros(1, 1, ir_length // 2).to(x.device),
+                x,
+                torch.zeros(1, 1, ir_length // 2 + is_odd).to(x.device),
+            ]
+        )
         return torch.nn.functional.conv1d(x, ir).squeeze(dim=0)
 
 
@@ -166,11 +157,7 @@ class BaseMasking(StochasticProcess):
             end = random.randint(start, start + self.max_length)
             end = min(length, end)
             indices = torch.arange(start, end, device=x.device)
-            mask = mask.index_fill(
-                dim=dim,
-                index=indices,
-                value=0
-            )
+            mask = mask.index_fill(dim=dim, index=indices, value=0)
         return mask
 
 

@@ -2,11 +2,16 @@ from pathlib import Path
 from typing import Union
 
 import torch
-
 from config import ModelConfig
-from constants import (ENC_OUT_KEY, HIDDEN_STATE_KEY, PREDS_KEY,
-                       PREV_HIDDEN_STATE_KEY, SPEECH_IDX_KEY,
-                       TERMINATION_STATE_KEY)
+from constants import (
+    ENC_OUT_KEY,
+    HIDDEN_STATE_KEY,
+    PREDS_KEY,
+    PREV_HIDDEN_STATE_KEY,
+    SPEECH_IDX_KEY,
+    TERMINATION_STATE_KEY,
+)
+
 from .data.registry import load_tokenizer
 from .interfaces import IProcessor
 from .models.registry import get_model
@@ -14,24 +19,20 @@ from .utils.utils import load_state_dict
 
 
 class _ASRBasePredictor:
-    """Implements the base ASR predictor
-    """
+    """Implements the base ASR predictor"""
 
     def __init__(
-            self,
-            speech_processor: IProcessor,
-            tokenizer_path: Union[str, Path],
-            model_config: ModelConfig,
-            device: str
+        self,
+        speech_processor: IProcessor,
+        tokenizer_path: Union[str, Path],
+        model_config: ModelConfig,
+        device: str,
     ) -> None:
         self.speech_processor = speech_processor
-        self.tokenizer = load_tokenizer(
-            tokenizer_path=tokenizer_path
-        )
+        self.tokenizer = load_tokenizer(tokenizer_path=tokenizer_path)
         self.device = device
         self.model = get_model(
-            model_config=model_config,
-            n_classes=self.tokenizer.vocab_size
+            model_config=model_config, n_classes=self.tokenizer.vocab_size
         ).to(self.device)
         model, *_ = load_state_dict(model_config.model_path)
         self.model.load_state_dict(model)
@@ -53,15 +54,15 @@ class CTCPredictor(_ASRBasePredictor):
     """
 
     def __init__(
-            self,
-            speech_processor: IProcessor,
-            tokenizer_path: Union[str, Path],
-            model_config: ModelConfig, device: str,
-            *args, **kwargs
+        self,
+        speech_processor: IProcessor,
+        tokenizer_path: Union[str, Path],
+        model_config: ModelConfig,
+        device: str,
+        *args,
+        **kwargs
     ) -> None:
-        super().__init__(
-            speech_processor, tokenizer_path, model_config, device
-        )
+        super().__init__(speech_processor, tokenizer_path, model_config, device)
 
     def predict(self, file_path: Union[Path, str]) -> str:
         speech = self.speech_processor.execute(file_path)
@@ -81,7 +82,7 @@ class CTCPredictor(_ASRBasePredictor):
             results = results[1:]
         if results[-1] == self.eos:
             results = results[:-1]
-        return ''.join(self.tokenizer.ids2tokens(results))
+        return "".join(self.tokenizer.ids2tokens(results))
 
 
 class Seq2SeqPredictor(_ASRBasePredictor):
@@ -97,17 +98,16 @@ class Seq2SeqPredictor(_ASRBasePredictor):
     """
 
     def __init__(
-            self,
-            speech_processor: IProcessor,
-            tokenizer_path: Union[str, Path],
-            model_config: ModelConfig,
-            device: str,
-            max_len: int,
-            *args, **kwargs
+        self,
+        speech_processor: IProcessor,
+        tokenizer_path: Union[str, Path],
+        model_config: ModelConfig,
+        device: str,
+        max_len: int,
+        *args,
+        **kwargs
     ) -> None:
-        super().__init__(
-            speech_processor, tokenizer_path, model_config, device
-        )
+        super().__init__(speech_processor, tokenizer_path, model_config, device)
         self.max_len = max_len
         # TODO: Add beam search
 
@@ -119,7 +119,7 @@ class Seq2SeqPredictor(_ASRBasePredictor):
         counter = 0
         state = {
             PREDS_KEY: torch.LongTensor([[self.sos]]).to(self.device),
-            TERMINATION_STATE_KEY: False
+            TERMINATION_STATE_KEY: False,
         }
         while counter <= self.max_len:
             state = self.model.predict(speech, mask, state)
@@ -129,7 +129,7 @@ class Seq2SeqPredictor(_ASRBasePredictor):
                 break
             counter += 1
         results = state[PREDS_KEY][0, 1:-1].tolist()
-        return ''.join(self.tokenizer.ids2tokens(results))
+        return "".join(self.tokenizer.ids2tokens(results))
 
 
 class TransducerPredictor(_ASRBasePredictor):
@@ -144,18 +144,13 @@ class TransducerPredictor(_ASRBasePredictor):
     """
 
     def __init__(
-            self,
-            speech_processor: IProcessor,
-            tokenizer_path: Union[str, Path],
-            model_config: ModelConfig,
-            device: str
+        self,
+        speech_processor: IProcessor,
+        tokenizer_path: Union[str, Path],
+        model_config: ModelConfig,
+        device: str,
     ) -> None:
-        super().__init__(
-            speech_processor,
-            tokenizer_path,
-            model_config,
-            device
-        )
+        super().__init__(speech_processor, tokenizer_path, model_config, device)
         # TODO: Add Beam search here
 
     def predict(self, file_path: Union[Path, str]) -> str:
@@ -166,7 +161,7 @@ class TransducerPredictor(_ASRBasePredictor):
         state = {
             PREDS_KEY: torch.LongTensor([[self.sos]]).to(self.device),
             SPEECH_IDX_KEY: 0,
-            HIDDEN_STATE_KEY: None
+            HIDDEN_STATE_KEY: None,
         }
         length = 1
         while state[SPEECH_IDX_KEY] < length:
@@ -179,4 +174,4 @@ class TransducerPredictor(_ASRBasePredictor):
                 # print(state[HIDDEN_STATE_KEY])
                 state[PREDS_KEY] = state[PREDS_KEY][:, :-1]
         results = state[PREDS_KEY][0, :].tolist()
-        return ''.join(self.tokenizer.ids2tokens(results[1:]))
+        return "".join(self.tokenizer.ids2tokens(results[1:]))
