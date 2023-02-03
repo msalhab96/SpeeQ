@@ -1,4 +1,4 @@
-import pytest
+IGNORE_USERWARNING = 'ignore::UserWarning'
 
 
 def check_grad(result, model):
