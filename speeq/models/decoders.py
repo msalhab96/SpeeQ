@@ -145,13 +145,16 @@ class GlobAttRNNDecoder(nn.Module):
             # for the first prediction iteration
             h = [h] * len(self.rnn_layers)
         out = self.emb(last_pred)
-        for i, (rnn, att) in enumerate(zip(self.rnn_layers, self.att_layers)):
+        layers = enumerate(
+            zip(self.fc_layers, self.rnn_layers, self.att_layers)
+        )
+        for i, (fc, rnn, att) in layers:
             h_ = h[i]
             if self.is_lstm:
                 (h_, c_) = h_
             h_ = h_.permute(1, 0, 2)
             out = torch.cat([out, h_], dim=-1)
-            out = self.fc(out)
+            out = fc(out)
             out = att(key=enc_out, query=out, mask=None)
             out, h[i] = rnn(out, h[i])
         out = self.pred_net(out)
@@ -263,13 +266,15 @@ class LocationAwareAttDecoder(GlobAttRNNDecoder):
         if isinstance(h, list) is False:
             h = [h] * len(self.rnn_layers)
         out = self.emb(last_pred)
-        for i, (rnn, att) in enumerate(zip(self.rnn_layers, self.att_layers)):
+        for i, (fc, rnn, att) in enumerate(
+            zip(self.fc_layers, self.rnn_layers, self.att_layers)
+        ):
             h_ = h[i]
             if self.is_lstm:
                 (h_, c_) = h_
             h_ = h_.permute(1, 0, 2)
             out = torch.cat([out, h_], dim=-1)
-            out = self.fc(out)
+            out = fc(out)
             out, alpha = att(key=enc_out, query=out, alpha=alpha, mask=None)
             out, h[i] = rnn(out, h[i])
         out = self.pred_net(out)
