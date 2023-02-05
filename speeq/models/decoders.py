@@ -216,16 +216,14 @@ class LocationAwareAttDecoder(GlobAttRNNDecoder):
         h = [h] * len(self.rnn_layers)
         for i in range(max_len):
             for j, (rnn, att) in enumerate(zip(self.rnn_layers, self.att_layers)):
-                out, h_ = rnn(out, h[j])
+                h_ = h[j]
                 if self.is_lstm:
                     (h_, c_) = h_
                 h_ = h_.permute(1, 0, 2)
-                h_, alpha = att(key=enc_h, query=h_, alpha=alpha, mask=enc_mask)
-                h = h.permute(1, 0, 2)
-                if self.is_lstm:
-                    h[j] = (h_, c_)
-                else:
-                    h[j] = h_
+                out = torch.cat([out, h_], dim=-1)
+                out = self.fc(out)
+                out, alpha = att(key=enc_h, query=out, alpha=alpha, mask=enc_mask)
+                out, h[j] = rnn(out, h[j])
             out = self.pred_net(out)
             results = out if results is None else torch.cat([results, out], dim=1)
             y = target[:, i : i + 1]
@@ -246,15 +244,14 @@ class LocationAwareAttDecoder(GlobAttRNNDecoder):
             h = [h] * len(self.rnn_layers)
         out = self.emb(last_pred)
         for i, (rnn, att) in enumerate(zip(self.rnn_layers, self.att_layers)):
-            out, h_ = rnn(out, h[i])
+            h_ = h[i]
             if self.is_lstm:
-                (h_, c_) = h[i]
+                (h_, c_) = h_
             h_ = h_.permute(1, 0, 2)
-            h_, alpha = att(key=enc_out, query=h_, alpha=alpha, mask=None)
-            h_ = h_.permute(1, 0, 2)
-            if self.is_lstm:
-                h_ = (h_, c_)
-            h[i] = h_
+            out = torch.cat([out, h_], dim=-1)
+            out = self.fc(out)
+            out, alpha = att(key=enc_out, query=out, alpha=alpha, mask=None)
+            out, h[i] = rnn(out, h[i])
         out = self.pred_net(out)
         state[PREDS_KEY] = torch.cat(
             [state[PREDS_KEY], torch.argmax(out, dim=-1)], dim=-1
