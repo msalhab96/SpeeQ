@@ -38,7 +38,7 @@ class GlobAttRNNDecoder(nn.Module):
         rnn_type: str = "rnn",
     ) -> None:
         super().__init__()
-        self.emb = nn.Embedding(num_embeddings=hidden_size, embedding_dim=embed_dim)
+        self.emb = nn.Embedding(num_embeddings=n_classes, embedding_dim=embed_dim)
         from .registry import RNN_REGISTRY
 
         self.rnn_layers = nn.ModuleList(
