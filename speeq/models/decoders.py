@@ -38,13 +38,14 @@ class GlobAttRNNDecoder(nn.Module):
         rnn_type: str = "rnn",
     ) -> None:
         super().__init__()
-        self.emb = nn.Embedding(num_embeddings=n_classes, embedding_dim=embed_dim)
+        self.emb = nn.Embedding(num_embeddings=n_classes,
+                                embedding_dim=embed_dim)
         from .registry import RNN_REGISTRY
 
         self.rnn_layers = nn.ModuleList(
             [
                 RNN_REGISTRY[rnn_type](
-                    input_size=embed_dim if i == 0 else hidden_size,
+                    input_size=hidden_size,
                     hidden_size=hidden_size,
                     batch_first=True,
                     bidirectional=False,
@@ -52,17 +53,28 @@ class GlobAttRNNDecoder(nn.Module):
                 for i in range(n_layers)
             ]
         )
-        self.fc = nn.Linear(
-            in_features=hidden_size + embed_dim, out_features=hidden_size
+        self.fc_layers = nn.ModuleList(
+            [
+                nn.Linear(
+                    in_features=hidden_size + embed_dim if i == 0
+                    else 2 * hidden_size,
+                    out_features=hidden_size
+                )
+                for i in range(n_layers)
+            ]
         )
         self.att_layers = nn.ModuleList(
             [
-                GlobalMulAttention(enc_feat_size=hidden_size, dec_feat_size=hidden_size)
+                GlobalMulAttention(
+                    enc_feat_size=hidden_size, dec_feat_size=hidden_size
+                )
                 for _ in range(n_layers)
             ]
         )
         self.pred_net = PredModule(
-            in_features=hidden_size, n_classes=n_classes, activation=pred_activation
+            in_features=hidden_size,
+            n_classes=n_classes,
+            activation=pred_activation
         )
         self.hidden_size = hidden_size
         self.n_classes = n_classes
@@ -103,18 +115,22 @@ class GlobAttRNNDecoder(nn.Module):
         out = self.emb(target[:, 0:1])
         h = [h] * len(self.rnn_layers)
         for i in range(max_len):
-            for j, (rnn, att) in enumerate(zip(self.rnn_layers, self.att_layers)):
+            layers = enumerate(
+                zip(self.fc_layers, self.rnn_layers, self.att_layers)
+            )
+            for j, (fc, rnn, att) in layers:
                 h_ = h[j]
                 if self.is_lstm:
                     (h_, c_) = h_
                 h_ = h_.permute(1, 0, 2)
                 out = torch.cat([out, h_], dim=-1)
-                out = self.fc(out)
+                out = fc(out)
                 out = att(key=enc_h, query=out, mask=enc_mask)
                 out, h[j] = rnn(out, h[j])
             out = self.pred_net(out)
-            results = out if results is None else torch.cat([results, out], dim=1)
-            y = target[:, i : i + 1]
+            results = out if results is None else torch.cat(
+                [results, out], dim=1)
+            y = target[:, i: i + 1]
             if self.teacher_forcing_rate > 0:
                 y = self._apply_teacher_forcing(y=y, out=out)
             out = self.emb(y)
@@ -215,18 +231,22 @@ class LocationAwareAttDecoder(GlobAttRNNDecoder):
         out = self.emb(target[:, 0:1])
         h = [h] * len(self.rnn_layers)
         for i in range(max_len):
-            for j, (rnn, att) in enumerate(zip(self.rnn_layers, self.att_layers)):
+            for j, (fc, rnn, att) in enumerate(
+                zip(self.fc_layers, self.rnn_layers, self.att_layers)
+            ):
                 h_ = h[j]
                 if self.is_lstm:
                     (h_, c_) = h_
                 h_ = h_.permute(1, 0, 2)
                 out = torch.cat([out, h_], dim=-1)
-                out = self.fc(out)
-                out, alpha = att(key=enc_h, query=out, alpha=alpha, mask=enc_mask)
+                out = fc(out)
+                out, alpha = att(key=enc_h, query=out,
+                                 alpha=alpha, mask=enc_mask)
                 out, h[j] = rnn(out, h[j])
             out = self.pred_net(out)
-            results = out if results is None else torch.cat([results, out], dim=1)
-            y = target[:, i : i + 1]
+            results = out if results is None else torch.cat(
+                [results, out], dim=1)
+            y = target[:, i: i + 1]
             if self.teacher_forcing_rate > 0:
                 y = self._apply_teacher_forcing(y=y, out=out)
             out = self.emb(y)
@@ -276,7 +296,8 @@ class RNNDecoder(nn.Module):
         self, vocab_size: int, emb_dim: int, hidden_size: int, rnn_type: str
     ) -> None:
         super().__init__()
-        self.emb = nn.Embedding(num_embeddings=vocab_size, embedding_dim=emb_dim)
+        self.emb = nn.Embedding(
+            num_embeddings=vocab_size, embedding_dim=emb_dim)
         from .registry import PACKED_RNN_REGISTRY
 
         self.rnn = PACKED_RNN_REGISTRY[rnn_type](
@@ -341,7 +362,8 @@ class TransformerDecoder(nn.Module):
             ]
         )
         self.pred_net = PredModule(
-            in_features=d_model, n_classes=n_classes, activation=nn.LogSoftmax(dim=-1)
+            in_features=d_model, n_classes=n_classes, activation=nn.LogSoftmax(
+                dim=-1)
         )
 
     def forward(
