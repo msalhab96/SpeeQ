@@ -1,0 +1,28 @@
+{
+	"Adding parametrize test block for a class": {
+		"prefix": "cptest",
+		"body": [
+			"@pytest.mark.parametrize(",
+			"($1),",
+			"	(",
+			"		($2),",
+			"	),",
+			")",
+			"def test_$3(self, $4):"
+		],
+		"description": "Adds parametrize pytest block"
+	},
+	"Adding parametrize test block for function": {
+		"prefix": "fptest",
+		"body": [
+			"@pytest.mark.parametrize(",
+			"($1),",
+			"	(",
+			"		($2),",
+			"	),",
+			")",
+			"def test_$3($4):"
+		],
+		"description": "Adds parametrize pytest block function"
+	}
+}
