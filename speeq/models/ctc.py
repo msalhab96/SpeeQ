@@ -83,7 +83,7 @@ class BERT(nn.Module):
 
     Args:
         max_len (int): The maximum length for positional encoding.
-        in_feature (int): The input/speech feature size.
+        in_features (int): The input/speech feature size.
         d_model (int): The model dimensionality.
         h (int): The number of heads.
         hidden_size (int): The inner size of the feed forward module.
@@ -95,7 +95,7 @@ class BERT(nn.Module):
     def __init__(
         self,
         max_len: int,
-        in_feature: int,
+        in_features: int,
         d_model: int,
         h: int,
         hidden_size: int,
@@ -105,7 +105,7 @@ class BERT(nn.Module):
     ) -> None:
         super().__init__()
         self.fc = nn.Linear(
-            in_features=in_feature,
+            in_features=in_features,
             out_features=d_model,
         )
         self.pos_emb = nn.Parameter(torch.randn(max_len, d_model))
