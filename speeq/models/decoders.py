@@ -52,6 +52,9 @@ class GlobAttRNNDecoder(nn.Module):
                 for i in range(n_layers)
             ]
         )
+        self.fc = nn.Linear(
+            in_features=hidden_size + embed_dim, out_features=hidden_size
+        )
         self.att_layers = nn.ModuleList(
             [
                 GlobalMulAttention(enc_feat_size=hidden_size, dec_feat_size=hidden_size)
@@ -101,16 +104,14 @@ class GlobAttRNNDecoder(nn.Module):
         h = [h] * len(self.rnn_layers)
         for i in range(max_len):
             for j, (rnn, att) in enumerate(zip(self.rnn_layers, self.att_layers)):
-                out, h_ = rnn(out, h[j])
+                h_ = h[j]
                 if self.is_lstm:
                     (h_, c_) = h_
                 h_ = h_.permute(1, 0, 2)
-                h_ = att(key=enc_h, query=h_, mask=enc_mask)
-                h_ = h_.permute(1, 0, 2)
-                if self.is_lstm:
-                    h[j] = (h_, c_)
-                else:
-                    h[j] = h_
+                out = torch.cat([out, h_], dim=-1)
+                out = self.fc(out)
+                out = att(key=enc_h, query=out, mask=enc_mask)
+                out, h[j] = rnn(out, h[j])
             out = self.pred_net(out)
             results = out if results is None else torch.cat([results, out], dim=1)
             y = target[:, i : i + 1]
@@ -129,15 +130,14 @@ class GlobAttRNNDecoder(nn.Module):
             h = [h] * len(self.rnn_layers)
         out = self.emb(last_pred)
         for i, (rnn, att) in enumerate(zip(self.rnn_layers, self.att_layers)):
-            out, h_ = rnn(out, h[i])
+            h_ = h[i]
             if self.is_lstm:
                 (h_, c_) = h_
             h_ = h_.permute(1, 0, 2)
-            h_ = att(key=enc_out, query=h_, mask=None)
-            h_ = h_.permute(1, 0, 2)
-            if self.is_lstm:
-                h_ = (h_, c_)
-            h[i] = h_
+            out = torch.cat([out, h_], dim=-1)
+            out = self.fc(out)
+            out = att(key=enc_out, query=out, mask=None)
+            out, h[i] = rnn(out, h[i])
         out = self.pred_net(out)
         state[PREDS_KEY] = torch.cat(
             [state[PREDS_KEY], torch.argmax(out, dim=-1)], dim=-1
