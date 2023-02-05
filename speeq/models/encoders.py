@@ -632,8 +632,8 @@ class SqueezeformerEncoder(nn.Module):
         # x of shape [B, M, d]
         x = x.transpose(-1, -2)
         out = self.upsampling_conv(x)
-        res_len = target_len - x.shape[-1]
-        out = torch.cat([x, torch.zeros(*x.shape[:2], res_len).to(x.device)], dim=-1)
+        res_len = target_len - out.shape[-1]
+        out = torch.cat([out, torch.zeros(*x.shape[:2], res_len).to(x.device)], dim=-1)
         out = out.transpose(-1, -2)
         return out
 
