@@ -598,3 +598,28 @@ class TransducerBuilderTemp(BaseTemplate):
     feat_size: Union[None, int] = None
     _name = TRANSDUCER_TYPE
     _type = MODEL_BUILDER_TYPE
+
+
+@dataclass
+class Seq2SeqBuilderTemp(BaseTemplate):
+    """Seq2Seq-based model builder template
+
+    Args:
+        encoder (Module): The speech encoder (acoustic model), such that
+            the forward method of the encoder returns a tuple of the encoded
+            speech tensor, the last encoder hidden state tensor/tuple if there
+            is any, and a length tensor for the encoded speech.
+        decoder (Module): The text decoder such that
+            the forward method of the decoder takes the encoder's output, the
+            last encoder's hidden state (if there is any), the encoder mask,
+            the decoder input, and the decoder mask and returns the prediction
+            tensor.
+        has_bnorm (bool): A flag indicates whether the encoder, the decoder
+            has batch normalization.
+    """
+
+    encoder: Module
+    decoder: Module
+    has_bnorm: bool
+    _name = SEQ2SEQ_TYPE
+    _type = MODEL_BUILDER_TYPE
