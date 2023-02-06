@@ -16,7 +16,7 @@ from .ctc import (
 )
 from .layers import PackedGRU, PackedLSTM, PackedRNN
 from .seq2seq import LAS, BasicAttSeq2SeqRNN, RNNWithLocationAwareAtt, SpeechTransformer
-from .skeletons import CTCSkeleton, TransducerSkeleton
+from .skeletons import CTCSkeleton, Seq2SeqSkeleton, TransducerSkeleton
 from .transducers import ConformerTransducer, ContextNet, RNNTransducer
 
 PACKED_RNN_REGISTRY = {"rnn": PackedRNN, "lstm": PackedLSTM, "gru": PackedGRU}
@@ -47,7 +47,11 @@ TRANSDUCER_MODELS = {
     "context_net": ContextNet,
 }
 
-MODELS_BUILDER = {CTC_TYPE: CTCSkeleton, TRANSDUCER_TYPE: TransducerSkeleton}
+MODELS_BUILDER = {
+    CTC_TYPE: CTCSkeleton,
+    TRANSDUCER_TYPE: TransducerSkeleton,
+    SEQ2SEQ_TYPE: Seq2SeqSkeleton,
+}
 
 
 def list_ctc_models() -> List[str]:
