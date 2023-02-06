@@ -2,6 +2,8 @@ from typing import Union
 
 from torch.nn import Module
 
+from speeq.utils.utils import get_mask_from_lens
+
 from .ctc import CTCModel
 from .transducers import BaseTransducer
 
@@ -96,3 +98,52 @@ class TransducerSkeleton(BaseTransducer):
         self.decoder = decoder
         if join_net is not None:
             self.join_net = join_net
+
+
+class Seq2SeqSkeleton:
+    """Builds the Seq2Seq model skeleton
+
+    Args:
+        encoder (Module): The speech encoder (acoustic model), such that
+            the forward method of the encoder returns a tuple of the encoded
+            speech tensor, the last encoder hidden state tensor/tuple if there
+            is any, and a length tensor for the encoded speech.
+        decoder (Module): The text decoder such that
+            the forward method of the decoder takes the encoder's output, the
+            last encoder's hidden state (if there is any), the encoder mask,
+            the decoder input, and the decoder mask and returns the prediction
+            tensor.
+        has_bnorm (bool): A flag indicates whether the encoder, the decoder
+            has batch normalization.
+    """
+
+    def __init__(self, encoder: Module, decoder: Module, has_bnorm: bool) -> None:
+        self.encoder = encoder
+        self.decoder = decoder
+        self.has_bnorm = has_bnorm
+
+    def _process_encoder_out(self, out: tuple) -> dict:
+        if len(out) == 2:
+            # not rnn encoder and does not return the last hidden state
+            out, lengths = out
+            mask = get_mask_from_lens(lengths=lengths, max_len=out.shape[1])
+            return {"enc_out": out, "enc_mask": mask}
+        if len(out) == 3:
+            out, h, lengths = out
+            mask = get_mask_from_lens(lengths=lengths, max_len=out.shape[1])
+            return {"enc_out": out, "enc_mask": mask, "h": h}
+        # TODO: raise an error here
+
+    def forward(
+        self,
+        speech: Tensor,
+        speech_mask: Tensor,
+        text: Tensor,
+        text_mask: Tensor,
+        *args,
+        **kwargs
+    ) -> Tensor:
+        out = self.encoder(x=speech, mask=speech_mask, return_h=True)
+        args = self._process_encoder_out(out)
+        result = self.decoder(**args)
+        return result
