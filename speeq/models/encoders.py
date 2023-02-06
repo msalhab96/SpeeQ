@@ -306,7 +306,9 @@ class JasperEncoder(nn.Module):
             p_dropout=p_dropout,
         )
 
-    def forward(self, x: Tensor, mask: Tensor) -> Tuple[Tensor, Tensor]:
+    def forward(
+        self, x: Tensor, mask: Tensor, *args, **kwargs
+    ) -> Tuple[Tensor, Tensor]:
         # x of shape [B, M, d]
         lengths = mask.sum(dim=-1)
         lengths = lengths.cpu()
@@ -406,7 +408,9 @@ class Wav2LetterEncoder(nn.Module):
         )
         self.dropout = nn.Dropout(p_dropout)
 
-    def forward(self, x: Tensor, mask: Tensor) -> Tuple[Tensor, Tensor]:
+    def forward(
+        self, x: Tensor, mask: Tensor, *args, **kwargs
+    ) -> Tuple[Tensor, Tensor]:
         # x of shape [B, M, d]
         lengths = mask.sum(dim=-1)
         lengths = lengths.cpu()
@@ -643,7 +647,9 @@ class SqueezeformerEncoder(nn.Module):
         out = out.transpose(-1, -2)
         return out
 
-    def forward(self, x: Tensor, mask: Tensor) -> Tuple[Tensor, Tensor]:
+    def forward(
+        self, x: Tensor, mask: Tensor, *args, **kwargs
+    ) -> Tuple[Tensor, Tensor]:
         lengths = mask.sum(dim=-1)
         out, lengths = self.subsampling(x, lengths)
         mask = get_mask_from_lens(lengths=lengths, max_len=out.shape[1])
@@ -747,7 +753,9 @@ class SpeechTransformerEncoder(nn.Module):
         mask = mask.to(x.device)
         return x, mask
 
-    def forward(self, x: Tensor, mask: Tensor) -> Tuple[Tensor, Tensor]:
+    def forward(
+        self, x: Tensor, mask: Tensor, *args, **kwargs
+    ) -> Tuple[Tensor, Tensor]:
         out, mask = self._pre_process(x, mask)
         for layer in self.layers:
             out = layer(out, mask)
@@ -984,7 +992,9 @@ class ContextNetEncoder(nn.Module):
                     )
                 )
 
-    def forward(self, x: Tensor, mask: Tensor) -> Tuple[Tensor, Tensor]:
+    def forward(
+        self, x: Tensor, mask: Tensor, *args, **kwargs
+    ) -> Tuple[Tensor, Tensor]:
         # x of shape [B,  M, d]
         lengths = mask.sum(dim=-1)
         out = x.transpose(-1, -2)  # [B, d, M]
