@@ -1,5 +1,6 @@
 from typing import Union
 
+from torch import Tensor
 from torch.nn import Module
 
 from speeq.utils.utils import get_mask_from_lens
@@ -145,5 +146,5 @@ class Seq2SeqSkeleton:
     ) -> Tensor:
         out = self.encoder(x=speech, mask=speech_mask, return_h=True)
         args = self._process_encoder_out(out)
-        result = self.decoder(**args)
+        result = self.decoder(dec_inp=text, dec_mask=text_mask, **args)
         return result
