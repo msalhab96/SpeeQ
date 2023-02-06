@@ -53,7 +53,7 @@ class BERTTemp(BaseTemplate):
 
     Args:
         max_len (int): The maximum length for positional encoding.
-        in_feature (int): The input/speech feature size.
+        in_features (int): The input/speech feature size.
         d_model (int): The model dimensionality.
         h (int): The number of heads.
         hidden_size (int): The inner size of the feed forward module.
@@ -62,7 +62,7 @@ class BERTTemp(BaseTemplate):
     """
 
     max_len: int
-    in_feature: int
+    in_features: int
     d_model: int
     h: int
     hidden_size: int
