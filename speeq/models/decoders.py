@@ -38,8 +38,7 @@ class GlobAttRNNDecoder(nn.Module):
         rnn_type: str = "rnn",
     ) -> None:
         super().__init__()
-        self.emb = nn.Embedding(num_embeddings=n_classes,
-                                embedding_dim=embed_dim)
+        self.emb = nn.Embedding(num_embeddings=n_classes, embedding_dim=embed_dim)
         from .registry import RNN_REGISTRY
 
         self.rnn_layers = nn.ModuleList(
@@ -56,25 +55,20 @@ class GlobAttRNNDecoder(nn.Module):
         self.fc_layers = nn.ModuleList(
             [
                 nn.Linear(
-                    in_features=hidden_size + embed_dim if i == 0
-                    else 2 * hidden_size,
-                    out_features=hidden_size
+                    in_features=hidden_size + embed_dim if i == 0 else 2 * hidden_size,
+                    out_features=hidden_size,
                 )
                 for i in range(n_layers)
             ]
         )
         self.att_layers = nn.ModuleList(
             [
-                GlobalMulAttention(
-                    enc_feat_size=hidden_size, dec_feat_size=hidden_size
-                )
+                GlobalMulAttention(enc_feat_size=hidden_size, dec_feat_size=hidden_size)
                 for _ in range(n_layers)
             ]
         )
         self.pred_net = PredModule(
-            in_features=hidden_size,
-            n_classes=n_classes,
-            activation=pred_activation
+            in_features=hidden_size, n_classes=n_classes, activation=pred_activation
         )
         self.hidden_size = hidden_size
         self.n_classes = n_classes
@@ -102,22 +96,20 @@ class GlobAttRNNDecoder(nn.Module):
     def forward(
         self,
         h: Union[Tensor, Tuple[Tensor, Tensor]],
-        enc_h: Tensor,
+        enc_out: Tensor,
         enc_mask: Tensor,
-        target: Tensor,
+        dec_inp: Tensor,
         *args,
         **kwargs
     ) -> Tensor:
         # h is the encoder's last hidden state
-        # target of shape [B, M]
-        max_len = target.shape[-1]
+        # dec_inp of shape [B, M]
+        max_len = dec_inp.shape[-1]
         results = None
-        out = self.emb(target[:, 0:1])
+        out = self.emb(dec_inp[:, 0:1])
         h = [h] * len(self.rnn_layers)
         for i in range(max_len):
-            layers = enumerate(
-                zip(self.fc_layers, self.rnn_layers, self.att_layers)
-            )
+            layers = enumerate(zip(self.fc_layers, self.rnn_layers, self.att_layers))
             for j, (fc, rnn, att) in layers:
                 h_ = h[j]
                 if self.is_lstm:
@@ -125,12 +117,11 @@ class GlobAttRNNDecoder(nn.Module):
                 h_ = h_.permute(1, 0, 2)
                 out = torch.cat([out, h_], dim=-1)
                 out = fc(out)
-                out = att(key=enc_h, query=out, mask=enc_mask)
+                out = att(key=enc_out, query=out, mask=enc_mask)
                 out, h[j] = rnn(out, h[j])
             out = self.pred_net(out)
-            results = out if results is None else torch.cat(
-                [results, out], dim=1)
-            y = target[:, i: i + 1]
+            results = out if results is None else torch.cat([results, out], dim=1)
+            y = dec_inp[:, i : i + 1]
             if self.teacher_forcing_rate > 0:
                 y = self._apply_teacher_forcing(y=y, out=out)
             out = self.emb(y)
@@ -145,9 +136,7 @@ class GlobAttRNNDecoder(nn.Module):
             # for the first prediction iteration
             h = [h] * len(self.rnn_layers)
         out = self.emb(last_pred)
-        layers = enumerate(
-            zip(self.fc_layers, self.rnn_layers, self.att_layers)
-        )
+        layers = enumerate(zip(self.fc_layers, self.rnn_layers, self.att_layers))
         for i, (fc, rnn, att) in layers:
             h_ = h[i]
             if self.is_lstm:
@@ -221,17 +210,17 @@ class LocationAwareAttDecoder(GlobAttRNNDecoder):
     def forward(
         self,
         h: Union[Tensor, Tuple[Tensor, Tensor]],
-        enc_h: Tensor,
+        enc_out: Tensor,
         enc_mask: Tensor,
-        target: Tensor,
+        dec_inp: Tensor,
         *args,
         **kwargs
     ) -> Tensor:
-        # target of shape [B, M]
-        batch_size, max_len = target.shape
+        # dec_inp of shape [B, M]
+        batch_size, max_len = dec_inp.shape
         results = None
-        alpha = torch.zeros(batch_size, 1, enc_h.shape[1]).to(enc_h.device)
-        out = self.emb(target[:, 0:1])
+        alpha = torch.zeros(batch_size, 1, enc_out.shape[1]).to(enc_out.device)
+        out = self.emb(dec_inp[:, 0:1])
         h = [h] * len(self.rnn_layers)
         for i in range(max_len):
             for j, (fc, rnn, att) in enumerate(
@@ -243,13 +232,11 @@ class LocationAwareAttDecoder(GlobAttRNNDecoder):
                 h_ = h_.permute(1, 0, 2)
                 out = torch.cat([out, h_], dim=-1)
                 out = fc(out)
-                out, alpha = att(key=enc_h, query=out,
-                                 alpha=alpha, mask=enc_mask)
+                out, alpha = att(key=enc_out, query=out, alpha=alpha, mask=enc_mask)
                 out, h[j] = rnn(out, h[j])
             out = self.pred_net(out)
-            results = out if results is None else torch.cat(
-                [results, out], dim=1)
-            y = target[:, i: i + 1]
+            results = out if results is None else torch.cat([results, out], dim=1)
+            y = dec_inp[:, i : i + 1]
             if self.teacher_forcing_rate > 0:
                 y = self._apply_teacher_forcing(y=y, out=out)
             out = self.emb(y)
@@ -301,8 +288,7 @@ class RNNDecoder(nn.Module):
         self, vocab_size: int, emb_dim: int, hidden_size: int, rnn_type: str
     ) -> None:
         super().__init__()
-        self.emb = nn.Embedding(
-            num_embeddings=vocab_size, embedding_dim=emb_dim)
+        self.emb = nn.Embedding(num_embeddings=vocab_size, embedding_dim=emb_dim)
         from .registry import PACKED_RNN_REGISTRY
 
         self.rnn = PACKED_RNN_REGISTRY[rnn_type](
@@ -367,8 +353,7 @@ class TransformerDecoder(nn.Module):
             ]
         )
         self.pred_net = PredModule(
-            in_features=d_model, n_classes=n_classes, activation=nn.LogSoftmax(
-                dim=-1)
+            in_features=d_model, n_classes=n_classes, activation=nn.LogSoftmax(dim=-1)
         )
 
     def forward(

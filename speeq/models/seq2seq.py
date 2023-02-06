@@ -78,7 +78,7 @@ class BasicAttSeq2SeqRNN(nn.Module):
                 h = self._process_hiddens(h)
         enc_mask = get_mask_from_lens(lengths=lengths, max_len=out.shape[1])
         enc_mask = enc_mask.to(enc_inp.device)
-        preds = self.decoder(h=h, enc_h=out, enc_mask=enc_mask, target=dec_inp)
+        preds = self.decoder(h=h, enc_out=out, enc_mask=enc_mask, dec_inp=dec_inp)
         return preds
 
     def predict(self, x: Tensor, mask: Tensor, state: dict) -> dict:
