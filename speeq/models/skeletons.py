@@ -101,7 +101,7 @@ class TransducerSkeleton(BaseTransducer):
             self.join_net = join_net
 
 
-class Seq2SeqSkeleton:
+class Seq2SeqSkeleton(Module):
     """Builds the Seq2Seq model skeleton
 
     Args:
@@ -118,7 +118,10 @@ class Seq2SeqSkeleton:
             has batch normalization.
     """
 
-    def __init__(self, encoder: Module, decoder: Module, has_bnorm: bool) -> None:
+    def __init__(
+        self, encoder: Module, decoder: Module, has_bnorm: bool, *args, **kwargs
+    ) -> None:
+        super().__init__()
         self.encoder = encoder
         self.decoder = decoder
         self.has_bnorm = has_bnorm
@@ -128,10 +131,13 @@ class Seq2SeqSkeleton:
             # not rnn encoder and does not return the last hidden state
             out, lengths = out
             mask = get_mask_from_lens(lengths=lengths, max_len=out.shape[1])
+            mask = mask.to(out.device)
+            h = None
             return {"enc_out": out, "enc_mask": mask, "h": None}
         if len(out) == 3:
             out, h, lengths = out
             mask = get_mask_from_lens(lengths=lengths, max_len=out.shape[1])
+            mask = mask.to(out.device)
             return {"enc_out": out, "enc_mask": mask, "h": h}
         # TODO: raise an error here
 
