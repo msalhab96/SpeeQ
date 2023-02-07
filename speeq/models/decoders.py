@@ -342,6 +342,7 @@ class TransformerDecoder(nn.Module):
         d_model (int): The model dimensionality.
         ff_size (int): The feed-forward inner layer dimensionality.
         h (int): The number of attentional heads.
+        pred_activation (Module): An activation function instance.
         masking_value (int): The attentin masking value. Default -1e15
     """
 
@@ -352,6 +353,7 @@ class TransformerDecoder(nn.Module):
         d_model: int,
         ff_size: int,
         h: int,
+        pred_activation: nn.Module,
         masking_value: int = -1e15,
     ) -> None:
         super().__init__()
@@ -365,7 +367,7 @@ class TransformerDecoder(nn.Module):
             ]
         )
         self.pred_net = PredModule(
-            in_features=d_model, n_classes=n_classes, activation=nn.LogSoftmax(dim=-1)
+            in_features=d_model, n_classes=n_classes, activation=pred_activation
         )
 
     def forward(
