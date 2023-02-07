@@ -93,9 +93,17 @@ class GlobAttRNNDecoder(nn.Module):
         out = torch.argmax(out, dim=-1)
         return (~mask) * y + mask * out
 
+    def _init_hidden_state(self, batch_size, device):
+        if self.is_lstm:
+            return (
+                torch.zeros(1, batch_size, self.hidden_size).to(device),
+                torch.zeros(1, batch_size, self.hidden_size).to(device),
+            )
+        return torch.zeros(1, batch_size, self.hidden_size).to(device)
+
     def forward(
         self,
-        h: Union[Tensor, Tuple[Tensor, Tensor]],
+        h: Union[Tensor, Tuple[Tensor, Tensor], None],
         enc_out: Tensor,
         enc_mask: Tensor,
         dec_inp: Tensor,
@@ -104,7 +112,9 @@ class GlobAttRNNDecoder(nn.Module):
     ) -> Tensor:
         # h is the encoder's last hidden state
         # dec_inp of shape [B, M]
-        max_len = dec_inp.shape[-1]
+        batch_size, max_len = dec_inp.shape
+        if h is None:
+            self._init_hidden_state(batch_size=batch_size, device=dec_inp.device)
         results = None
         out = self.emb(dec_inp[:, 0:1])
         h = [h] * len(self.rnn_layers)
@@ -209,7 +219,7 @@ class LocationAwareAttDecoder(GlobAttRNNDecoder):
 
     def forward(
         self,
-        h: Union[Tensor, Tuple[Tensor, Tensor]],
+        h: Union[Tensor, Tuple[Tensor, Tensor], None],
         enc_out: Tensor,
         enc_mask: Tensor,
         dec_inp: Tensor,
@@ -219,6 +229,8 @@ class LocationAwareAttDecoder(GlobAttRNNDecoder):
         # dec_inp of shape [B, M]
         batch_size, max_len = dec_inp.shape
         results = None
+        if h is None:
+            self._init_hidden_state(batch_size=batch_size, device=dec_inp.device)
         alpha = torch.zeros(batch_size, 1, enc_out.shape[1]).to(enc_out.device)
         out = self.emb(dec_inp[:, 0:1])
         h = [h] * len(self.rnn_layers)
@@ -362,6 +374,8 @@ class TransformerDecoder(nn.Module):
         enc_mask: Union[Tensor, None],
         dec_inp: Tensor,
         dec_mask: Union[Tensor, None],
+        *args,
+        **kwargs
     ) -> Tensor:
         out = self.emb(dec_inp)
         for layer in self.layers:
