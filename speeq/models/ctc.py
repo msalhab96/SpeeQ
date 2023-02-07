@@ -86,7 +86,7 @@ class BERT(nn.Module):
         in_features (int): The input/speech feature size.
         d_model (int): The model dimensionality.
         h (int): The number of heads.
-        hidden_size (int): The inner size of the feed forward module.
+        ff_size (int): The inner size of the feed forward module.
         n_layers (int): The number of transformer encoders.
         n_classes (int): The number of classes.
         p_dropout (float): The dropout rate.
@@ -98,7 +98,7 @@ class BERT(nn.Module):
         in_features: int,
         d_model: int,
         h: int,
-        hidden_size: int,
+        ff_size: int,
         n_layers: int,
         n_classes: int,
         p_dropout: float,
@@ -111,7 +111,7 @@ class BERT(nn.Module):
         self.pos_emb = nn.Parameter(torch.randn(max_len, d_model))
         self.layers = nn.ModuleList(
             [
-                TransformerEncLayer(d_model=d_model, hidden_size=hidden_size, h=h)
+                TransformerEncLayer(d_model=d_model, ff_size=ff_size, h=h)
                 for _ in range(n_layers)
             ]
         )
