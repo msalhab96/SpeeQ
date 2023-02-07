@@ -128,7 +128,7 @@ class Seq2SeqSkeleton:
             # not rnn encoder and does not return the last hidden state
             out, lengths = out
             mask = get_mask_from_lens(lengths=lengths, max_len=out.shape[1])
-            return {"enc_out": out, "enc_mask": mask}
+            return {"enc_out": out, "enc_mask": mask, "h": None}
         if len(out) == 3:
             out, h, lengths = out
             mask = get_mask_from_lens(lengths=lengths, max_len=out.shape[1])
