@@ -114,7 +114,7 @@ class GlobAttRNNDecoder(nn.Module):
         # dec_inp of shape [B, M]
         batch_size, max_len = dec_inp.shape
         if h is None:
-            self._init_hidden_state(batch_size=batch_size, device=dec_inp.device)
+            h = self._init_hidden_state(batch_size=batch_size, device=dec_inp.device)
         results = None
         out = self.emb(dec_inp[:, 0:1])
         h = [h] * len(self.rnn_layers)
@@ -230,7 +230,7 @@ class LocationAwareAttDecoder(GlobAttRNNDecoder):
         batch_size, max_len = dec_inp.shape
         results = None
         if h is None:
-            self._init_hidden_state(batch_size=batch_size, device=dec_inp.device)
+            h = self._init_hidden_state(batch_size=batch_size, device=dec_inp.device)
         alpha = torch.zeros(batch_size, 1, enc_out.shape[1]).to(enc_out.device)
         out = self.emb(dec_inp[:, 0:1])
         h = [h] * len(self.rnn_layers)
