@@ -285,7 +285,7 @@ class LocationAwareAttDecoder(GlobAttRNNDecoder):
         return state
 
 
-class RNNDecoder(nn.Module):
+class TransducerRNNDecoder(nn.Module):
     """Builds a simple RNN-decoder that contains embedding layer
     and a single RNN layer
 

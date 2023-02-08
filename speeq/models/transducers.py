@@ -12,11 +12,11 @@ from speeq.constants import (
     SPEECH_IDX_KEY,
 )
 
-from .decoders import RNNDecoder
+from .decoders import TransducerRNNDecoder
 from .encoders import ConformerEncoder, ContextNetEncoder, RNNEncoder
 
 
-class BaseTransducer(nn.Module):
+class _BaseTransducer(nn.Module):
     def __init__(self, feat_size: int, n_classes: int) -> None:
         super().__init__()
         self.has_bnorm = False
@@ -63,7 +63,7 @@ class BaseTransducer(nn.Module):
         return state
 
 
-class RNNTransducer(BaseTransducer):
+class RNNTransducer(_BaseTransducer):
     """Implements the RNN transducer model proposed in
     https://arxiv.org/abs/1211.3711
 
@@ -98,7 +98,7 @@ class RNNTransducer(BaseTransducer):
             p_dropout=p_dropout,
             rnn_type=rnn_type,
         )
-        self.decoder = RNNDecoder(
+        self.decoder = TransducerRNNDecoder(
             vocab_size=n_classes,
             emb_dim=emb_dim,
             hidden_size=hidden_size,
@@ -162,7 +162,7 @@ class ConformerTransducer(RNNTransducer):
         )
 
 
-class ContextNet(BaseTransducer):
+class ContextNet(_BaseTransducer):
     """Implements the ContextNet transducer model proposed in
     https://arxiv.org/abs/2005.03191
 
@@ -213,7 +213,7 @@ class ContextNet(BaseTransducer):
             kernel_size=kernel_size,
             reduction_factor=reduction_factor,
         )
-        self.decoder = RNNDecoder(
+        self.decoder = TransducerRNNDecoder(
             vocab_size=n_classes,
             emb_dim=emb_dim,
             hidden_size=out_channels[-1]

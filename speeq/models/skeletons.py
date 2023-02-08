@@ -6,7 +6,7 @@ from torch.nn import Module
 from speeq.utils.utils import get_mask_from_lens
 
 from .ctc import CTCModel
-from .transducers import BaseTransducer
+from .transducers import _BaseTransducer
 
 
 class CTCSkeleton(CTCModel):
@@ -52,7 +52,7 @@ class CTCSkeleton(CTCModel):
             self.pred_net = pred_net
 
 
-class TransducerSkeleton(BaseTransducer):
+class TransducerSkeleton(_BaseTransducer):
     """Builds the Transducer-based model skeleton
 
     Args:
