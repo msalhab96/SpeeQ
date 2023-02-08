@@ -67,18 +67,18 @@ class BasicAttSeq2SeqRNN(nn.Module):
         return h
 
     def forward(
-        self, enc_inp: Tensor, enc_mask: Tensor, dec_inp: Tensor, *args, **kwargs
+        self, speech: Tensor, speech_mask: Tensor, text: Tensor, *args, **kwargs
     ) -> Tensor:
-        out, h, lengths = self.encoder(enc_inp, enc_mask, return_h=True)
+        out, h, lengths = self.encoder(speech, speech_mask, return_h=True)
         if self.bidirectional is True:
             if isinstance(h, tuple):
                 # if LSTM is used
                 h = (self._process_hiddens(h[0]), self._process_hiddens(h[1]))
             else:
                 h = self._process_hiddens(h)
-        enc_mask = get_mask_from_lens(lengths=lengths, max_len=out.shape[1])
-        enc_mask = enc_mask.to(enc_inp.device)
-        preds = self.decoder(h=h, enc_out=out, enc_mask=enc_mask, dec_inp=dec_inp)
+        speech_mask = get_mask_from_lens(lengths=lengths, max_len=out.shape[1])
+        speech_mask = speech_mask.to(speech.device)
+        preds = self.decoder(h=h, enc_out=out, enc_mask=speech_mask, dec_inp=text)
         return preds
 
     def predict(self, x: Tensor, mask: Tensor, state: dict) -> dict:
