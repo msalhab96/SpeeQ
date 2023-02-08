@@ -231,6 +231,8 @@ class LASTemp(BaseTemplate):
         dec_num_layers (int): The number of the decoders' RNN layers.
         emb_dim (int): The embedding size.
         p_dropout (float): The dropout rate.
+        pred_activation (Module): An activation function instance to be applied
+            on the last dimension of the predicted logits.
         teacher_forcing_rate (float): The teacher forcing rate. Default 0.0
         rnn_type (str): The rnn type. Default 'rnn'.
     """
@@ -243,6 +245,7 @@ class LASTemp(BaseTemplate):
     dec_num_layers: int
     emb_dim: int
     p_dropout: float
+    pred_activation: Module
     teacher_forcing_rate: float = 0.0
     rnn_type: str = "rnn"
     _name = "las"
@@ -261,6 +264,8 @@ class BasicAttSeq2SeqRNNTemp(BaseTemplate):
         dec_num_layers (int): The number of the decoders' RNN layers.
         emb_dim (int): The embedding size.
         p_dropout (float): The dropout rate.
+        pred_activation (Module): An activation function instance to be applied
+            on the last dimension of the predicted logits.
         teacher_forcing_rate (float): The teacher forcing rate. Default 0.0
         rnn_type (str): The rnn type. Default 'rnn'.
     """
@@ -272,6 +277,7 @@ class BasicAttSeq2SeqRNNTemp(BaseTemplate):
     dec_num_layers: int
     emb_dim: int
     p_dropout: float
+    pred_activation: Module
     teacher_forcing_rate: float = 0.0
     rnn_type: str = "rnn"
     _name = "basic_att_rnn"
@@ -294,6 +300,8 @@ class RNNWithLocationAwareAttTemp(BaseTemplate):
         activation (str): The activation function to use in the
             attention layer. it can be either softmax or sigmax.
         p_dropout (float): The dropout rate.
+        pred_activation (Module): An activation function instance to be applied
+            on the last dimension of the predicted logits.
         inv_temperature (Union[float, int]): The inverse temperature value of
             the attention. Default 1.
         teacher_forcing_rate (float): The teacher forcing rate. Default 0.0
@@ -309,6 +317,7 @@ class RNNWithLocationAwareAttTemp(BaseTemplate):
     kernel_size: int
     activation: str
     p_dropout: float
+    pred_activation: Module
     inv_temperature: Union[float, int] = 1
     teacher_forcing_rate: float = 0.0
     rnn_type: str = "rnn"
@@ -335,6 +344,8 @@ class SpeechTransformerTemp(BaseTemplate):
             layers' kernel size.
         att_out_channels (int): The number of output channels of the
             attentional convolution
+        pred_activation (Module): An activation function instance to be applied
+            on the last dimension of the predicted logits.
         masking_value (int): The attentin masking value. Default -1e15
     """
 
@@ -349,6 +360,7 @@ class SpeechTransformerTemp(BaseTemplate):
     h: int
     att_kernel_size: int
     att_out_channels: int
+    pred_activation: Module
     masking_value: int = -1e15
     _name = "speech_transformer"
     _type = SEQ2SEQ_TYPE

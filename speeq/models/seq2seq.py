@@ -21,6 +21,8 @@ class BasicAttSeq2SeqRNN(nn.Module):
         dec_num_layers (int): The number of the decoders' RNN layers.
         emb_dim (int): The embedding size.
         p_dropout (float): The dropout rate.
+        pred_activation (Module): An activation function instance to be applied
+            on the last dimension of the predicted logits.
         teacher_forcing_rate (float): The teacher forcing rate. Default 0.0
         rnn_type (str): The rnn type. default 'rnn'.
     """
@@ -35,6 +37,7 @@ class BasicAttSeq2SeqRNN(nn.Module):
         dec_num_layers: int,
         emb_dim: int,
         p_dropout: float,
+        pred_activation: nn.Module,
         teacher_forcing_rate: float = 0.0,
         rnn_type: str = "rnn",
     ) -> None:
@@ -53,7 +56,7 @@ class BasicAttSeq2SeqRNN(nn.Module):
             hidden_size=hidden_size,
             n_layers=dec_num_layers,
             n_classes=n_classes,
-            pred_activation=nn.LogSoftmax(dim=-1),
+            pred_activation=pred_activation,
             teacher_forcing_rate=teacher_forcing_rate,
             rnn_type=rnn_type,
         )
@@ -110,6 +113,8 @@ class LAS(BasicAttSeq2SeqRNN):
         dec_num_layers (int): The number of the decoders' RNN layers.
         emb_dim (int): The embedding size.
         p_dropout (float): The dropout rate.
+        pred_activation (Module): An activation function instance to be applied
+            on the last dimension of the predicted logits.
         teacher_forcing_rate (float): The teacher forcing rate. Default 0.0
         rnn_type (str): The rnn type. default 'rnn'.
     """
@@ -125,6 +130,7 @@ class LAS(BasicAttSeq2SeqRNN):
         dec_num_layers: int,
         emb_dim: int,
         p_dropout: float,
+        pred_activation: nn.Module,
         teacher_forcing_rate: float = 0.0,
         rnn_type: str = "rnn",
     ) -> None:
@@ -137,6 +143,7 @@ class LAS(BasicAttSeq2SeqRNN):
             dec_num_layers=dec_num_layers,
             emb_dim=emb_dim,
             p_dropout=p_dropout,
+            pred_activation=pred_activation,
             teacher_forcing_rate=teacher_forcing_rate,
             rnn_type=rnn_type,
         )
@@ -168,6 +175,8 @@ class RNNWithLocationAwareAtt(BasicAttSeq2SeqRNN):
         activation (str): The activation function to use in the
             attention layer. it can be either softmax or sigmax.
         p_dropout (float): The dropout rate.
+        pred_activation (Module): An activation function instance to be applied
+            on the last dimension of the predicted logits.
         inv_temperature (Union[float, int]): The inverse temperature value of
             the attention. Default 1.
         teacher_forcing_rate (float): The teacher forcing rate. Default 0.0
@@ -186,6 +195,7 @@ class RNNWithLocationAwareAtt(BasicAttSeq2SeqRNN):
         kernel_size: int,
         activation: str,
         p_dropout: float,
+        pred_activation: nn.Module,
         inv_temperature: Union[float, int] = 1,
         teacher_forcing_rate: float = 0.0,
         rnn_type: str = "rnn",
@@ -198,6 +208,7 @@ class RNNWithLocationAwareAtt(BasicAttSeq2SeqRNN):
             bidirectional=bidirectional,
             dec_num_layers=dec_num_layers,
             emb_dim=emb_dim,
+            pred_activation=pred_activation,
             p_dropout=p_dropout,
             rnn_type=rnn_type,
         )
@@ -206,7 +217,7 @@ class RNNWithLocationAwareAtt(BasicAttSeq2SeqRNN):
             hidden_size=hidden_size,
             n_layers=dec_num_layers,
             n_classes=n_classes,
-            pred_activation=nn.LogSoftmax(dim=-1),
+            pred_activation=pred_activation,
             kernel_size=kernel_size,
             activation=activation,
             inv_temperature=inv_temperature,
@@ -234,6 +245,8 @@ class SpeechTransformer(nn.Module):
             layers' kernel size.
         att_out_channels (int): The number of output channels of the
             attentional convolution
+        pred_activation (Module): An activation function instance to be applied
+            on the last dimension of the predicted logits.
         masking_value (int): The attentin masking value. Default -1e15
     """
 
@@ -251,6 +264,7 @@ class SpeechTransformer(nn.Module):
         h: int,
         att_kernel_size: int,
         att_out_channels: int,
+        pred_activation: nn.Module,
         masking_value: int = -1e15,
     ) -> None:
         super().__init__()
@@ -273,6 +287,7 @@ class SpeechTransformer(nn.Module):
             d_model=d_model,
             ff_size=ff_size,
             h=h,
+            pred_activation=pred_activation,
             masking_value=masking_value,
         )
 
