@@ -83,11 +83,12 @@ class VariableAttenuator(StochasticProcess):
         applied to the data. Default 1.0
     """
 
-    def __init__(self, ratio=1.0) -> None:
+    def __init__(self, ratio=1.0, noise_mul=0.5) -> None:
         super().__init__(ratio)
+        self.noise_mul = noise_mul
 
     def func(self, x: Tensor):
-        return x * torch.randn_like(x).to(x.device)
+        return x + x * self.noise_mul * torch.randn_like(x).to(x.device)
 
 
 class Reverberation(StochasticProcess):
