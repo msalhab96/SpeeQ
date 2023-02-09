@@ -149,7 +149,7 @@ class Reverberation(StochasticProcess):
         return torch.nn.functional.conv1d(x, ir).squeeze(dim=0)
 
 
-class BaseMasking(StochasticProcess):
+class _BaseMasking(StochasticProcess):
     def __init__(self, n: int, max_length: int, ratio=1.0) -> None:
         super().__init__(ratio)
         self.n = n
@@ -167,7 +167,7 @@ class BaseMasking(StochasticProcess):
         return mask
 
 
-class FrequencyMasking(BaseMasking):
+class FrequencyMasking(_BaseMasking):
     """Mask the inpus spectrogram, on the frequency axis.
 
     Args:
@@ -178,7 +178,7 @@ class FrequencyMasking(BaseMasking):
     """
 
     def __init__(self, n: int, max_length: int, ratio=1.0) -> None:
-        super().__init__(ratio, n, max_length)
+        super().__init__(ratio=ratio, n=n, max_length=max_length)
 
     def func(self, x: Tensor) -> Tensor:
         """
@@ -188,7 +188,7 @@ class FrequencyMasking(BaseMasking):
         return x * self._get_mask(x, dim=-1)
 
 
-class TimeMasking(BaseMasking):
+class TimeMasking(_BaseMasking):
     """Mask the inpus spectrogram, on the time axis.
 
     Args:
@@ -199,7 +199,7 @@ class TimeMasking(BaseMasking):
     """
 
     def __init__(self, n: int, max_length: int, ratio=1.0) -> None:
-        super().__init__(ratio, n, max_length)
+        super().__init__(ratio=ratio, n=n, max_length=max_length)
 
     def func(self, x: Tensor) -> Tensor:
         """
