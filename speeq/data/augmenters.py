@@ -36,11 +36,11 @@ class VolumeChanger(StochasticProcess):
 
     Args:
         ratio (float): The ratio/rate that the augmentation will be
-        applied to the data. Default 1.0
+            applied to the data. Default 1.0
         min_gain (float): The minimum gain that will be multiplied by
-        the signal.
+            the signal.
         max_gain (float): The maximum gain that will be multiplied by
-        the signal.
+            the signal.
     """
 
     def __init__(self, min_gain: float, max_gain: float, ratio=1.0) -> None:
@@ -70,7 +70,7 @@ class ConsistentAttenuator(VolumeChanger):
     """
 
     def __init__(self, ratio=1.0, min_gain=0.1) -> None:
-        super().__init__(ratio, min_gain, max_gain=1)
+        super().__init__(ratio=ratio, min_gain=min_gain, max_gain=1)
 
 
 class VariableAttenuator(StochasticProcess):
