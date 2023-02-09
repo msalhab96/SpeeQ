@@ -192,3 +192,18 @@ class CharTokenizer(BaseTokenizer):
 
     def preprocess_tokens(self, sentence: str) -> List[str]:
         return list(sentence)
+
+
+class WordTokenizer(BaseTokenizer):
+    def __init__(self, sep=" ") -> None:
+        super().__init__()
+        self.sep = sep
+
+    def get_tokens(self, data: List[str]):
+        result = set()
+        for line in data:
+            result = result.union(line.split(self.sep))
+        return result
+
+    def preprocess_tokens(self, sentence: str) -> List[str]:
+        return sentence.split(self.sep)
