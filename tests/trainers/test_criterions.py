@@ -150,3 +150,37 @@ class TestRNNTLoss:
         loss.backward()
         for param in model.parameters():
             assert param.grad is not None
+
+
+@pytest.mark.parametrize(
+    ("batch_size", "seq_len", "n_classes"),
+    (
+        (5, 8, 7),
+        (2, 1, 7),
+    ),
+)
+def test_get_flatten_results(batcher, int_batcher, batch_size, seq_len, n_classes):
+    input = batcher(batch_size, seq_len, n_classes)
+    target = int_batcher(batch_size, seq_len, n_classes)
+    input, target = criterions.get_flatten_results(input=input, target=target)
+    assert target.shape == (batch_size * seq_len,)
+    assert input.shape == (batch_size * seq_len, n_classes)
+
+
+@pytest.mark.parametrize(
+    ("batch_size", "seq_len", "n_classes"),
+    (
+        (5, 8, 7),
+        (2, 1, 7),
+    ),
+)
+def test_remove_positionals(batcher, int_batcher, batch_size, seq_len, n_classes):
+    input = batcher(batch_size, seq_len, n_classes)
+    target = int_batcher(batch_size, seq_len, n_classes)
+    expected_input = input[:, :-1, :]
+    expected_target = target[:, 1:]
+    input, target = criterions.remove_positionals(input=input, target=target)
+    assert target.shape == (batch_size, seq_len - 1)
+    assert input.shape == (batch_size, seq_len - 1, n_classes)
+    assert torch.allclose(expected_input, input)
+    assert torch.all(expected_target == target)
