@@ -143,7 +143,8 @@ class Reverberation(StochasticProcess):
                 torch.zeros(1, 1, ir_length // 2).to(x.device),
                 x,
                 torch.zeros(1, 1, ir_length // 2 + is_odd).to(x.device),
-            ]
+            ],
+            dim=-1,
         )
         return torch.nn.functional.conv1d(x, ir).squeeze(dim=0)
 
