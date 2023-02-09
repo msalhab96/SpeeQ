@@ -122,9 +122,7 @@ class BERT(nn.Module):
         self.has_bnorm = False
 
     def embed(self, x: Tensor, mask: Tensor):
-        # this is valid as long the padding is dynamic!
-        # TODO
-        max_len = mask.shape[-1]
+        max_len = mask.sum(dim=-1).max().item()
         emb = self.pos_emb[:max_len]  # M, d
         emb = emb.unsqueeze(dim=0)  # 1, M, d
         emb = emb.repeat(mask.shape[0], 1, 1)  # B, M , d
