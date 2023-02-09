@@ -11,18 +11,22 @@ class WhiteNoiseInjector(StochasticProcess):
     this is done by adding the inpus signal x to randomly generated
     Gaussian noise multiplied by a random gain as the below equation
     show:
-    x_aumgneted = x + noise * gain
+    x_aumgneted = x + noise * gain * gain_mul
+    where `gain` is a random number in the range [0, 1]
 
     Args:
         ratio (float): The ratio/rate that the augmentation will be
-        applied to the data. Default 1.0
+            applied to the data. Default 1.0
+        gain_mul (float): The gain multiplier factor to control the
+            strength of the noise. Default 0.05
     """
 
-    def __init__(self, ratio=1.0) -> None:
+    def __init__(self, ratio=1.0, gain_mul=5e-2) -> None:
         super().__init__(ratio)
+        self.gain_mul = gain_mul
 
     def func(self, x: Tensor) -> Tensor:
-        gain = random.random()
+        gain = random.random() * self.gain_mul
         return x + gain * torch.randn_like(x).to(x.device)
 
 
