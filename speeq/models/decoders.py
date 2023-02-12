@@ -91,7 +91,7 @@ class GlobAttRNNDecoder(nn.Module):
         mask = mask.to(y.device)
         mask = mask.unsqueeze(dim=-1)
         out = torch.argmax(out, dim=-1)
-        return (~mask) * y + mask * out
+        return mask * y + (~mask) * out
 
     def _init_hidden_state(self, batch_size, device):
         if self.is_lstm:
