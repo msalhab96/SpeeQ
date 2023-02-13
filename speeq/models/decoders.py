@@ -75,14 +75,14 @@ class GlobAttRNNDecoder(nn.Module):
         self.is_lstm = rnn_type == "lstm"
         self.teacher_forcing_rate = teacher_forcing_rate
 
-    def _apply_teacher_forcing(self, y: Tensor, out: Tensor) -> Tensor:
+    def _apply_teacher_forcing(self, y: Tensor, preds: Tensor) -> Tensor:
         # y of shape [B, 1]
-        # out of shape [B, 1, C]
+        # preds of shape [B, 1]
         """Applies teacher forcing on the decoder's input.
 
         Args:
             y (Tensor): The original target labels.
-            out (Tensor): The latest predicted probabilities.
+            preds (Tensor): The latest prediction.
 
         Returns:
             Tensor: The new decoder input tensor.
@@ -90,8 +90,7 @@ class GlobAttRNNDecoder(nn.Module):
         mask = torch.rand(y.shape[0]) <= self.teacher_forcing_rate
         mask = mask.to(y.device)
         mask = mask.unsqueeze(dim=-1)
-        out = torch.argmax(out, dim=-1)
-        return mask * y + (~mask) * out
+        return mask * y + (~mask) * preds
 
     def _init_hidden_state(self, batch_size, device):
         if self.is_lstm:
@@ -131,9 +130,9 @@ class GlobAttRNNDecoder(nn.Module):
                 out, h[j] = rnn(out, h[j])
             out = self.pred_net(out)
             results = out if results is None else torch.cat([results, out], dim=1)
-            y = dec_inp[:, i : i + 1]
+            y = torch.argmax(out, dim=-1)
             if self.teacher_forcing_rate > 0:
-                y = self._apply_teacher_forcing(y=y, out=out)
+                y = self._apply_teacher_forcing(y=dec_inp[:, i : i + 1], preds=y)
             out = self.emb(y)
         return results
 
@@ -248,9 +247,9 @@ class LocationAwareAttDecoder(GlobAttRNNDecoder):
                 out, h[j] = rnn(out, h[j])
             out = self.pred_net(out)
             results = out if results is None else torch.cat([results, out], dim=1)
-            y = dec_inp[:, i : i + 1]
+            y = torch.argmax(out, dim=-1)
             if self.teacher_forcing_rate > 0:
-                y = self._apply_teacher_forcing(y=y, out=out)
+                y = self._apply_teacher_forcing(y=dec_inp[:, i : i + 1], preds=y)
             out = self.emb(y)
         return results
 
