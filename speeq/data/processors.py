@@ -1,6 +1,5 @@
 import random
 from abc import abstractmethod
-from typing import List
 
 from speeq.interfaces import IProcess, IProcessor
 
@@ -22,7 +21,7 @@ class OrderedProcessor(IProcessor):
         return x
 
 
-class StochasticProcessor(IProcessor):
+class StochasticProcessor(OrderedProcessor):
     """Applies the provided processes in a stochastic way, where all processes
     first get shuffled then applied.
 
@@ -35,7 +34,7 @@ class StochasticProcessor(IProcessor):
 
     def execute(self, x):
         random.shuffle(self.processes)
-        super().execute(x)
+        return super().execute(x)
 
 
 class StochasticProcess(IProcess):
