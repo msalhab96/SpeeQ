@@ -63,6 +63,8 @@ def get_asr_datasets(
         sep=data_config.sep,
         add_eos=data_config.add_eos_token,
         add_sos=data_config.add_sos_token,
+        sort_key=data_config.sort_key,
+        reverse=data_config.reverse,
     )
     test_dataset = SpeechTextDataset(
         data_path=data_config.testing_path,
@@ -72,6 +74,8 @@ def get_asr_datasets(
         sep=data_config.sep,
         add_eos=data_config.add_eos_token,
         add_sos=data_config.add_sos_token,
+        sort_key=data_config.sort_key,
+        reverse=data_config.reverse,
     )
     return train_dataset, test_dataset
 
@@ -125,6 +129,7 @@ def get_asr_loaders(
         batch_size=batch_size,
         text_padder=text_padder,
         speech_padder=speech_padder,
+        shuffle=data_config.shuffle,
     )
     test_loader = SpeechTextLoader(
         dataset=test_dataset,

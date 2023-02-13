@@ -82,6 +82,11 @@ class ASRDataConfig:
             shall be added to the text squences. Default True.
         use_blank_as_pad (bool): A flag if the blank id to be used as padding.
             Default False.
+        sort_key (Optional[str]): The key to sort the data on. Default ''.
+        reverse (bool): Used if sorting key is passed, False will sort ascending,
+            True will sort descending. Default is False.
+        shuffle (bool): A flag indicating whether the dataset should be
+            shuffled at each iteration Default False.
     """
 
     training_path: Union[str, Path]
@@ -97,6 +102,9 @@ class ASRDataConfig:
     add_sos_token: bool = True
     add_eos_token: bool = True
     use_blank_as_pad: bool = False
+    sort_key: str = ""
+    reverse: bool = False
+    shuffle: bool = False
 
 
 @dataclass

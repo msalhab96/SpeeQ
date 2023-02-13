@@ -1,5 +1,6 @@
+import random
 from pathlib import Path
-from typing import List, Tuple, Union
+from typing import List, Optional, Tuple, Union
 
 import torch
 from torch import Tensor
@@ -19,13 +20,27 @@ class CSVDataset(IDataset):
         data_path (Union[str, Path]): The file path.
         sep (str): The CSV separator.
         encoding (str): The file encoding. Default "utf-8".
+        sort_key (Optional[str]): The key to sort the data on. Default ''.
+        reverse (bool): Used if sorting key is passed, False will sort ascending,
+            True will sort descending. Default is False.
     """
 
-    def __init__(self, data_path: Union[str, Path], sep: str, encoding="utf-8") -> None:
+    def __init__(
+        self,
+        data_path: Union[str, Path],
+        sep: str,
+        encoding="utf-8",
+        sort_key: Optional[str] = "",
+        reverse: bool = False,
+    ) -> None:
         super().__init__()
         self.data_path = data_path
         self.sep = sep
         self.data = load_csv(file_path=data_path, encoding=encoding, sep=sep)
+        if sort_key != "":
+            self.data = list(
+                sorted(self.data, key=lambda x: x[sort_key], reverse=reverse)
+            )
 
     def __getitem__(self, idx: int) -> dict:
         return self.data[idx]
@@ -45,10 +60,13 @@ class SpeechTextDataset(CSVDataset):
         text_processor (IProcessor): The text processor.
         sep (str): The CSV separator.
         add_sos (bool): a flag indicates if SOS token shall be added
-        to the text sequence. Default False.
+            to the text sequence. Default False.
         add_eos (bool): a flag indicates if EOS token shall be added
-        to the text sequence. Default False.
+            to the text sequence. Default False.
         encoding (str): The file encoding. Default "utf-8".
+        sort_key (Optional[str]): The key to sort the data on. Default ''.
+        reverse (bool): Used if sorting key is passed, False will sort ascending,
+            True will sort descending. Default is False.
     """
 
     def __init__(
@@ -61,8 +79,16 @@ class SpeechTextDataset(CSVDataset):
         add_sos=False,
         add_eos=False,
         encoding="utf-8",
+        sort_key: Optional[str] = "",
+        reverse: bool = False,
     ) -> None:
-        super().__init__(data_path, sep, encoding)
+        super().__init__(
+            data_path=data_path,
+            sep=sep,
+            encoding=encoding,
+            sort_key=sort_key,
+            reverse=reverse,
+        )
         self.tokenizer = tokenizer
         self.speech_processor = speech_processor
         self.text_processor = text_processor
@@ -96,10 +122,17 @@ class DataLoader(IDataLoader):
         rank (int): The process rank.
         world_size (int): The number of total processes.
         batch_size (int): The batch size.
+        shuffle (bool): A flag indicating whether the dataset should be
+            shuffled at each iteration Default False.
     """
 
     def __init__(
-        self, dataset: object, rank: int, world_size: int, batch_size: int
+        self,
+        dataset: object,
+        rank: int,
+        world_size: int,
+        batch_size: int,
+        shuffle: bool = False,
     ) -> None:
         self.rank = rank
         self.world_size = world_size
@@ -109,6 +142,7 @@ class DataLoader(IDataLoader):
         self._counter = 0
         self.batch_size = batch_size
         self.n_batches = self.length // self.batch_size
+        self.shuffle = shuffle
 
     @property
     def start_idx(self):
@@ -132,6 +166,8 @@ class SpeechTextLoader(DataLoader):
         batch_size (int): The batch size.
         text_padder (IPadder): The text padder.
         speech_padder (IPadder): The speech padder.
+        shuffle (bool): A flag indicating whether the dataset should be
+            shuffled at each iteration Default False.
     """
 
     def __init__(
@@ -142,8 +178,9 @@ class SpeechTextLoader(DataLoader):
         batch_size: int,
         text_padder: IPadder,
         speech_padder: IPadder,
+        shuffle: bool = False,
     ) -> None:
-        super().__init__(dataset, rank, world_size, batch_size)
+        super().__init__(dataset, rank, world_size, batch_size, shuffle)
         self.text_padder = text_padder
         self.speech_padder = speech_padder
 
@@ -184,6 +221,8 @@ class SpeechTextLoader(DataLoader):
 
     def __iter__(self):
         self._counter = 0
+        if self.shuffle is True:
+            random.shuffle(self.indices)
         return self
 
     def __next__(self):
