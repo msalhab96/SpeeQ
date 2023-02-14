@@ -84,3 +84,11 @@ def int_batcher():
         return torch.randint(min_val, max_val, size=(batch_size, seq_len))
 
     return func
+
+
+@fixture
+def audio_generator():
+    def func(n_samples: int, n_channels=1):
+        return torch.randn(n_channels, n_samples)
+
+    return func
