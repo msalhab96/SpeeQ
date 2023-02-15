@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Tuple, Union
 
+from speeq.constants import CHAR_TOKENIZER_TYPE, TOKENIZER_TYPE_KEY, WORD_TOKENIZER_TYPE
 from speeq.interfaces import ITokenizer
 from speeq.utils.utils import load_json, save_json
 
@@ -175,6 +176,13 @@ class _BaseTokenizer(ITokenizer):
         if os.path.exists(tokenizer_path) is False:
             raise FileNotFoundError(f"{tokenizer_path} not found!")
         data = load_json(tokenizer_path)
+        assert (
+            data[TOKENIZER_TYPE_KEY] == self._type
+        ), f"""
+        The used tokenizer is not matched with the pre-trained tokenizer!
+        Given pre-trained tokenizer of type {data[TOKENIZER_TYPE_KEY]} while {self._type}
+        is used!
+        """
         self._token_to_id = data[self._token_to_id_key]
         self.__set_special_tokens_dict(data[self._special_tokens_key])
         self._reset_id_to_token()
@@ -197,6 +205,7 @@ class _BaseTokenizer(ITokenizer):
 
     def save_tokenizer(self, save_path: Union[str, Path], *args, **kwargs) -> None:
         data = {
+            TOKENIZER_TYPE_KEY: self._type,
             self._token_to_id_key: self._token_to_id,
             self._special_tokens_key: self.__get_special_tokens_dict(),
         }
@@ -242,6 +251,8 @@ class _BaseTokenizer(ITokenizer):
 class CharTokenizer(_BaseTokenizer):
     """Implements character based tokenizer."""
 
+    _type = CHAR_TOKENIZER_TYPE
+
     def __init__(self) -> None:
         super().__init__()
 
@@ -254,6 +265,8 @@ class CharTokenizer(_BaseTokenizer):
 
 class WordTokenizer(_BaseTokenizer):
     """Implements white space based tokenizer."""
+
+    _type = WORD_TOKENIZER_TYPE
 
     def __init__(self, sep=" ") -> None:
         super().__init__()

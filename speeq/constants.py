@@ -21,6 +21,13 @@ PREV_HIDDEN_STATE_KEY = "prev_h"
 # %%
 
 
+# %%
+TOKENIZER_TYPE_KEY = "type"
+CHAR_TOKENIZER_TYPE = "char_tokenizer"
+WORD_TOKENIZER_TYPE = "word_tokenizer"
+# %%
+
+
 class FileKeys(Enum):
     text_key = "text"
     speech_key = "file_path"
