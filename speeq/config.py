@@ -65,7 +65,9 @@ class ASRDataConfig:
         speech_processor (IProcessor): The speech processor.
         text_processor (IProcessor): The text processor.
         tokenizer_path (Union[str, Path]): The path to load or save
-        the tokenizer.
+            the tokenizer.
+        tokenizer_type (str): The tokenizer type to be used. Default
+            `char_tokenizer`
         sep (str): the csv file's fields seprator. Default ','.
         type (str): the file type. Default 'csv'.
         padding_type (str): The padding to use static or dynamic.
@@ -94,6 +96,7 @@ class ASRDataConfig:
     speech_processor: IProcessor
     text_processor: IProcessor
     tokenizer_path: Union[str, Path]
+    tokenizer_type: str = "char_tokenizer"
     sep: str = ","
     type: str = "csv"
     padding_type: str = "dynamic"
