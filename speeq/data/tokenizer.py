@@ -76,6 +76,7 @@ class _SpecialTokens:
 
 class _BaseTokenizer(ITokenizer):
     _pad_key = "pad"
+    _oov_key = "oov"
     _sos_key = "sos"
     _eos_key = "eos"
     _blank_key = "blank"
