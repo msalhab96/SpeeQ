@@ -54,7 +54,7 @@ class SpeechTextDataset(CSVDataset):
     for speech-recognition application.
 
     Args:
-        data_path (Union[str, Path]): The file path.
+        data_path (Union[str, Path]): The data csv file path.
         tokenizer (ITokenizerITokenizer): The tokenizer that will be used.
         speech_processor (IProcessor): The speech processor.
         text_processor (IProcessor): The text processor.
