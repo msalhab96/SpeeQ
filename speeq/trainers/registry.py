@@ -2,11 +2,12 @@ import os
 
 from torch.optim import SGD, Adam, AdamW, RMSprop
 
+from speeq.constants import FileKeys
 from speeq.data.registry import get_asr_loaders, get_tokenizer
 from speeq.interfaces import ITrainer
 from speeq.models.registry import get_model
 from speeq.utils.loggers import get_logger
-from speeq.utils.utils import set_state_dict
+from speeq.utils.utils import get_text_list, load_csv, set_state_dict
 
 from .criterions import CrossEntropyLoss, CTCLoss, NLLLoss, RNNTLoss
 from .schedulers import NoamScheduler, SqueezeformerNoamScheduler
@@ -70,7 +71,9 @@ def _get_asr_trainer_args(
         n_logs=trainer_config.n_logs,
         clear_screen=trainer_config.clear_screen,
     )
-    tokenizer = get_tokenizer(data_config=data_config)
+    data = load_csv(data_config.training_path, sep=data_config.sep)
+    data = get_text_list(data=data)
+    tokenizer = get_tokenizer(data_config=data_config, data=data)
     model = get_model(model_config=model_config, n_classes=tokenizer.vocab_size)
     if world_size == 1:
         model = model.to(trainer_config.device)
