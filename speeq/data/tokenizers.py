@@ -162,6 +162,12 @@ class _BaseTokenizer(ITokenizer):
             data[self._oov_key] = list(self.special_tokens._oov)
         return data
 
+    def load_tokenizer_from_dict(self, data: dict) -> ITokenizer:
+        self._token_to_id = data[self._token_to_id_key]
+        self.__set_special_tokens_dict(data[self._special_tokens_key])
+        self._reset_id_to_token()
+        return self
+
     def load_tokenizer(
         self, tokenizer_path: Union[str, Path], *args, **kwargs
     ) -> ITokenizer:
@@ -183,10 +189,7 @@ class _BaseTokenizer(ITokenizer):
         Given pre-trained tokenizer of type {data[TOKENIZER_TYPE_KEY]} while {self._type}
         is used!
         """
-        self._token_to_id = data[self._token_to_id_key]
-        self.__set_special_tokens_dict(data[self._special_tokens_key])
-        self._reset_id_to_token()
-        return self
+        return self.load_tokenizer_from_dict(data)
 
     def set_tokenizer(self, data: List[str], *args, **kwargs) -> ITokenizer:
         """Sets/trains the tokenizer on the provided data.
