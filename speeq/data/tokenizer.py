@@ -11,6 +11,7 @@ from speeq.utils.utils import load_json, save_json
 from .decorators import check_token
 
 PAD = "<PAD>"
+OOV = "<OOV>"
 SOS = "<SOS>"
 EOS = "<EOS>"
 BLANK = "<BLANK>"
@@ -22,6 +23,7 @@ class _SpecialTokens:
     _blank: Tuple[str, int] = (None, None)
     _sos: Tuple[str, int] = (None, None)
     _eos: Tuple[str, int] = (None, None)
+    _oov: Tuple[str, int] = (None, None)
 
     @property
     def pad_id(self):
@@ -63,6 +65,14 @@ class _SpecialTokens:
     def mask_token(self):
         return self._mask[0]
 
+    @property
+    def oov_id(self):
+        return self._oov[1]
+
+    @property
+    def oov_token(self):
+        return self._oov[0]
+
 
 class _BaseTokenizer(ITokenizer):
     _pad_key = "pad"
@@ -77,6 +87,7 @@ class _BaseTokenizer(ITokenizer):
         self._token_to_id = dict()
         self._id_to_token = dict()
         self.special_tokens = _SpecialTokens()
+        self.add_oov_token()
 
     @property
     def vocab_size(self):
@@ -112,6 +123,12 @@ class _BaseTokenizer(ITokenizer):
         self.special_tokens._eos = (token, token_id)
         return self
 
+    @check_token(OOV)
+    def add_oov_token(self, token=OOV) -> ITokenizer:
+        token_id = self.add_token(token)
+        self.special_tokens._oov = (token, token_id)
+        return self
+
     def _reset_id_to_token(self) -> None:
         self._id_to_token = dict(
             zip(self._token_to_id.values(), self._token_to_id.keys())
@@ -126,6 +143,8 @@ class _BaseTokenizer(ITokenizer):
             self.special_tokens._sos = tuple(data[self._sos_key])
         if self._eos_key in data:
             self.special_tokens._eos = tuple(data[self._eos_key])
+        if self._oov_key in data:
+            self.special_tokens._oov = tuple(data[self._oov_key])
 
     def __get_special_tokens_dict(self) -> dict:
         data = {}
@@ -137,6 +156,8 @@ class _BaseTokenizer(ITokenizer):
             data[self._sos_key] = list(self.special_tokens._sos)
         if self.special_tokens.eos_id is not None:
             data[self._eos_key] = list(self.special_tokens._eos)
+        if self.special_tokens.oov_id is not None:
+            data[self._oov_key] = list(self.special_tokens._oov)
         return data
 
     def load_tokenizer(
@@ -200,7 +221,9 @@ class _BaseTokenizer(ITokenizer):
         if add_sos is True:
             results.append(self.special_tokens.sos_id)
         tokens = self.preprocess_tokens(sentence)
-        results.extend(map(lambda x: self._token_to_id[x], tokens))
+        results.extend(
+            map(lambda x: self._token_to_id.get(x, self.special_tokens.oov_id), tokens)
+        )
         if add_eos is True:
             results.append(self.special_tokens.eos_id)
         return results
@@ -229,6 +252,8 @@ class CharTokenizer(_BaseTokenizer):
 
 
 class WordTokenizer(_BaseTokenizer):
+    """Implements white space based tokenizer."""
+
     def __init__(self, sep=" ") -> None:
         super().__init__()
         self.sep = sep
