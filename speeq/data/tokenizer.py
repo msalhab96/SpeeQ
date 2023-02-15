@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Tuple, Union
@@ -16,7 +17,7 @@ BLANK = "<BLANK>"
 
 
 @dataclass
-class SpecialTokens:
+class _SpecialTokens:
     _pad: Tuple[str, int] = (None, None)
     _blank: Tuple[str, int] = (None, None)
     _sos: Tuple[str, int] = (None, None)
@@ -63,7 +64,7 @@ class SpecialTokens:
         return self._mask[0]
 
 
-class BaseTokenizer(ITokenizer):
+class _BaseTokenizer(ITokenizer):
     _pad_key = "pad"
     _sos_key = "sos"
     _eos_key = "eos"
@@ -75,7 +76,7 @@ class BaseTokenizer(ITokenizer):
         super().__init__()
         self._token_to_id = dict()
         self._id_to_token = dict()
-        self.special_tokens = SpecialTokens()
+        self.special_tokens = _SpecialTokens()
 
     @property
     def vocab_size(self):
@@ -141,6 +142,16 @@ class BaseTokenizer(ITokenizer):
     def load_tokenizer(
         self, tokenizer_path: Union[str, Path], *args, **kwargs
     ) -> ITokenizer:
+        """Loads a pre-trained tokenizer.
+
+        Args:
+            tokenizer_path (Union[str, Path]): The pre-trained tokenizer path.
+
+        Returns:
+            ITokenizer: The loaded tokenizer.
+        """
+        if os.path.exists(tokenizer_path) is False:
+            raise FileNotFoundError(f"{tokenizer_path} not found!")
         data = load_json(tokenizer_path)
         self._token_to_id = data[self._token_to_id_key]
         self.__set_special_tokens_dict(data[self._special_tokens_key])
@@ -148,6 +159,14 @@ class BaseTokenizer(ITokenizer):
         return self
 
     def set_tokenizer(self, data: List[str], *args, **kwargs) -> ITokenizer:
+        """Sets/trains the tokenizer on the provided data.
+
+        Args:
+            data (List[str]): A list of all text sentences.
+
+        Returns:
+            ITokenizer: The trained tokenizer.
+        """
         all_tokens = self.get_tokens(data)
         for token in all_tokens:
             self.add_token(token=token)
@@ -165,10 +184,23 @@ class BaseTokenizer(ITokenizer):
         return list(map(lambda x: self._id_to_token[x], ids))
 
     def tokenize(self, sentence: str, add_sos=False, add_eos=False) -> List[int]:
+        """Tokenizes the input sentence.
+
+        Args:
+            sentence (str): The sentence to be tokenized.
+            add_sos (bool, optional): A flag to whether added SOS token at the
+                end of the sequence. Defaults to False.
+            add_eos (bool, optional): A flag to whether add EOS token at the
+                end of the sequence. Defaults to False.
+
+        Returns:
+            List[int]: The tokenized sequence.
+        """
         results = []
         if add_sos is True:
             results.append(self.special_tokens.sos_id)
-        results.extend(map(lambda x: self._token_to_id[x], sentence))
+        tokens = self.preprocess_tokens(sentence)
+        results.extend(map(lambda x: self._token_to_id[x], tokens))
         if add_eos is True:
             results.append(self.special_tokens.eos_id)
         return results
@@ -183,7 +215,9 @@ class BaseTokenizer(ITokenizer):
         return list(map(self.ids2tokens, data))
 
 
-class CharTokenizer(BaseTokenizer):
+class CharTokenizer(_BaseTokenizer):
+    """Implements character based tokenizer."""
+
     def __init__(self) -> None:
         super().__init__()
 
@@ -194,7 +228,7 @@ class CharTokenizer(BaseTokenizer):
         return list(sentence)
 
 
-class WordTokenizer(BaseTokenizer):
+class WordTokenizer(_BaseTokenizer):
     def __init__(self, sep=" ") -> None:
         super().__init__()
         self.sep = sep
