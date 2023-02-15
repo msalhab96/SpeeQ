@@ -8,7 +8,7 @@ from speeq.utils.utils import load_csv
 
 from .loaders import SpeechTextDataset, SpeechTextLoader
 from .padders import DynamicPadder, StaticPadder
-from .tokenizer import CharTokenizer
+from .tokenizers import CharTokenizer
 
 PADDING_TYPES = {"static": StaticPadder, "dynamic": DynamicPadder}
 
