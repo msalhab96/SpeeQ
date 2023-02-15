@@ -92,3 +92,11 @@ def audio_generator():
         return torch.randn(n_channels, n_samples)
 
     return func
+
+
+@fixture
+def spectrogram_generator():
+    def func(n_samples: int, feat_size: int, n_channels=1):
+        return torch.randn(n_channels, n_samples, feat_size)
+
+    return func
