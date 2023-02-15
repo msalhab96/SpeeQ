@@ -2,15 +2,22 @@ import os
 from pathlib import Path
 from typing import Tuple, Union
 
-from speeq.constants import FileKeys
+from speeq.constants import (
+    CHAR_TOKENIZER_TYPE,
+    TOKENIZER_TYPE_KEY,
+    WORD_TOKENIZER_TYPE,
+    FileKeys,
+)
 from speeq.interfaces import IDataLoader, IDataset, IPadder, ITokenizer
-from speeq.utils.utils import load_csv
+from speeq.utils.utils import load_csv, load_json
 
 from .loaders import SpeechTextDataset, SpeechTextLoader
 from .padders import DynamicPadder, StaticPadder
-from .tokenizers import CharTokenizer
+from .tokenizers import CharTokenizer, WordTokenizer
 
 PADDING_TYPES = {"static": StaticPadder, "dynamic": DynamicPadder}
+
+TOKENIZERS = {WORD_TOKENIZER_TYPE: WordTokenizer, CHAR_TOKENIZER_TYPE: CharTokenizer}
 
 
 def get_tokenizer(data_config: object) -> ITokenizer:
@@ -24,7 +31,11 @@ def get_tokenizer(data_config: object) -> ITokenizer:
         ITokenizer: A tokenizer object.
     """
     tokenizer_path = data_config.tokenizer_path
-    tokenizer = CharTokenizer()
+    if data_config.tokenizer_type not in TOKENIZERS:
+        raise KeyError(
+            f"invalid tokenizer name, please use one of {list(TOKENIZERS.keys())}"
+        )
+    tokenizer = TOKENIZERS[data_config.tokenizer_type]()
     if os.path.exists(tokenizer_path) is True:
         tokenizer.load_tokenizer(tokenizer_path)
         print(f"Tokenizer {tokenizer_path} loadded!")
@@ -40,7 +51,8 @@ def get_tokenizer(data_config: object) -> ITokenizer:
 
 
 def load_tokenizer(tokenizer_path: Union[Path, str]) -> ITokenizer:
-    return CharTokenizer().load_tokenizer(tokenizer_path)
+    type = load_json(tokenizer_path)[TOKENIZER_TYPE_KEY]
+    return TOKENIZERS[type].load_tokenizer(tokenizer_path)
 
 
 def get_asr_datasets(
