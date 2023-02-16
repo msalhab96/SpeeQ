@@ -180,3 +180,31 @@ class TestWordTokenizer:
         tokenizer = tokenizers.WordTokenizer()
         result = tokenizer.get_tokens(data=data)
         assert result - expected == set()
+
+    @pytest.mark.parametrize(
+        ("sentence", "add_sos", "add_eos", "expected"),
+        (
+            ("a a b a", False, False, [4, 4, 5, 4]),
+            (
+                "a",
+                False,
+                False,
+                [
+                    4,
+                ],
+            ),
+            ("a b b a", True, False, [2, 4, 5, 5, 4]),
+            ("a a b a", True, True, [None]),  # assertoin
+        ),
+    )
+    def test_tokenize(self, word_tokenizer_dict, sentence, add_sos, add_eos, expected):
+        tokenizer = tokenizers.WordTokenizer()
+        tokenizer.load_tokenizer_from_dict(word_tokenizer_dict)
+        if add_eos is True:
+            with pytest.raises(AssertionError):
+                tokenizer.tokenize(sentence=sentence, add_eos=add_eos, add_sos=add_sos)
+        else:
+            result = tokenizer.tokenize(
+                sentence=sentence, add_eos=add_eos, add_sos=add_sos
+            )
+            assert result == expected
