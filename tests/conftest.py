@@ -100,3 +100,43 @@ def spectrogram_generator():
         return torch.randn(n_channels, n_samples, feat_size)
 
     return func
+
+
+@fixture
+def char_tokenizer_dict():
+    return {
+        "type": "char_tokenizer",
+        "token_to_id": {
+            "<OOV>": 0,
+            "<PAD>": 1,
+            "<SOS>": 2,
+            "a": 4,
+            "b": 5,
+            "c": 6,
+        },
+        "special_tokens": {
+            "oov": ["<OOV>", 0],
+            "pad": ["<PAD>", 1],
+            "sos": ["<SOS>", 2],
+        },
+    }
+
+
+@fixture
+def word_tokenizer_dict():
+    return {
+        "type": "word_tokenizer",
+        "token_to_id": {
+            "<OOV>": 0,
+            "<PAD>": 1,
+            "<SOS>": 2,
+            "a": 4,
+            "b": 5,
+            "c": 6,
+        },
+        "special_tokens": {
+            "oov": ["<OOV>", 0],
+            "pad": ["<PAD>", 1],
+            "sos": ["<SOS>", 2],
+        },
+    }
