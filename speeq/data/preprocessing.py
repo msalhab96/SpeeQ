@@ -63,9 +63,9 @@ class FeatStacker(IProcess):
         residual = x.shape[-2] % self.feat_stack_factor
         if residual != 0:
             size = list(x.shape)
-            size[1] = self.feat_stack_factor - residual
+            size[-2] = self.feat_stack_factor - residual
             zeros = torch.zeros(*size).to(x.device)
-            x = torch.cat([x, zeros])
+            x = torch.cat([x, zeros], dim=-2)
         x = x.view(*x.shape[:-2], x.shape[-2] // self.feat_stack_factor, -1)
         return x
 
