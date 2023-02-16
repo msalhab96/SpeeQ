@@ -92,10 +92,12 @@ class _BaseTokenizer(ITokenizer):
         self.add_oov_token()
 
     @property
-    def vocab_size(self):
+    def vocab_size(self) -> int:
         return len(self._token_to_id)
 
-    def add_token(self, token: str):
+    def add_token(self, token: str) -> int:
+        if token in self._token_to_id:
+            return self._token_to_id[token]
         token_id = self.vocab_size
         self._token_to_id[token] = token_id
         self._id_to_token[token_id] = token
