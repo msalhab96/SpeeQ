@@ -234,12 +234,14 @@ class _BaseTokenizer(ITokenizer):
         """
         results = []
         if add_sos is True:
+            assert self.special_tokens.sos_id is not None
             results.append(self.special_tokens.sos_id)
         tokens = self.preprocess_tokens(sentence)
         results.extend(
             map(lambda x: self._token_to_id.get(x, self.special_tokens.oov_id), tokens)
         )
         if add_eos is True:
+            assert self.special_tokens.sos_id is not None
             results.append(self.special_tokens.eos_id)
         return results
 
