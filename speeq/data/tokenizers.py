@@ -241,7 +241,7 @@ class _BaseTokenizer(ITokenizer):
             map(lambda x: self._token_to_id.get(x, self.special_tokens.oov_id), tokens)
         )
         if add_eos is True:
-            assert self.special_tokens.sos_id is not None
+            assert self.special_tokens.eos_id is not None
             results.append(self.special_tokens.eos_id)
         return results
 
