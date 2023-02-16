@@ -283,6 +283,8 @@ class WordTokenizer(_BaseTokenizer):
         result = set()
         for line in data:
             result = result.union(line.split(self.sep))
+        if "" in result:
+            result.remove("")
         return result
 
     def preprocess_tokens(self, sentence: str) -> List[str]:
