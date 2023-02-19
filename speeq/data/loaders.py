@@ -54,9 +54,10 @@ class SpeechTextDataset(CSVDataset):
     for speech-recognition application.
 
     Args:
-        data_path (Union[str, Path]): The file path.
+        data_path (Union[str, Path]): The data csv file path.
         tokenizer (ITokenizerITokenizer): The tokenizer that will be used.
-        speech_processor (IProcessor): The speech processor.
+        speech_processor (IProcessor): The speech processor, where the `run`
+            method returns the speech of shape [B] or [1, M], or [..., M, F].
         text_processor (IProcessor): The text processor.
         sep (str): The CSV separator.
         add_sos (bool): a flag indicates if SOS token shall be added
@@ -104,8 +105,15 @@ class SpeechTextDataset(CSVDataset):
 
     def process_speech(self, file_path: Union[Path, str]) -> Tensor:
         speech = self.speech_processor.execute(file_path)
-        # FIX: handle MONO and STEREO issue
-        return speech, speech.shape[-2]
+        if speech.dim() == 1:
+            # [M]
+            speech_len = speech.shape[0]
+        elif speech.dim() == 2:
+            # [B, M]
+            speech_len = speech.shape[-1]
+        else:
+            speech_len = speech.shape[-2]
+        return speech, speech_len
 
     def __getitem__(self, idx: int) -> dict:
         item = super().__getitem__(idx)
@@ -114,14 +122,16 @@ class SpeechTextDataset(CSVDataset):
         return speech, speech_len, text, text_len
 
 
-class DataLoader(IDataLoader):
+class _DataLoader(IDataLoader):
     """Builds the iterable data loader basic class.
 
     Args:
         dataset (object): The dataset.
-        rank (int): The process rank.
-        world_size (int): The number of total processes.
         batch_size (int): The batch size.
+        rank (int): The process rank used in distributed data-parallel
+            setting. Default 0.
+        world_size (int): The number of total processes used in distributed
+            data-parallel settings. Default 1.
         shuffle (bool): A flag indicating whether the dataset should be
             shuffled at each iteration Default False.
     """
@@ -129,9 +139,9 @@ class DataLoader(IDataLoader):
     def __init__(
         self,
         dataset: object,
-        rank: int,
-        world_size: int,
         batch_size: int,
+        rank: int = 0,
+        world_size: int = 1,
         shuffle: bool = False,
     ) -> None:
         self.rank = rank
@@ -156,16 +166,18 @@ class DataLoader(IDataLoader):
         return self.n_batches
 
 
-class SpeechTextLoader(DataLoader):
+class SpeechTextLoader(_DataLoader):
     """Build the speech-text iterable data loader
 
     Args:
         dataset (object): The dataset.
-        rank (int): The process rank.
-        world_size (int): The number of total processes.
         batch_size (int): The batch size.
         text_padder (IPadder): The text padder.
         speech_padder (IPadder): The speech padder.
+        rank (int): The process rank used in distributed data-parallel
+            setting. Default 0.
+        world_size (int): The number of total processes used in distributed
+            data-parallel settings. Default 1.
         shuffle (bool): A flag indicating whether the dataset should be
             shuffled at each iteration Default False.
     """
@@ -173,14 +185,20 @@ class SpeechTextLoader(DataLoader):
     def __init__(
         self,
         dataset: object,
-        rank: int,
-        world_size: int,
         batch_size: int,
         text_padder: IPadder,
         speech_padder: IPadder,
+        rank: int = 0,
+        world_size: int = 1,
         shuffle: bool = False,
     ) -> None:
-        super().__init__(dataset, rank, world_size, batch_size, shuffle)
+        super().__init__(
+            dataset=dataset,
+            rank=rank,
+            world_size=world_size,
+            batch_size=batch_size,
+            shuffle=shuffle,
+        )
         self.text_padder = text_padder
         self.speech_padder = speech_padder
 

@@ -1,46 +1,55 @@
 import os
 from pathlib import Path
-from typing import Tuple, Union
+from typing import List, Tuple, Union
 
-from speeq.constants import FileKeys
+from speeq.constants import CHAR_TOKENIZER_TYPE, TOKENIZER_TYPE_KEY, WORD_TOKENIZER_TYPE
 from speeq.interfaces import IDataLoader, IDataset, IPadder, ITokenizer
-from speeq.utils.utils import load_csv
+from speeq.utils.utils import load_json
 
 from .loaders import SpeechTextDataset, SpeechTextLoader
 from .padders import DynamicPadder, StaticPadder
-from .tokenizer import CharTokenizer
+from .tokenizers import CharTokenizer, WordTokenizer
 
 PADDING_TYPES = {"static": StaticPadder, "dynamic": DynamicPadder}
 
+TOKENIZERS = {WORD_TOKENIZER_TYPE: WordTokenizer, CHAR_TOKENIZER_TYPE: CharTokenizer}
 
-def get_tokenizer(data_config: object) -> ITokenizer:
+
+def get_tokenizer(data_config: object, data: List[str] = None) -> ITokenizer:
     """Creates a tokenizer based on the training data,
     or load a pre-built tokenizer from file.
 
     Args:
         data_config (object): Data configuration object.
+        data (List[None]): The data to train the tokenizer on, used when
+            there's no pre-trained tokenizer path provided.
 
     Returns:
         ITokenizer: A tokenizer object.
     """
     tokenizer_path = data_config.tokenizer_path
-    tokenizer = CharTokenizer()
+    if data_config.tokenizer_type not in TOKENIZERS:
+        raise KeyError(
+            f"invalid tokenizer name, please use one of {list(TOKENIZERS.keys())}"
+        )
     if os.path.exists(tokenizer_path) is True:
-        tokenizer.load_tokenizer(tokenizer_path)
+        tokenizer = load_tokenizer(tokenizer_path)
         print(f"Tokenizer {tokenizer_path} loadded!")
-    else:
-        tokenizer.add_pad_token().add_blank_token()
-        tokenizer.add_sos_token().add_eos_token()
-        data = load_csv(data_config.training_path, sep=data_config.sep)
-        data = [item[FileKeys.text_key.value] for item in data]
-        tokenizer.set_tokenizer(data)
-        tokenizer.save_tokenizer(tokenizer_path)
-        print(f"Tokenizer saved to {tokenizer_path}!")
+        return tokenizer
+    assert data is not None
+    tokenizer = TOKENIZERS[data_config.tokenizer_type]()
+    tokenizer.add_pad_token().add_blank_token()
+    tokenizer.add_sos_token().add_eos_token()
+    tokenizer.set_tokenizer(data)
+    tokenizer.save_tokenizer(tokenizer_path)
+    print(f"Tokenizer saved to {tokenizer_path}!")
     return tokenizer
 
 
 def load_tokenizer(tokenizer_path: Union[Path, str]) -> ITokenizer:
-    return CharTokenizer().load_tokenizer(tokenizer_path)
+    data = load_json(tokenizer_path)
+    type = data[TOKENIZER_TYPE_KEY]
+    return TOKENIZERS[type]().load_tokenizer_from_dict(data)
 
 
 def get_asr_datasets(
