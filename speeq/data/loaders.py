@@ -122,7 +122,7 @@ class SpeechTextDataset(CSVDataset):
         return speech, speech_len, text, text_len
 
 
-class DataLoader(IDataLoader):
+class _DataLoader(IDataLoader):
     """Builds the iterable data loader basic class.
 
     Args:
@@ -166,7 +166,7 @@ class DataLoader(IDataLoader):
         return self.n_batches
 
 
-class SpeechTextLoader(DataLoader):
+class SpeechTextLoader(_DataLoader):
     """Build the speech-text iterable data loader
 
     Args:
@@ -192,7 +192,13 @@ class SpeechTextLoader(DataLoader):
         world_size: int = 1,
         shuffle: bool = False,
     ) -> None:
-        super().__init__(dataset, rank, world_size, batch_size, shuffle)
+        super().__init__(
+            dataset=dataset,
+            rank=rank,
+            world_size=world_size,
+            batch_size=batch_size,
+            shuffle=shuffle,
+        )
         self.text_padder = text_padder
         self.speech_padder = speech_padder
 
