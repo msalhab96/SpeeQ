@@ -1,3 +1,5 @@
+import csv
+import os
 import string
 
 import pytest
@@ -6,6 +8,9 @@ from pytest import fixture
 from torch import LongTensor
 
 from speeq.constants import FileKeys
+from speeq.data.loaders import SpeechTextDataset
+from speeq.data.processors import OrderedProcessor
+from speeq.data.tokenizers import CharTokenizer
 
 
 @fixture
@@ -140,3 +145,36 @@ def word_tokenizer_dict():
             "sos": ["<SOS>", 2],
         },
     }
+
+
+@fixture
+def speech_text_dataset(dict_csv_data, tmp_path):
+    def func(use_mel_spec=False):
+        # mocking class
+        class SpeechProcessor:
+            def execute(self, *args, **kwargs):
+                if use_mel_spec is False:
+                    return torch.randn(1, 100)
+                return torch.randn(1, 50, 60)
+
+        encoding = "utf-8"
+        sep = ","
+        data = [item[FileKeys.text_key.value] for item in dict_csv_data]
+        file_path = os.path.join(tmp_path, "file.csv")
+        with open(file_path, "w", encoding=encoding) as f:
+            writer = csv.DictWriter(f, dict_csv_data[0].keys(), delimiter=sep)
+            writer.writeheader()
+            writer.writerows(dict_csv_data)
+        text_processor = OrderedProcessor([])
+        char_tokenizer = CharTokenizer()
+        char_tokenizer.set_tokenizer(data)
+        return SpeechTextDataset(
+            data_path=file_path,
+            tokenizer=char_tokenizer,
+            speech_processor=SpeechProcessor(),
+            text_processor=text_processor,
+            sep=sep,
+            encoding=encoding,
+        )
+
+    return func
