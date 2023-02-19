@@ -8,7 +8,8 @@ from pytest import fixture
 from torch import LongTensor
 
 from speeq.constants import FileKeys
-from speeq.data.loaders import SpeechTextDataset
+from speeq.data.loaders import SpeechTextDataset, SpeechTextLoader
+from speeq.data.padders import DynamicPadder
 from speeq.data.processors import OrderedProcessor
 from speeq.data.tokenizers import CharTokenizer
 
@@ -175,6 +176,26 @@ def speech_text_dataset(dict_csv_data, tmp_path):
             text_processor=text_processor,
             sep=sep,
             encoding=encoding,
+        )
+
+    return func
+
+
+@fixture
+def speech_text_loader(speech_text_dataset):
+    def func(batch_size, rank=0, world_size=1, use_mel_spec=False):
+        dataset = speech_text_dataset(use_mel_spec=use_mel_spec)
+        speech_padder = DynamicPadder(dim=-2 if use_mel_spec else -1, pad_val=0)
+        text_padder = DynamicPadder(dim=-1, pad_val=0)
+        print("*" * 10)
+        print(len(dataset), batch_size)
+        return SpeechTextLoader(
+            dataset=dataset,
+            batch_size=batch_size,
+            text_padder=text_padder,
+            speech_padder=speech_padder,
+            rank=rank,
+            world_size=world_size,
         )
 
     return func
