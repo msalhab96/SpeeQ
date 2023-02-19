@@ -35,3 +35,19 @@ class TestSpeechTextDataset:
         assert text.shape[-1] == text_len
         with pytest.raises(IndexError):
             dataset[len(dataset)]
+
+
+class TestSpeechTextLoader:
+    @pytest.mark.parametrize(
+        ("batch_size", "rank", "world_size", "n_runs"),
+        (
+            (1, 0, 1, 2),
+            (1, 0, 2, 1),
+            (2, 0, 1, 1),
+        ),
+    )
+    def test(self, speech_text_loader, batch_size, rank, world_size, n_runs):
+        loader = speech_text_loader(
+            batch_size=batch_size, rank=rank, world_size=world_size
+        )
+        assert len(loader) == n_runs
