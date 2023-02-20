@@ -1,10 +1,8 @@
 speeq.models package
 ====================
 
-Submodules
-----------
 
-speeq.models.activations module
+Activations
 -------------------------------
 
 .. automodule:: speeq.models.activations
@@ -12,7 +10,7 @@ speeq.models.activations module
    :undoc-members:
    :show-inheritance:
 
-speeq.models.ctc module
+CTC Models
 -----------------------
 
 .. automodule:: speeq.models.ctc
@@ -20,7 +18,7 @@ speeq.models.ctc module
    :undoc-members:
    :show-inheritance:
 
-speeq.models.decoders module
+Decoders
 ----------------------------
 
 .. automodule:: speeq.models.decoders
@@ -28,7 +26,7 @@ speeq.models.decoders module
    :undoc-members:
    :show-inheritance:
 
-speeq.models.encoders module
+Encoders
 ----------------------------
 
 .. automodule:: speeq.models.encoders
@@ -36,7 +34,7 @@ speeq.models.encoders module
    :undoc-members:
    :show-inheritance:
 
-speeq.models.layers module
+Layers
 --------------------------
 
 .. automodule:: speeq.models.layers
@@ -44,7 +42,7 @@ speeq.models.layers module
    :undoc-members:
    :show-inheritance:
 
-speeq.models.registry module
+Registry
 ----------------------------
 
 .. automodule:: speeq.models.registry
@@ -52,7 +50,7 @@ speeq.models.registry module
    :undoc-members:
    :show-inheritance:
 
-speeq.models.seq2seq module
+Seq2Seq Models
 ---------------------------
 
 .. automodule:: speeq.models.seq2seq
@@ -60,7 +58,7 @@ speeq.models.seq2seq module
    :undoc-members:
    :show-inheritance:
 
-speeq.models.skeletons module
+Skeletons
 -----------------------------
 
 .. automodule:: speeq.models.skeletons
@@ -68,7 +66,7 @@ speeq.models.skeletons module
    :undoc-members:
    :show-inheritance:
 
-speeq.models.templates module
+Model Templates
 -----------------------------
 
 .. automodule:: speeq.models.templates
@@ -76,18 +74,10 @@ speeq.models.templates module
    :undoc-members:
    :show-inheritance:
 
-speeq.models.transducers module
+Transducer Models
 -------------------------------
 
 .. automodule:: speeq.models.transducers
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-Module contents
----------------
-
-.. automodule:: speeq.models
    :members:
    :undoc-members:
    :show-inheritance:

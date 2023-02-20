@@ -1,9 +1,2 @@
 Introduction
 ============
-
-
-Motivation
-----------
-
-Limitations
------------

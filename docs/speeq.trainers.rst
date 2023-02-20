@@ -1,61 +1,42 @@
-speeq.trainers package
-======================
+Trainers
+========
 
-Submodules
+Criterions
 ----------
-
-speeq.trainers.criterions module
---------------------------------
 
 .. automodule:: speeq.trainers.criterions
    :members:
    :undoc-members:
    :show-inheritance:
 
-speeq.trainers.decorators module
---------------------------------
-
-.. automodule:: speeq.trainers.decorators
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-speeq.trainers.registry module
-------------------------------
+Registry
+--------
 
 .. automodule:: speeq.trainers.registry
    :members:
    :undoc-members:
    :show-inheritance:
 
-speeq.trainers.schedulers module
---------------------------------
+Schedulers
+----------
 
 .. automodule:: speeq.trainers.schedulers
    :members:
    :undoc-members:
    :show-inheritance:
 
-speeq.trainers.templates module
--------------------------------
+Templates
+---------
 
 .. automodule:: speeq.trainers.templates
    :members:
    :undoc-members:
    :show-inheritance:
 
-speeq.trainers.trainers module
-------------------------------
+Trainers
+--------
 
 .. automodule:: speeq.trainers.trainers
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-Module contents
----------------
-
-.. automodule:: speeq.trainers
    :members:
    :undoc-members:
    :show-inheritance:

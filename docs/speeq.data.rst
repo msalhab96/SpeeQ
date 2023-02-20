@@ -1,10 +1,7 @@
 speeq.data package
 ==================
 
-Submodules
-----------
-
-speeq.data.augmenters module
+Augmenters
 ----------------------------
 
 .. automodule:: speeq.data.augmenters
@@ -12,15 +9,7 @@ speeq.data.augmenters module
    :undoc-members:
    :show-inheritance:
 
-speeq.data.decorators module
-----------------------------
-
-.. automodule:: speeq.data.decorators
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-speeq.data.loaders module
+Data Loaders
 -------------------------
 
 .. automodule:: speeq.data.loaders
@@ -28,7 +17,7 @@ speeq.data.loaders module
    :undoc-members:
    :show-inheritance:
 
-speeq.data.padders module
+Padders
 -------------------------
 
 .. automodule:: speeq.data.padders
@@ -36,7 +25,7 @@ speeq.data.padders module
    :undoc-members:
    :show-inheritance:
 
-speeq.data.preprocessing module
+Data Preprocessing
 -------------------------------
 
 .. automodule:: speeq.data.preprocessing
@@ -44,7 +33,7 @@ speeq.data.preprocessing module
    :undoc-members:
    :show-inheritance:
 
-speeq.data.processors module
+Processors
 ----------------------------
 
 .. automodule:: speeq.data.processors
@@ -52,7 +41,7 @@ speeq.data.processors module
    :undoc-members:
    :show-inheritance:
 
-speeq.data.registry module
+Registry
 --------------------------
 
 .. automodule:: speeq.data.registry
@@ -60,18 +49,10 @@ speeq.data.registry module
    :undoc-members:
    :show-inheritance:
 
-speeq.data.tokenizers module
+Tokenizers
 ----------------------------
 
 .. automodule:: speeq.data.tokenizers
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-Module contents
----------------
-
-.. automodule:: speeq.data
    :members:
    :undoc-members:
    :show-inheritance:

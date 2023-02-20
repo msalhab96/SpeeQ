@@ -1,29 +1,18 @@
-speeq.utils package
-===================
+Utils
+=====
 
-Submodules
-----------
-
-speeq.utils.loggers module
---------------------------
+Loggers
+-------
 
 .. automodule:: speeq.utils.loggers
    :members:
    :undoc-members:
    :show-inheritance:
 
-speeq.utils.utils module
-------------------------
+Utils
+-----
 
 .. automodule:: speeq.utils.utils
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-Module contents
----------------
-
-.. automodule:: speeq.utils
    :members:
    :undoc-members:
    :show-inheritance:
