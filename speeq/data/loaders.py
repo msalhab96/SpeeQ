@@ -1,3 +1,19 @@
+"""
+This module contains classes for loading and building data loaders.
+
+Dataset Classes:
+- CSVDataset: A base dataset class for handling CSV datasets.
+- SpeechTextDataset: A dataset class for speech-text pairs.
+
+Data loader classes
+- SpeechTextLoader: An iterable data loader class for speech-text pairs.
+
+The `CSVDataset` class provides a generic base class for handling CSV datasets,
+while the `SpeechTextDataset` class is specifically designed for speech-text pairs.
+The `SpeechTextLoader` class builds an iterable data loader for speech-text pairs,
+which can be used for training speech recognition models.
+"""
+
 import random
 from pathlib import Path
 from typing import List, Optional, Tuple, Union
@@ -13,16 +29,20 @@ from .processors import IProcessor
 
 
 class CSVDataset(IDataset):
-    """The base dataset class that handles
-    CSV datasets.
+    """A base dataset class for handling CSV datasets.
 
     Args:
-        data_path (Union[str, Path]): The file path.
-        sep (str): The CSV separator.
-        encoding (str): The file encoding. Default "utf-8".
-        sort_key (Optional[str]): The key to sort the data on. Default ''.
-        reverse (bool): Used if sorting key is passed, False will sort ascending,
-            True will sort descending. Default is False.
+        data_path (Union[str, Path]): The file path of the CSV dataset.
+
+        sep (str): The separator used in the CSV file.
+
+        encoding (str): The encoding of the CSV file. Default is "utf-8".
+
+        sort_key (Optional[str]): The key to sort the data on. Default is an empty string.
+
+        reverse (bool): Used to specify the sorting order. If set to False, data
+        will be sorted in ascending order. If set to True, data will be sorted
+        in descending order. Default is False.
     """
 
     def __init__(
@@ -50,24 +70,85 @@ class CSVDataset(IDataset):
 
 
 class SpeechTextDataset(CSVDataset):
-    """Implements the basic dataset for speech-text pairs
-    for speech-recognition application.
+    """Implements a basic dataset for speech-text pairs to be used in
+    speech-recognition.
 
     Args:
-        data_path (Union[str, Path]): The data csv file path.
-        tokenizer (ITokenizerITokenizer): The tokenizer that will be used.
-        speech_processor (IProcessor): The speech processor, where the `run`
-            method returns the speech of shape [B] or [1, M], or [..., M, F].
+        data_path (Union[str, Path]): The file path for the data in CSV format.
+
+        tokenizer (ITokenizerITokenizer): The tokenizer that will be used to
+        process the text data.
+
+
+        speech_processor (IProcessor): The speech processor, where the `run` method
+        returns the speech data with shape [B] or [1, M], or [..., M, F].
+
         text_processor (IProcessor): The text processor.
-        sep (str): The CSV separator.
-        add_sos (bool): a flag indicates if SOS token shall be added
-            to the text sequence. Default False.
-        add_eos (bool): a flag indicates if EOS token shall be added
-            to the text sequence. Default False.
-        encoding (str): The file encoding. Default "utf-8".
+
+        sep (str): The separator used in the CSV file.
+
+        add_sos (bool): A flag that indicates whether to add the Start of
+        Sequence (SOS) token to the text sequence. Default is False.
+
+        add_eos (bool): A flag that indicates whether to add the End of Sequence
+        (EOS) token to the text sequence. Default is False.
+
+        encoding (Optional[str]): The file encoding. Default "utf-8".
+
+        text_key (Optional[str]): The name of the column that holds the text
+        data. Default 'text'.
+
+        speech_key (Optional[str]): The name of the column that holds the audio
+        file path. Default 'file_path'
+
         sort_key (Optional[str]): The key to sort the data on. Default ''.
-        reverse (bool): Used if sorting key is passed, False will sort ascending,
-            True will sort descending. Default is False.
+
+        reverse (bool): A flag used if a sorting key is passed. If set to False,
+        data will be sorted in ascending order. If set to True, data will be
+        sorted in descending order. Default is False.
+
+        Example:
+
+        .. code-block:: python
+
+            # Import the module
+            from speeq.data.loaders import SpeechTextDataset
+            from speeq.data.tokenizers import CharTokenizer
+            from speeq.data.processors import OrderedProcessor
+            from speeq.data.preprocessing import AudioLoader
+            sample_rate = 16000
+            sep = ','
+            file_path = 'file.csv'
+
+            # creating a dummy tokenizer and processors
+            tokenizer = CharTokenizer()
+            speech_processor = OrderedProcessor(
+                [
+                    AudioLoader(sample_rate=sample_rate),
+                ]
+                )
+            text_processor = OrderedProcessor([])
+            tokenizer.add_sos_token().add_eos_token()
+
+            # Create an instance of the dataset
+            dataset = SpeechTextDataset(
+                data_path=file_path,
+                tokenizer=tokenizer,
+                speech_processor=speech_processor,
+                text_processor=text_processor,
+                sep=sep,
+                add_sos=True
+                )
+
+            # to get the first item of the dataset
+            speech, speech_len, text, text_len = dataset[0]
+
+            # to get the number of examples in the dataset
+            length = len(dataset)
+
+            # to iterate over the dataset
+            for speech, speech_len, text, text_len in dataset:
+                pass
     """
 
     def __init__(
@@ -80,6 +161,8 @@ class SpeechTextDataset(CSVDataset):
         add_sos=False,
         add_eos=False,
         encoding="utf-8",
+        text_key: Optional[str] = FileKeys.text_key.value,
+        speech_key: Optional[str] = FileKeys.speech_key.value,
         sort_key: Optional[str] = "",
         reverse: bool = False,
     ) -> None:
@@ -95,15 +178,17 @@ class SpeechTextDataset(CSVDataset):
         self.text_processor = text_processor
         self.add_sos = add_sos
         self.add_eos = add_eos
+        self.text_key = text_key
+        self.speech_key = speech_key
 
-    def process_text(self, text: str) -> Tuple[Tensor, int]:
+    def _process_text(self, text: str) -> Tuple[Tensor, int]:
         text = self.text_processor.execute(text)
         tokens = self.tokenizer.tokenize(
             text, add_sos=self.add_sos, add_eos=self.add_eos
         )
         return torch.LongTensor(tokens), len(tokens)
 
-    def process_speech(self, file_path: Union[Path, str]) -> Tensor:
+    def _process_speech(self, file_path: Union[Path, str]) -> Tuple[Tensor, int]:
         speech = self.speech_processor.execute(file_path)
         if speech.dim() == 1:
             # [M]
@@ -117,23 +202,28 @@ class SpeechTextDataset(CSVDataset):
 
     def __getitem__(self, idx: int) -> dict:
         item = super().__getitem__(idx)
-        text, text_len = self.process_text(item[FileKeys.text_key.value])
-        speech, speech_len = self.process_speech(item[FileKeys.speech_key.value])
+        text, text_len = self._process_text(item[self.text_key])
+        speech, speech_len = self._process_speech(item[self.speech_key])
         return speech, speech_len, text, text_len
 
 
 class _DataLoader(IDataLoader):
-    """Builds the iterable data loader basic class.
+    """
+    This class builds an iterable data loader.
 
     Args:
-        dataset (object): The dataset.
-        batch_size (int): The batch size.
+        dataset (object): The dataset to be loaded.
+
+        batch_size (int): The size of each batch.
+
         rank (int): The process rank used in distributed data-parallel
-            setting. Default 0.
+        setting. Default is 0.
+
         world_size (int): The number of total processes used in distributed
-            data-parallel settings. Default 1.
+        data-parallel settings. Default is 1.
+
         shuffle (bool): A flag indicating whether the dataset should be
-            shuffled at each iteration Default False.
+        shuffled at each iteration. Default is False.
     """
 
     def __init__(
@@ -167,19 +257,85 @@ class _DataLoader(IDataLoader):
 
 
 class SpeechTextLoader(_DataLoader):
-    """Build the speech-text iterable data loader
+    """Builds an iterable data loader for speech-text pairs.
 
     Args:
-        dataset (object): The dataset.
-        batch_size (int): The batch size.
-        text_padder (IPadder): The text padder.
-        speech_padder (IPadder): The speech padder.
+        dataset (object): The dataset to be loaded, the `__getitem__` method of
+        the dataset should return a tuple contains the below in order:
+
+        - The speech tensor of shape [1, M, f]
+        - The speech length as integer value equal to M
+        - The text tensor of shape [N]
+        - The text length as integer value equal to N
+
+        batch_size (int): The size of each batch.
+
+        text_padder (IPadder): The padder for the text data.
+
+        speech_padder (IPadder): The padder for the speech data.
+
         rank (int): The process rank used in distributed data-parallel
-            setting. Default 0.
+        setting. Default is 0.
+
         world_size (int): The number of total processes used in distributed
-            data-parallel settings. Default 1.
+        data-parallel settings. Default is 1.
+
         shuffle (bool): A flag indicating whether the dataset should be
-            shuffled at each iteration Default False.
+        shuffled at each iteration. Default is False.
+
+        Example:
+
+        .. code-block:: python
+
+            # Import the module
+            from speeq.data.loaders import SpeechTextDataset, SpeechTextLoader
+            from speeq.data.padders import DynamicPadder
+            from speeq.data.tokenizers import CharTokenizer
+            from speeq.data.processors import OrderedProcessor
+            from speeq.data.preprocessing import AudioLoader, FeatExtractor
+            batch_size = 4
+            sample_rate = 16000
+            sep = ','
+            file_path = 'clean_data.csv'
+
+            # creating a dummy tokenizer, processors, and padders
+            tokenizer = CharTokenizer()
+            speech_processor = OrderedProcessor(
+                [
+                    AudioLoader(sample_rate=sample_rate),
+                    FeatExtractor(feat_ext_name='mfcc', feat_ext_args={})
+                ]
+                )
+            text_processor = OrderedProcessor([])
+            tokenizer.add_sos_token().add_eos_token()
+            speech_padder = DynamicPadder(dim=1, pad_val=0.0)
+            text_padder = DynamicPadder(dim=0, pad_val=-1)
+
+            # Create an instance of a dataset
+            dataset = SpeechTextDataset(
+                data_path=file_path,
+                tokenizer=tokenizer,
+                speech_processor=speech_processor,
+                text_processor=text_processor,
+                sep=sep,
+                add_sos=True
+                )
+
+            # Create an instance of the data loader
+            loader = SpeechTextLoader(
+                dataset=dataset,
+                batch_size=batch_size,
+                text_padder=text_padder,
+                speech_padder=speech_padder
+            )
+
+            # to get the number of batches
+            n_batches = len(loader)
+
+            # to iterate over the loader
+            for batch in dataset:
+                speech, speech_len, text, text_len = batch
+                break
     """
 
     def __init__(
@@ -215,6 +371,14 @@ class SpeechTextLoader(_DataLoader):
         return torch.vstack(masks)
 
     def get_batch(self) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
+        """Prepares and returns a batch of examples
+
+        Returns:
+            Tuple[Tensor, Tensor, Tensor, Tensor]: A tuple containing the following tensors
+            in order: speech tensor of shape [B, M, d], speech mask tensor of shape [B, M],
+            text tensor of shape [B, M], and text mask tensor of shape [B, M].
+        """
+
         # TODO: Add multi-threading here
         max_speech_len = 0
         max_text_len = 0
@@ -222,6 +386,7 @@ class SpeechTextLoader(_DataLoader):
         texts = []
         for idx in self.indices[self.start_idx : self.end_idx]:
             speech, speech_len, text, text_len = self.data[idx]
+            print(speech.shape, speech_len)
             max_speech_len = max(max_speech_len, speech_len)
             max_text_len = max(max_text_len, text_len)
             speeches.append(speech)
