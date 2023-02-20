@@ -1,5 +1,5 @@
-speeq.data package
-==================
+Data
+====
 
 Augmenters
 ----------------------------

@@ -30,10 +30,10 @@ For a quick start navigate to the :doc:`quick_start` page!
 
    Data <speeq.data>
    Models <speeq.models>
-   Configs <speeq.trainers>
+   Configs <speeq.config>
    Trainers <speeq.trainers>
    Utils <speeq.utils>
-
+   Predictors <speeq.predictors>
 
 .. toctree::
    :maxdepth: 2

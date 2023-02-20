@@ -1,5 +1,5 @@
-speeq.models package
-====================
+Models
+======
 
 
 Activations

@@ -1,19 +1,9 @@
 speeq package
 =============
 
-Subpackages
------------
-
 .. toctree::
    :maxdepth: 4
-
-   speeq.data
-   speeq.models
-   speeq.trainers
-   speeq.utils
-
-Submodules
-----------
+      fd <speeq.config>
 
 speeq.config module
 -------------------
@@ -43,14 +33,6 @@ speeq.predictors module
 -----------------------
 
 .. automodule:: speeq.predictors
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-Module contents
----------------
-
-.. automodule:: speeq
    :members:
    :undoc-members:
    :show-inheritance:
