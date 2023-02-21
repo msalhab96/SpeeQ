@@ -48,6 +48,8 @@ Example usage:
 """
 
 import functools
+import random
+from abc import abstractmethod
 from pathlib import Path
 from typing import Union
 
@@ -59,6 +61,31 @@ from torchaudio import transforms
 from speeq.interfaces import IProcess
 
 SAMPLER_CACHE_SIZE = 5
+
+
+class StochasticProcess(IProcess):
+    """An inteerface that applies the process functionality based on the ratio provided
+
+    Args:
+        ratio (float): The rate of applying the process on the input.
+    """
+
+    def __init__(self, ratio: float) -> None:
+        super().__init__()
+        self.ratio = ratio
+
+    @property
+    def _shall_do(self) -> bool:
+        return random.random() <= self.ratio
+
+    @abstractmethod
+    def func():
+        pass
+
+    def run(self, x):
+        if self._shall_do:
+            return self.func(x)
+        return x
 
 
 class AudioLoader(IProcess):

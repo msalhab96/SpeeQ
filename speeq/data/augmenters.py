@@ -44,7 +44,7 @@ import random
 import torch
 from torch import Tensor
 
-from .processors import StochasticProcess
+from .processes import StochasticProcess
 
 
 class WhiteNoiseInjector(StochasticProcess):

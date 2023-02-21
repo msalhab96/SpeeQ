@@ -1,7 +1,7 @@
 import random
 from abc import abstractmethod
 from pathlib import Path
-from typing import List, Optional, Union
+from typing import Any, List, Optional, Union
 
 from speeq.interfaces import IProcess, IProcessor
 
@@ -17,7 +17,7 @@ class OrderedProcessor(IProcessor):
         super().__init__()
         self.processes = processes
 
-    def execute(self, x):
+    def execute(self, x: Any) -> Any:
         for process in self.processes:
             x = process.run(x)
         return x
@@ -34,34 +34,9 @@ class StochasticProcessor(OrderedProcessor):
     def __init__(self, processes: List[IProcess]) -> None:
         super().__init__(processes)
 
-    def execute(self, x):
+    def execute(self, x: Any) -> Any:
         random.shuffle(self.processes)
         return super().execute(x)
-
-
-class StochasticProcess(IProcess):
-    """Applies the process functionality based on the ratio provided
-
-    Args:
-        ratio (float): The rate of applying the process on the input.
-    """
-
-    def __init__(self, ratio: float) -> None:
-        super().__init__()
-        self.ratio = ratio
-
-    @property
-    def _shall_do(self) -> bool:
-        return random.random() <= self.ratio
-
-    @abstractmethod
-    def func():
-        pass
-
-    def run(self, x):
-        if self._shall_do:
-            return self.func(x)
-        return x
 
 
 class SpeechProcessor(IProcessor):
