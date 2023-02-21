@@ -1,7 +1,7 @@
 import pytest
 import torch
 
-from speeq.data import preprocessing
+from speeq.data import processes
 
 
 class TestAudioLoader:
@@ -13,7 +13,7 @@ class TestAudioLoader:
         ),
     )
     def test_run(self, sr, file_path):
-        loader = preprocessing.AudioLoader(sample_rate=sr)
+        loader = processes.AudioLoader(sample_rate=sr)
         result = loader.run(file_path=file_path)
         assert len(result.shape) == 2
 
@@ -53,7 +53,7 @@ class TestFeatExtractor:
     )
     def test_run(self, seq_len, feat_extractor, args, expected_shape):
         input = torch.randn(1, seq_len)
-        extractor = preprocessing.FeatExtractor(
+        extractor = processes.FeatExtractor(
             feat_ext_name=feat_extractor, feat_ext_args=args
         )
         result = extractor.run(input)
@@ -77,7 +77,7 @@ class TestFeatStacker:
     )
     def test_run(self, inp_shape, stacking_factor, expected_shape):
         input = torch.randn(*inp_shape)
-        feat_stacker = preprocessing.FeatStacker(feat_stack_factor=stacking_factor)
+        feat_stacker = processes.FeatStacker(feat_stack_factor=stacking_factor)
         result = feat_stacker.run(input)
         assert result.shape == expected_shape
 
@@ -93,7 +93,7 @@ class TestFrameContextualizer:
         ),
     )
     def test_run(self, context_size, inp_shape, expected_shape):
-        processor = preprocessing.FrameContextualizer(contex_size=context_size)
+        processor = processes.FrameContextualizer(contex_size=context_size)
         x = torch.randn(*inp_shape)
         result = processor.run(x)
         assert result.shape == expected_shape
