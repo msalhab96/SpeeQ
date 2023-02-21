@@ -25,10 +25,10 @@ Padders
    :undoc-members:
    :show-inheritance:
 
-Data Preprocessing
+Data Processes
 -------------------------------
 
-.. automodule:: speeq.data.preprocessing
+.. automodule:: speeq.data.processes
    :members:
    :undoc-members:
    :show-inheritance:
