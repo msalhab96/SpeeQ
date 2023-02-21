@@ -75,7 +75,7 @@ class _SpecialTokens:
         return self._oov[0]
 
 
-class _BaseTokenizer(ITokenizer):
+class BaseTokenizer(ITokenizer):
     _pad_key = "pad"
     _oov_key = "oov"
     _sos_key = "sos"
@@ -96,6 +96,14 @@ class _BaseTokenizer(ITokenizer):
         return len(self._token_to_id)
 
     def add_token(self, token: str) -> int:
+        """Adds the provided token to the tokenizer.
+
+        Args:
+            token (str): The token to be added.
+
+        Returns:
+            int: The id of the token.
+        """
         if token in self._token_to_id:
             return self._token_to_id[token]
         token_id = self.vocab_size
@@ -105,30 +113,35 @@ class _BaseTokenizer(ITokenizer):
 
     @check_token(PAD)
     def add_pad_token(self, token=PAD) -> ITokenizer:
+        """Adds PAD token"""
         token_id = self.add_token(token)
         self.special_tokens._pad = (token, token_id)
         return self
 
     @check_token(BLANK)
     def add_blank_token(self, token=BLANK) -> ITokenizer:
+        """Adds BLANK token"""
         token_id = self.add_token(token)
         self.special_tokens._blank = (token, token_id)
         return self
 
     @check_token(SOS)
     def add_sos_token(self, token=SOS) -> ITokenizer:
+        """Adds SOS token"""
         token_id = self.add_token(token)
         self.special_tokens._sos = (token, token_id)
         return self
 
     @check_token(EOS)
     def add_eos_token(self, token=EOS) -> ITokenizer:
+        """Adds EOS token"""
         token_id = self.add_token(token)
         self.special_tokens._eos = (token, token_id)
         return self
 
     @check_token(OOV)
     def add_oov_token(self, token=OOV) -> ITokenizer:
+        """Adds OOV token"""
         token_id = self.add_token(token)
         self.special_tokens._oov = (token, token_id)
         return self
@@ -165,6 +178,14 @@ class _BaseTokenizer(ITokenizer):
         return data
 
     def load_tokenizer_from_dict(self, data: dict) -> ITokenizer:
+        """Loads a pre-trained tokenizer of type dict.
+
+        Args:
+            data (dict): The pre-trained tokenizer dictionary.
+
+        Returns:
+            ITokenizer: The loaded tokenizer.
+        """
         self._token_to_id = data[self._token_to_id_key]
         self.__set_special_tokens_dict(data[self._special_tokens_key])
         self._reset_id_to_token()
@@ -209,6 +230,11 @@ class _BaseTokenizer(ITokenizer):
         return self
 
     def save_tokenizer(self, save_path: Union[str, Path], *args, **kwargs) -> None:
+        """Saves the tokenizer to a json file
+
+        Args:
+            save_path (Union[str, Path]): The path to save the tokenizer to.
+        """
         data = {
             TOKENIZER_TYPE_KEY: self._type,
             self._token_to_id_key: self._token_to_id,
@@ -216,7 +242,15 @@ class _BaseTokenizer(ITokenizer):
         }
         save_json(save_path, data)
 
-    def ids2tokens(self, ids: List[str]) -> List[str]:
+    def ids2tokens(self, ids: List[int]) -> List[str]:
+        """Converts a list of integers to a list of strings
+
+        Args:
+            ids (List[int]): The list of tokens ids.
+
+        Returns:
+            List[str]: A list of string.
+        """
         return list(map(lambda x: self._id_to_token[x], ids))
 
     def tokenize(self, sentence: str, add_sos=False, add_eos=False) -> List[int]:
@@ -224,10 +258,12 @@ class _BaseTokenizer(ITokenizer):
 
         Args:
             sentence (str): The sentence to be tokenized.
+
             add_sos (bool, optional): A flag to whether added SOS token at the
-                end of the sequence. Defaults to False.
+            of the sequence. Defaults to False.
+
             add_eos (bool, optional): A flag to whether add EOS token at the
-                end of the sequence. Defaults to False.
+            end of the sequence. Defaults to False.
 
         Returns:
             List[int]: The tokenized sequence.
@@ -255,7 +291,7 @@ class _BaseTokenizer(ITokenizer):
         return list(map(self.ids2tokens, data))
 
 
-class CharTokenizer(_BaseTokenizer):
+class CharTokenizer(BaseTokenizer):
     """Implements character based tokenizer."""
 
     _type = CHAR_TOKENIZER_TYPE
@@ -270,7 +306,7 @@ class CharTokenizer(_BaseTokenizer):
         return list(sentence)
 
 
-class WordTokenizer(_BaseTokenizer):
+class WordTokenizer(BaseTokenizer):
     """Implements white space based tokenizer."""
 
     _type = WORD_TOKENIZER_TYPE
