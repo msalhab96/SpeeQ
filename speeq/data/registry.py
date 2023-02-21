@@ -1,6 +1,8 @@
+"""The factory of all data related object
+"""
 import os
 from pathlib import Path
-from typing import List, Tuple, Union
+from typing import List, Optional, Tuple, Union
 
 from speeq.constants import CHAR_TOKENIZER_TYPE, TOKENIZER_TYPE_KEY, WORD_TOKENIZER_TYPE
 from speeq.interfaces import IDataLoader, IDataset, IPadder, ITokenizer
@@ -15,14 +17,18 @@ PADDING_TYPES = {"static": StaticPadder, "dynamic": DynamicPadder}
 TOKENIZERS = {WORD_TOKENIZER_TYPE: WordTokenizer, CHAR_TOKENIZER_TYPE: CharTokenizer}
 
 
-def get_tokenizer(data_config: object, data: List[str] = None) -> ITokenizer:
-    """Creates a tokenizer based on the training data,
-    or load a pre-built tokenizer from file.
+def get_tokenizer(data_config: object, data: Optional[List[str]] = None) -> ITokenizer:
+    """Creates a tokenizer based on the provided data configuration, or loads
+    a pre-trained tokenizer from a file. If a pre-trained tokenizer path is not
+    provided, the function trains the tokenizer on the provided data.
+
 
     Args:
-        data_config (object): Data configuration object.
-        data (List[None]): The data to train the tokenizer on, used when
-            there's no pre-trained tokenizer path provided.
+        data_config (object): An object that contains the configuration for the
+        data.
+
+        data (List[str], optional): A list of strings to train the tokenizer on.
+        Defaults to None.
 
     Returns:
         ITokenizer: A tokenizer object.
@@ -47,6 +53,14 @@ def get_tokenizer(data_config: object, data: List[str] = None) -> ITokenizer:
 
 
 def load_tokenizer(tokenizer_path: Union[Path, str]) -> ITokenizer:
+    """Loads a pre-trained tokenizer from the specified path.
+
+    Args:
+        tokenizer_path (Union[Path, str]): A path to the pre-trained tokenizer file.
+
+    Returns:
+        ITokenizer: An object representing the loaded tokenizer.
+    """
     data = load_json(tokenizer_path)
     type = data[TOKENIZER_TYPE_KEY]
     return TOKENIZERS[type]().load_tokenizer_from_dict(data)
@@ -55,14 +69,18 @@ def load_tokenizer(tokenizer_path: Union[Path, str]) -> ITokenizer:
 def get_asr_datasets(
     data_config: object, tokenizer: ITokenizer
 ) -> Tuple[IDataset, IDataset]:
-    """Creates a train and test dataset objects
+    """Creates train and test dataset objects based on the provided data
+    configuration and tokenizer.
+
 
     Args:
         data_config (object): Data configuration object.
+
         tokenizer (ITokenizer): The tokenizer to tokenize the test data.
 
     Returns:
-        Tuple[IDataset, IDataset]: The train and test datasets.
+        Tuple[IDataset, IDataset]: A tuple containing the train and test dataset
+        objects.
     """
     train_dataset = SpeechTextDataset(
         data_path=data_config.training_path,
@@ -90,12 +108,32 @@ def get_asr_datasets(
 
 
 def get_text_padder(data_config: object, pad_val: Union[float, int]) -> IPadder:
+    """Creates a text padding object.
+
+    Args:
+        data_config (object): The data configuration object.
+
+        pad_val (Union[float, int]): The padding value.
+
+    Returns:
+        IPadder: A padder object that pads the input on the zeroth dim.
+    """
     return PADDING_TYPES[data_config.padding_type](
         dim=0, pad_val=pad_val, max_len=data_config.text_pad_max_len
     )
 
 
 def get_speech_padder(data_config) -> IPadder:
+    """Creates a speech padding object.
+
+    Args:
+        data_config (object): The data configuration object.
+
+        pad_val (Union[float, int]): The padding value.
+
+    Returns:
+        IPadder: A padder object that pads the input on the first dim.
+    """
     return PADDING_TYPES[data_config.padding_type](
         dim=1, pad_val=0.0, max_len=data_config.speech_pad_max_len
     )
@@ -112,11 +150,14 @@ def get_asr_loaders(
 
     Args:
         data_config (object): Data configuration object.
+
         tokenizer (ITokenizer): the text tokenizer.
+
         batch_size (int): The batch size.
+
         world_size (int): The number of nodes/gpus.
-        rank (int): the index of the current process/gpu
-        will use the data loaders.
+
+        rank (int): the index of the current process/gpu will use the data loaders.
 
     Returns:
         Tuple[IDataLoader, IDataLoader]: The training and testing data
