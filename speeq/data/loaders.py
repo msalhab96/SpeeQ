@@ -115,7 +115,7 @@ class SpeechTextDataset(CSVDataset):
             from speeq.data.loaders import SpeechTextDataset
             from speeq.data.tokenizers import CharTokenizer
             from speeq.data.processors import OrderedProcessor
-            from speeq.data.preprocessing import AudioLoader
+            from speeq.data.processes import AudioLoader
             sample_rate = 16000
             sep = ','
             file_path = 'file.csv'
@@ -292,7 +292,7 @@ class SpeechTextLoader(_DataLoader):
             from speeq.data.padders import DynamicPadder
             from speeq.data.tokenizers import CharTokenizer
             from speeq.data.processors import OrderedProcessor
-            from speeq.data.preprocessing import AudioLoader, FeatExtractor
+            from speeq.data.processes import AudioLoader, FeatExtractor
             batch_size = 4
             sample_rate = 16000
             sep = ','
