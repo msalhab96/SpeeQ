@@ -2,6 +2,7 @@ from typing import List
 
 from torch import nn
 
+from speeq.config import ModelConfig
 from speeq.constants import CTC_TYPE, MODEL_BUILDER_TYPE, SEQ2SEQ_TYPE, TRANSDUCER_TYPE
 
 from .ctc import (
@@ -75,7 +76,18 @@ def list_transducer_models() -> List[str]:
     return list(TRANSDUCER_MODELS.values())
 
 
-def get_model(model_config, n_classes):
+def get_model(model_config: ModelConfig, n_classes: int) -> nn.Module:
+    """Creates and returns a targeted model using the provided configuration
+    object `model_config`.
+
+    Args:
+        model_config (object): The model configuration object.
+
+        n_classes (int): The number of classes for the model to predict.
+
+    Returns:
+        Module: The targeted model created using the configuration object.
+    """
     if model_config.template.type == CTC_TYPE:
         return CTC_MODELS[model_config.template.name](
             **model_config.template.get_dict(), n_classes=n_classes
