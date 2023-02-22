@@ -1,4 +1,50 @@
-from typing import List, Tuple, Union
+"""
+This module contains implementations of various atomic layers used in neural network models.
+
+Layers:
+
+- PackedRNN: RNN layer with support for PackedSequence.
+- PackedLSTM: LSTM layer with support for PackedSequence.
+- PackedGRU: GRU layer with support for PackedSequence.
+- PredModule: A simple feedforward prediction module.
+- ConvPredModule: A convolutional prediction module.
+- FeedForwardModule: A transformer feedforward module.
+- AddAndNorm: A layer that performs residual connection and layer normalization.
+- MultiHeadAtt: Multi-Head Attention layer.
+- MaskedMultiHeadAtt: Masked Multi-Head Attention layer.
+- TransformerEncLayer: Transformer Encoder layer.
+- RowConv1D: A 1D convolution layer that convolves each row separately.
+- Conv1DLayers: A stack of 1D convolutional layers.
+- GlobalMulAttention: Global Multiplicative Attention layer.
+- ConformerFeedForward: A feedforward module used in Conformer model.
+- ConformerConvModule: A convolutional module used in Conformer model.
+- ConformerRelativeMHSA: Conformer Relative Multi-Head Self-Attention layer.
+- ConformerBlock: Conformer block.
+- ConformerPreNet: A pre-processing network used in Conformer model.
+- JasperSubBlock: Jasper Sub-block.
+- JasperResidual: Jasper Residual module.
+- JasperBlock: Jasper Block.
+- JasperBlocks: A stack of Jasper Blocks.
+- LocAwareGlobalAddAttention: Location-Aware Global Additive Attention layer.
+- MultiHeadAtt2d: 2D Multi-Head Attention layer.
+- SpeechTransformerEncLayer: Speech Transformer Encoder layer.
+- TransformerDecLayer: Transformer Decoder layer.
+- PositionalEmbedding: Positional embedding layer.
+- GroupsShuffle: Group Shuffle layer.
+- QuartzSubBlock: Quartz Sub-block.
+- QuartzBlock: Quartz Block.
+- QuartzBlocks: A stack of Quartz Blocks.
+- Scaling1d: A learnable scaling layer.
+- SqueezeformerConvModule: A convolutional module used in Squeezeformer model.
+- SqueezeformerRelativeMHSA: Squeezeformer Relative Multi-Head Self-Attention layer.
+- SqueezeformerFeedForward: A feedforward module used in Squeezeformer model.
+- SqueezeformerBlock: Squeezeformer block.
+- SqueezeAndExcit1D: Squeeze-and-Excitation layer for 1D inputs.
+- ContextNetConvLayer: ContextNet convolution layer.
+- ContextNetResidual: ContextNet residual module.
+- ContextNetBlock: ContextNet block.
+"""
+from typing import List, Optional, Tuple, Union
 
 import torch
 import torch.nn as nn
@@ -44,8 +90,27 @@ class PackedRNN(nn.Module):
         self.enforce_sorted = enforce_sorted
 
     def forward(
-        self, x: Tensor, lens: Union[List[int], Tensor], h: Union[Tensor, None] = None
-    ):
+        self, x: Tensor, lens: Union[List[int], Tensor], h: Optional[Tensor] = None
+    ) -> Tuple[Tensor, Tensor, Tensor]:
+        """Passes the input tensor x of shape [B, M, d], along with tensor or
+        list of lengths lens of shape [B] representing the length of each
+        sequence without padding, through the layer. An optional tensor h
+        representing the last hidden state can also be provided.
+
+
+        Args:
+            x (Tensor): The input sequence tensor of shape [B, M, d].
+
+            lens (Union[List[int], Tensor]): The lengths of the data without
+            padding for each sequence of length [B].
+
+            h (Tensor, optional): The last hidden state if there's any. Defaults to None.
+
+        Returns:
+            Tuple[Tensor, Tensor, Tensor]: A tuple of three tensors containing
+            the output sequence of shape [B, max(lens), hidden_size], the last
+            hidden state of shape [D, B, hidden_size], and the new lengths.
+        """
         packed = pack_padded_sequence(
             x, lens, batch_first=self.batch_first, enforce_sorted=self.enforce_sorted
         )
@@ -96,13 +161,15 @@ class PackedGRU(PackedRNN):
 
 
 class PredModule(nn.Module):
-    """A prediction module that consist of a signle
-    feed forward layer followed by a pre-defined activation
-    function.
+    """This is a Prediction Module class that comprises a single feedforward
+    layer followed by a pre-defined activation function.
+
 
     Args:
         in_features (int): The input feature size.
-        n_classes (int): The number of classes to produce.
+
+        n_classes (int): The number of classes to be produced.
+
         activation (Module): The activation function to be used.
     """
 
@@ -112,6 +179,16 @@ class PredModule(nn.Module):
         self.activation = activation
 
     def forward(self, x: Tensor) -> Tensor:
+        """Passes the input thought the layers' modules, where the input x of
+        shape [B, M, d]
+
+        Args:
+            x (Tensor): The input tensor of shape [B, M, d]
+
+        Returns:
+            Tensor: The output tensor of shape [B, M, C] obtained after passing
+            through the layers' modules.
+        """
         return self.activation(self.fc(x))
 
 
@@ -122,7 +199,9 @@ class ConvPredModule(nn.Module):
 
     Args:
         in_features (int): The input feature size.
-        n_classes (int): The number of classes to produce.
+
+        n_classes (int): The number of classes to be produced.
+
         activation (Module): The activation function to be used.
     """
 
@@ -134,7 +213,16 @@ class ConvPredModule(nn.Module):
         )
 
     def forward(self, x: Tensor) -> Tensor:
-        # x of shape [B, M, d]
+        """Passes the input thought the layers' modules, where the input x of
+        shape [B, M, C]
+
+        Args:
+            x (Tensor): The input tensor of shape [B, M, d]
+
+        Returns:
+            Tensor: The output tensor of shape [B, M, C] obtained after passing
+            through the layers' modules.
+        """
         x = x.transpose(-1, -2)
         out = self.conv(x)
         out = out.transpose(-1, -2)
@@ -143,12 +231,13 @@ class ConvPredModule(nn.Module):
 
 
 class FeedForwardModule(nn.Module):
-    """Implements the feed-forward module
-    described in https://arxiv.org/abs/1706.03762
+    """Implements the feed-forward module of the transformer architecture as
+    described in the paper https://arxiv.org/abs/1706.03762
 
     Args:
         d_model (int): The model dimensionality.
-        ff_size (int): The inner layer's dimensionality.
+
+        ff_size (int): The dimensionality of the inner layer.
     """
 
     def __init__(self, d_model: int, ff_size: int) -> None:
@@ -158,6 +247,15 @@ class FeedForwardModule(nn.Module):
         self.fc2 = nn.Linear(in_features=ff_size, out_features=d_model)
 
     def forward(self, x: Tensor) -> Tensor:
+        """Passes the input to the layer
+
+        Args:
+            x (Tensor): The input tensor of shape [B, M, d]
+
+        Returns:
+            Tensor: The output tensor of shape [B, M, d] obtained after passing
+            through the layer.
+        """
         out = self.fc1(x)
         out = self.relu(out)
         out = self.fc2(out)
@@ -165,29 +263,49 @@ class FeedForwardModule(nn.Module):
 
 
 class AddAndNorm(nn.Module):
-    """Implements the Add and norm module
-    described in https://arxiv.org/abs/1706.03762
+    """Implements the Add and Norm module of the transformer model as described
+    in the paper https://arxiv.org/abs/1706.03762
 
     Args:
+
         d_model (int): The model dimensionality.
+
     """
 
     def __init__(self, d_model: int) -> None:
         super().__init__()
         self.lnorm = nn.LayerNorm(normalized_shape=d_model)
 
-    def forward(self, x: Tensor, sub_x: Tensor):
+    def forward(self, x: Tensor, sub_x: Tensor) -> Tensor:
+        """takes the output tensor `x` from the last layer and the output tensor
+        `sub_x` from the sub-layer, adds them, and then normalizes the sum
+        using layer normalization.
+
+        Args:
+            x (Tensor): The output tensor of the last layer with shape [B, M, d].
+
+            sub_x (Tensor): The output tensor of the sub-layer with shape
+            [B, M, d].
+
+        Returns:
+            Tensor: The result tensor obtained after normalizing the sum of
+            the inputs with shape [B, M, d].
+
+        """
         return self.lnorm(x + sub_x)
 
 
 class MultiHeadAtt(nn.Module):
-    """Implements the multi-head attention module
-    described in https://arxiv.org/abs/1706.03762
+    """A module that implements the multi-head attention mechanism described in
+    https://arxiv.org/abs/1706.03762.
 
     Args:
-        d_model (int): The model dimensionality.
-        h (int): The number of heads.
-        masking_value (int): The masking value. Default -1e15
+        d_model (int): The dimensionality of the model.
+
+        h (int): The number of heads to use in the attention mechanism.
+
+        masking_value (float, optional): The value used for masking. Defaults
+        to -1e15.
     """
 
     def __init__(self, d_model: int, h: int, masking_value: int = -1e15) -> None:
@@ -223,9 +341,33 @@ class MultiHeadAtt(nn.Module):
         key: Tensor,
         query: Tensor,
         value: Tensor,
-        key_mask: Union[Tensor, None] = None,
-        query_mask: Union[Tensor, None] = None,
+        key_mask: Optional[Tensor] = None,
+        query_mask: Optional[Tensor] = None,
     ) -> Tensor:
+        """Performs multi-head attention by computing a weighted sum of the
+        values using queries and keys. The weights are computed as a softmax
+        over the dot products of the queries and keys for each attention head.
+        Optionally, attention can be masked using key and query masks.
+
+        Args:
+            key (Tensor): The key input tensor of shape [B, M, d]
+
+            query (Tensor): The query of shape [B, M, d]
+
+            value (Tensor): Teh value tensor of shape [B, M, d]
+
+            key_mask (Tensor, optional): A boolean tensor of shape
+            [B, M] where True indicates that the corresponding key position
+            contains data, not padding, and should not be masked
+
+            query_mask (Tensor, optional): A boolean tensor of shape
+            [B, M] where True indicates that the corresponding query position
+            contains data, not padding, and should not be masked
+
+        Returns:
+            Tensor: The tensor of shape [B, M, d] resulting from the multi-head
+            attention computation.
+        """
         key = self._reshape(key)  # B, M, h, dk
         query = self._reshape(query)  # B, M, h, dk
         value = self._reshape(value)  # B, M, h, dk
@@ -250,6 +392,30 @@ class MultiHeadAtt(nn.Module):
         key_mask: Union[Tensor, None] = None,
         query_mask: Union[Tensor, None] = None,
     ) -> Tensor:
+        """passes the input to the multi-head attention by computing a weighted
+        sum of the values using queries and keys. The weights are computed as a softmax
+        over the dot products of the queries and keys for each attention head.
+        Optionally, attention can be masked using key and query masks.
+
+        Args:
+            key (Tensor): The key input tensor of shape [B, M, d]
+
+            query (Tensor): The query of shape [B, M, d]
+
+            value (Tensor): Teh value tensor of shape [B, M, d]
+
+            key_mask (Tensor, optional): A boolean tensor of shape
+            [B, M] where True indicates that the corresponding key position
+            contains data, not padding, and should not be masked
+
+            query_mask (Tensor, optional): A boolean tensor of shape
+            [B, M] where True indicates that the corresponding query position
+            contains data, not padding, and should not be masked
+
+        Returns:
+            Tensor: The tensor of shape [B, M, d] resulting from the multi-head
+            attention computation.
+        """
         key = self.key_fc(key)
         query = self.query_fc(query)
         value = self.value_fc(value)
@@ -259,16 +425,20 @@ class MultiHeadAtt(nn.Module):
 
 
 class MaskedMultiHeadAtt(MultiHeadAtt):
-    """Implements the masked multi-head attention module
-    described in https://arxiv.org/abs/1706.03762
+    """A multi-head attention module that performs masking to handle padded sequences.
+    This implementation is based on the architecture described in https://arxiv.org/abs/1706.03762
 
     Args:
+
         d_model (int): The model dimensionality.
-        h (int): The number of heads.
-        masking_value (int): The masking value. Default -1e15
+
+        h (int): The number of heads in the attention mechanism.
+
+        masking_value (float, optional): The value to use for masking padded
+        elements. Defaults to -1e15.
     """
 
-    def __init__(self, d_model: int, h: int, masking_value: int = -1e15) -> None:
+    def __init__(self, d_model: int, h: int, masking_value: float = -1e15) -> None:
         super().__init__(d_model=d_model, h=h, masking_value=masking_value)
 
     def get_looking_ahead_mask(self, key_mask: Tensor) -> Tensor:
@@ -286,9 +456,24 @@ class MaskedMultiHeadAtt(MultiHeadAtt):
         value: Tensor,
         key_mask: Union[Tensor, None],
     ) -> Tensor:
-        # if key_mask is not passed, it will act as a normal
-        # Multi-head attention, other wise, it will build don't
-        # look ahead mask
+        """Applies masked multi-head attention to the input.
+
+        Args:
+            key (Tensor): The key input tensor of shape [B, M, d].
+
+            query (Tensor): The query input tensor of shape [B, M, d].
+
+            value (Tensor): The value input tensor of shape [B, M, d].
+
+            key_mask (Union[Tensor, None]): The mask tensor of the key of shape
+            [B, M] where True indicates that the corresponding key position
+            contains data not padding and therefore should not be masked.
+            If None, the function will act as a normal multi-head attention.
+
+        Returns:
+            Tensor: The attention result tensor of shape [B, M, d].
+        """
+
         query_mask = None
         if key_mask is not None:
             query_mask = self.get_looking_ahead_mask(key_mask=key_mask)
@@ -298,14 +483,19 @@ class MaskedMultiHeadAtt(MultiHeadAtt):
 
 
 class TransformerEncLayer(nn.Module):
-    """Implements a single encoder layer of the transformer
-    as described in https://arxiv.org/abs/1706.03762
+    """Implements a single layer of the transformer encoder model as
+    presented in the paper https://arxiv.org/abs/1706.03762
 
     Args:
         d_model (int): The model dimensionality.
+
         ff_size (int): The feed forward inner layer dimensionality.
-        h (int): The number of heads.
-        masking_value (int): The masking value. Default -1e15
+
+        h (int): The number of heads in the attention mechanism.
+
+        masking_value (float, optional): The value to use for masking padded
+        elements. Defaults to -1e15.
+
     """
 
     def __init__(
@@ -318,6 +508,20 @@ class TransformerEncLayer(nn.Module):
         self.add_and_norm2 = AddAndNorm(d_model=d_model)
 
     def forward(self, x: Tensor, mask: Union[Tensor, None] = None) -> Tensor:
+        """Performs a forward pass of the transformer encoder layer.
+
+        Args:
+
+            x (Tensor): The input tensor of shape [B, M, d].
+
+            mask (Union[Tensor, None], optional): Boolean tensor of the input of shape
+            [B, M] where True indicates that the corresponding key position
+            contains data not padding and therefore should not be masked.
+            If None, the function will act as a normal multi-head attention. Defaults to None.
+
+        Returns:
+            Tensor: Result tensor of the same shape as x.
+        """
         out = self.mhsa(key=x, query=x, value=x, key_mask=mask, query_mask=mask)
         out = self.add_and_norm1(x, out)
         result = self.ff(out)
@@ -329,8 +533,11 @@ class RowConv1D(nn.Module):
     proposed in https://arxiv.org/abs/1512.02595
 
     Args:
+
         tau (int): The size of future context.
-        feat_size (int): The input feature size.
+
+        feat_size (int): The size of the input feature.
+
     """
 
     def __init__(self, tau: int, feat_size: int) -> None:
@@ -359,8 +566,15 @@ class RowConv1D(nn.Module):
         zeros = zeros.to(x.device)
         return torch.cat([x, zeros], dim=-1)
 
-    def forward(self, x: Tensor):
-        # x of shape [B, M, d]
+    def forward(self, x: Tensor) -> Tensor:
+        """Passes the input tensor x through the row convolution layer.
+
+        Args:
+            x (Tensor): The input tensor of shape [B, M, feat_size].
+
+        Returns:
+            Tensor: The result tensor of the same shape [B, M, feat_size].
+        """
         max_len = x.shape[1]
         x = x.transpose(1, 2)
         x = self._pad(x)
@@ -375,21 +589,25 @@ class Conv1DLayers(nn.Module):
     """Implements stack of Conv1d layers.
 
     Args:
+
         in_size (int): The input feature size.
-        out_size (Union[List[int], int]): The output feature size of each
-            layer. if a list is passed it has to be of length
-            equal to n_layers.
-        kernel_size (Union[List[int], int]): The kernel size of the conv
-            layers, if a list is passed it has to be of length
-            equal to n_layers.
-        stride (Union[List[int], int]): The stride size of the conv
-            layers, if a list is passed it has to be of length
-            equal to n_layers.
-        n_layers (int): The number of conv layers.
+
+        out_size (Union[List[int], int]): The output feature size(s) of each
+        layer. If a list is passed, it has to be of length equal to `n_layers`.
+
+        kernel_size (Union[List[int], int]): The kernel size(s) of the Conv1d
+        layers. If a list is passed, it has to be of length equal to `n_layers`.
+
+        stride (Union[List[int], int]): The stride size(s) of the Conv1d layers.
+        If a list is passed, it has to be of length equal to `n_layers`.
+
+        n_layers (int): The number of Conv1d layers to stack.
+
         p_dropout (float): The dropout rate.
-        groups (Union[List[int], int]): The groups size of the conv
-            layers, if a list is passed it has to be of length
-            equal to n_layers. Default 1.
+
+        groups (Union[List[int], int]): The groups size of the conv layers, if
+        a list is passed it has to be of length equal to n_layers. Default 1.
+
     """
 
     def __init__(
@@ -426,7 +644,22 @@ class Conv1DLayers(nn.Module):
         self.dropout = nn.Dropout(p_dropout)
 
     def forward(self, x: Tensor, data_len: Tensor) -> Tuple[Tensor, Tensor]:
-        # x of shape [B, M, d]
+        """Passes the input tensor x through the Conv1D layers and returns the
+        result.
+
+        Args:
+            x (Tensor): The input tensor of shape [B, M, in_size].
+
+            data_len (Tensor):  A tensor of shape [B] containing the length of
+            each sequence in x.
+
+        Returns:
+            Tuple[Tensor, Tensor]: A tuple containing the result tensor of shape
+            [B, M, out_size] and a tensor of shape [B] containing the new length
+            of each sequence after applying the conv layers.
+
+        """
+
         x = x.transpose(1, 2)
         out = x
         pad_len = x.shape[-1] - data_len
@@ -447,18 +680,19 @@ class Conv1DLayers(nn.Module):
 
 
 class GlobalMulAttention(nn.Module):
-    """Implements the global multiplicative
-    attention mechanism as described in
-    https://arxiv.org/abs/1508.04025 with direct
-    dot product for scoring.
+    """Implements the global multiplicative attention mechanism as described
+    in https://arxiv.org/abs/1508.04025, using direct dot product for scoring.
 
     Args:
-        enc_feat_size (int): The encoder feature size.
-        dec_feat_size (int): The decoder feature size.
-        scaling_factor (Union[float, int]): The scaling factor
-            for numerical stability used inside the softmax.
-            Default 1.
+        enc_feat_size (int): The size of encoder features.
+
+        dec_feat_size (int): The size of decoder features.
+
+        scaling_factor (Union[float, int]): The scaling factor for numerical
+        stability used inside the softmax. Default: 1.
+
         mask_val (float): the masking value. Default -1e12.
+
     """
 
     def __init__(
@@ -479,9 +713,20 @@ class GlobalMulAttention(nn.Module):
     def forward(
         self, key: Tensor, query: Tensor, mask: Union[None, Tensor] = None
     ) -> Tensor:
-        # key of shape [B, M, feat_size]
-        # query of shape [B, 1, feat_size]
-        # mask of shape [B, M], False for padding
+        """Applies the global multiplicative attention mechanism
+        to the input key and query.
+
+        Args:
+            key (Tensor): The key tensor of shape [B, M, enc_feat_size].
+
+            query (Tensor): The query tensor of shape [B, 1, dec_feat_size].
+
+            mask (Union[None, Tensor], optional): The boolean mask tensor of shape
+            [B, M], where False for padding. Default None.
+
+        Returns:
+            Tensor: The attention tensor of shape [B, enc_feat_size].
+        """
         value = self.fc_value(key)
         key = self.fc_key(key)
         query = self.fc_query(query)
@@ -498,13 +743,14 @@ class GlobalMulAttention(nn.Module):
 
 
 class ConformerFeedForward(nn.Module):
-    """Implements the conformer feed-forward module
+    """Implements the feed-forward module used in Conformer models
     as described in https://arxiv.org/abs/2005.08100
 
     Args:
-        d_model (int): The model dimension.
-        expansion_factor (int): The linear layer's expansion
-            factor.
+        d_model (int): The input feature dimensionality.
+
+        expansion_factor (int): The expansion factor used by the linear layer.
+
         p_dropout (float): The dropout rate.
     """
 
@@ -521,6 +767,14 @@ class ConformerFeedForward(nn.Module):
         self.dropout = nn.Dropout(p_dropout)
 
     def forward(self, x: Tensor) -> Tensor:
+        """Passes the input x through the conformer feed-forward module.
+
+        Args:
+            x (Tensor): The input tensor of shape [B, M, d].
+
+        Returns:
+            Tensor: The output tensor of shape [B, M, d].
+        """
         out = self.lnrom(x)
         out = self.fc1(out)
         out = self.swish(out)
@@ -535,8 +789,11 @@ class ConformerConvModule(nn.Module):
     as described in https://arxiv.org/abs/2005.08100
 
     Args:
+
         d_model (int): The model dimension.
+
         kernel_size (int): The depth-wise convolution kernel size.
+
         p_dropout (float): The dropout rate.
     """
 
@@ -562,7 +819,16 @@ class ConformerConvModule(nn.Module):
         self.dropout = nn.Dropout(p_dropout)
 
     def forward(self, x: Tensor) -> Tensor:
-        # x of shape [B, M, d]
+        """
+        Passes the input tensor through the Conformer Convolutional Module.
+
+        Args:
+            x (Tensor): Input tensor of shape [B, M, d].
+
+        Returns:
+            Tensor: Result tensor of shape [B, M, d].
+        """
+
         out = self.lnorm(x)
         out = out.transpose(-1, -2)  # [B, d, M]
         out = self.pwise_conv1(out)  # [B, 2d, M]
@@ -577,15 +843,17 @@ class ConformerConvModule(nn.Module):
 
 
 class ConformerRelativeMHSA(MultiHeadAtt):
-    """Implements the multi-head self attention module with
-    relative positional encoding as described in
-    https://arxiv.org/abs/2005.08100
+    """Multi-Head Self-Attention module with relative positional encoding,
+    based on the paper https://arxiv.org/abs/2005.08100
 
     Args:
-        d_model (int): The model dimension.
-        h (int): The number of heads.
+        d_model (int): The input and output feature dimension.
+
+        h (int): The number of attention heads.
+
         p_dropout (float): The dropout rate.
-        masking_value (int): The masking value. Default -1e15
+
+        masking_value (int): The masking value used for padding. Default -1e15.
     """
 
     def __init__(
@@ -596,6 +864,22 @@ class ConformerRelativeMHSA(MultiHeadAtt):
         self.dropout = nn.Dropout(p_dropout)
 
     def forward(self, x: Tensor, mask: Union[None, Tensor] = None) -> Tensor:
+        """Performs Multi-Head Self-Attention operation with relative positional
+        encoding on input tensor x.
+
+        Args:
+
+            x (Tensor): Input tensor of shape [B, M, d].
+
+            mask (Tensor, optional): Boolean tensor of shape [B, M], where
+            False for padding. If None is provided, no masking is applied.
+            Default is None.
+
+        Returns:
+
+            Tensor: Result tensor of shape [B, M, d].
+
+        """
         out = self.lnrom(x)
         out = add_pos_enc(out)
         out = super().forward(
@@ -606,16 +890,21 @@ class ConformerRelativeMHSA(MultiHeadAtt):
 
 
 class ConformerBlock(nn.Module):
-    """Implements the conformer block
-    described in https://arxiv.org/abs/2005.08100
+    """Implements the conformer block described in https://arxiv.org/abs/2005.08100
 
     Args:
+
         d_model (int): The model dimension.
-        ff_expansion_factor (int): The linear layer's expansion factor.
+
+        ff_expansion_factor (int): The expansion factor of the linear layer.
+
         h (int): The number of heads.
-        kernel_size (int): The depth-wise convolution kernel size.
+
+        kernel_size (int): The kernel size of depth-wise convolution.
+
         p_dropout (float): The dropout rate.
-        res_scaling (float): The residual connection multiplier.
+
+        res_scaling (float): The multiplier for residual connection.
     """
 
     def __init__(
@@ -642,6 +931,20 @@ class ConformerBlock(nn.Module):
         self.res_scaling = res_scaling
 
     def forward(self, x: Tensor, mask: Union[None, Tensor] = None) -> Tensor:
+        """Passes the input to the conformer block.
+
+        Args:
+
+            x (torch.Tensor): The input tensor of shape [B, M, d].
+
+            mask (Tensor, optional): Boolean tensor of shape [B, M], where
+            False for padding. If None is provided, no masking is applied.
+            Default is None.
+
+        Returns:
+
+            Tensor: The output tensor of the same shape as the input tensor `x`.
+        """
         out = self.ff1(x)
         out = x + self.res_scaling * out
         out = out + self.mhsa(out, mask)
@@ -656,13 +959,19 @@ class ConformerPreNet(nn.Module):
     the subsampling as described in https://arxiv.org/abs/2005.08100
 
     Args:
+
         in_features (int): The input/speech feature size.
-        kernel_size (Union[int, List[int]]): The kernel size of the
-            subsampling layer.
+
+        kernel_size (Union[int, List[int]]): The kernel size of the subsampling layer.
+
         stride (Union[int, List[int]]): The stride of the subsampling layer.
+
         n_conv_layers (int): The number of convolutional layers.
+
         d_model (int): The model dimension.
+
         p_dropout (float): The dropout rate.
+
         groups (Union[int, List[int]]): The convolution groups size. Default 1.
     """
 
@@ -690,7 +999,23 @@ class ConformerPreNet(nn.Module):
         self.drpout = nn.Dropout(p_dropout)
 
     def forward(self, x: Tensor, lengths: Tensor) -> Tuple[Tensor, Tensor]:
-        # x of shape [B, M, d]
+        """Passes the input `x` to the pre-conformer blocks that contains
+        the subsampling convolutional.
+
+        Args:
+
+            x (Tensor): The input tensor of shape [B, M, d].
+
+            lengths (Tensor): A tensor of shape [B] containing the lengths of
+            each sequence in `x` before subsampling.
+
+        Returns:
+
+            Tuple[Tensor, Tensor]: A tuple containing two tensors. The first
+            tensor is the output of the pre-conformer block of shape [B, N, d].
+            The second tensor is a tensor of shape [B] containing the lengths of
+            each sequence in the output tensor after subsampling.
+        """
         out, lengths = self.layers(x, lengths)
         out = self.fc(out)
         out = self.drpout(out)
@@ -702,12 +1027,18 @@ class JasperSubBlock(nn.Module):
     https://arxiv.org/abs/1904.03288
 
     Args:
-        in_channels (int): The number of the input's channels.
-        out_channels (int): The number of the output channels.
-        kernel_size (int): The convolution layer's kernel size.
+
+        in_channels (int): The number of input channels.
+
+        out_channels (int): The number of output channels.
+
+        kernel_size (int): The kernel size of the convolutional layer.
+
         p_dropout (float): The dropout rate.
-        stride (int): The convolution layer's stride. Default 1.
-        padding (Union[str, int]): The padding mood/size. Default 'same'.
+
+        stride (int): The stride of the convolutional layer. Default is 1.
+
+        padding (Union[str, int]): The padding mode or size. Default is 'same'.
     """
 
     def __init__(
@@ -732,8 +1063,22 @@ class JasperSubBlock(nn.Module):
         self.dropout = nn.Dropout(p_dropout)
 
     def forward(self, x: Tensor, residual: Union[Tensor, None] = None) -> Tensor:
-        # x of shape [B, d, M]
-        # residual of shape [B, out_channels, M]
+        """Passes the input to the layer
+
+        Args:
+
+            x (Tensor): The input tensor of shape [B, d, M].
+
+            residual (Union[Tensor, None], optional): An optional tensor of shape
+            [B, out_channels, M]. If not None, it is added element-wise to the
+            output tensor. Defaults to None.
+
+        Returns:
+
+            Tensor: The output tensor of shape [B, out_channels, M].
+
+        """
+
         out = self.conv(x)
         out = self.bnorm(out)
         if residual is not None:
@@ -744,12 +1089,13 @@ class JasperSubBlock(nn.Module):
 
 
 class JasperResidual(nn.Module):
-    """Implements the the residual connection
-    module as described in https://arxiv.org/abs/1904.03288
+    """Implements the residual connection module described in https://arxiv.org/abs/1904.03288
 
     Args:
-        in_channels (int): The number of the input's channels.
-        out_channels (int): The number of the output's channels.
+
+        in_channels (int): The number of input channels.
+
+        out_channels (int): The number of output channels.
     """
 
     def __init__(self, in_channels: int, out_channels: int) -> None:
@@ -760,23 +1106,35 @@ class JasperResidual(nn.Module):
         self.bnorm = nn.BatchNorm1d(num_features=out_channels)
 
     def forward(self, x: Tensor) -> Tensor:
-        # x of shape [B, d, M]
+        """Passes the input x through the residual branch.
+
+        Args:
+            x (Tensor): The input tensor of shape [B, in_channels, M]
+
+        Returns:
+
+            Tensor: The result tensor of shape [B, out_channels, M]
+        """
         out = self.conv(x)
         out = self.bnorm(out)
         return out
 
 
 class JasperBlock(nn.Module):
-    """Implements the main jasper block of the
-    Jasper model as described in
+    """Implements the main jasper block of the Jasper model as described in
     https://arxiv.org/abs/1904.03288
 
     Args:
-        num_sub_blocks (int): The number of subblocks, which is
-            denoted as 'R' in the paper.
-        in_channels (int): The number of the input's channels.
-        out_channels (int): The number of the output's channels.
-        kernel_size (int): The convolution layer's kernel size.
+
+        num_sub_blocks (int): The number of subblocks, which is denoted as
+        'R' in the paper.
+
+        in_channels (int): The number of input channels.
+
+        out_channels (int): The number of output channels.
+
+        kernel_size (int): The kernel size of the convolutional layer.
+
         p_dropout (float): The dropout rate.
     """
 
@@ -806,7 +1164,15 @@ class JasperBlock(nn.Module):
         self.num_sub_blocks = num_sub_blocks
 
     def forward(self, x: Tensor) -> Tensor:
-        # x of shape [B, d, M]
+        """Passes the input x through the layer.
+
+        Args:
+            x (Tensor): The input tensor of shape [B, in_channels, M]
+
+        Returns:
+
+            Tensor: The result tensor of shape [B, out_channels, M]
+        """
         out = x
         for i, block in enumerate(self.blocks):
             if (i + 1) == self.num_sub_blocks:
@@ -817,19 +1183,21 @@ class JasperBlock(nn.Module):
 
 
 class JasperBlocks(nn.Module):
-    """Implements the jasper's series of blocks
-    as described in https://arxiv.org/abs/1904.03288
+    """Implements the jasper's series of blocks as described in
+    https://arxiv.org/abs/1904.03288
 
     Args:
-        num_blocks (int): The number of jasper blocks, denoted
-            as 'B' in the paper.
-        num_sub_blocks (int): The number of jasper subblocks, denoted
-            as 'R' in the paper.
-        in_channels (int): The number of the input's channels.
-        channel_inc (int): The rate to increase the number of channels
-            across the blocks.
-        kernel_size (Union[int, List[int]]): The convolution layer's
-            kernel size of each block.
+
+        num_blocks (int): The number of Jasper blocks (denoted as 'B' in the paper).
+
+        num_sub_blocks (int): The number of Jasper subblocks (denoted as 'R' in the paper).
+
+        in_channels (int): The number of input channels.
+
+        channel_inc (int): The rate to increase the number of channels across the blocks.
+
+        kernel_size (Union[int, List[int]]): The kernel size(s) of the convolution layer for each block.
+
         p_dropout (float): The dropout rate.
     """
 
@@ -859,7 +1227,17 @@ class JasperBlocks(nn.Module):
         )
 
     def forward(self, x: Tensor) -> Tensor:
-        # x of shape [B, d, M]
+        """Passes the input tensor through the JasperBlocks layer.
+
+        Args:
+            x (Tensor): The input tensor of shape [B, in_channels, M].
+
+        Returns:
+
+            Tensor: The output tensor of shape [B, in_channels + channel_inc * num_blocks, M].
+                This tensor is the result of applying the JasperBlocks layer to the input tensor x.
+
+        """
         out = x
         for block in self.blocks:
             out = block(out)
@@ -867,18 +1245,22 @@ class JasperBlocks(nn.Module):
 
 
 class LocAwareGlobalAddAttention(nn.Module):
-    """Implements the location-aware global additive attention
-    proposed in https://arxiv.org/abs/1506.07503
+    """Implements the location-aware global additive attention proposed in
+    https://arxiv.org/abs/1506.07503
 
     Args:
         enc_feat_size (int): The encoder feature size.
+
         dec_feat_size (int): The decoder feature size.
-        kernel_size (int): The attention kernel size.
-        activation (str): The activation function to use.
-            it can be either softmax or sigmax.
-        inv_temperature (Union[float, int]): The inverse temperature value.
-            Default 1.
-        mask_val (float): The masking value. Default -1e12.
+
+        kernel_size (int): The size of the attention kernel.
+
+        activation (str): The activation function to use. Can be either 'softmax' or 'sigmoid'.
+
+        inv_temperature (Union[float, int], optional): The value of the inverse temperature parameter. Default is 1.
+
+        mask_val (float, optional): The masking value for the attention weights. Default is -1e12.
+
     """
 
     def __init__(
@@ -887,8 +1269,8 @@ class LocAwareGlobalAddAttention(nn.Module):
         dec_feat_size: int,
         kernel_size: int,
         activation: str,
-        inv_temperature: Union[float, int] = 1,
-        mask_val: float = -1e12,
+        inv_temperature: Optional[Union[float, int]] = 1,
+        mask_val: Optional[float] = -1e12,
     ) -> None:
         super().__init__()
         activations = {"softmax": nn.Softmax, "sigmax": Sigmax}
@@ -909,9 +1291,28 @@ class LocAwareGlobalAddAttention(nn.Module):
         self.inv_temperature = inv_temperature
 
     def forward(
-        self, key: Tensor, query: Tensor, alpha: Tensor, mask=None
+        self, key: Tensor, query: Tensor, alpha: Tensor, mask: Optional[Tensor] = None
     ) -> Tuple[Tensor, Tensor]:
-        # alpha of shape [B, 1, M_enc]
+        """
+        Computes the forward pass of the location-aware global additive attention mechanism.
+
+        Args:
+
+            key (Tensor): The encoder feature maps of shape [B, M_enc, enc_feat_size].
+
+            query (Tensor): The decoder feature maps of shape [B, 1, dec_feat_size].
+
+            alpha (Tensor): The previous attention weights of shape [B, 1, M_enc].
+
+            mask (Tensor, optional): The mask tensor of shape [B, M_enc], with zeros/False in the
+                                     positions that should be masked. Default is None.
+
+        Returns:
+            A tuple of two tensors:
+
+            - context (Tensor): The context tensor of shape [B, 1, M_dec].
+            - attn_weights (Tensor): The attention weights tensor of shape [B, 1, M_enc].
+        """
         value = self.fc_value(key)
         key = self.fc_key(key)
         query = self.fc_query(query)
@@ -935,10 +1336,15 @@ class MultiHeadAtt2d(MultiHeadAtt):
     proposed in https://ieeexplore.ieee.org/document/8462506
 
     Args:
-        d_model (int): The model dimensionality.
-        h (int): The number of heads.
-        out_channels (int): The number of output channels of the convolution
-        kernel_size (int): The convolutional layers' kernel size.
+
+        d_model (int): The input feature dimensionality.
+
+        h (int): The number of attention heads.
+
+        out_channels (int): The number of output channels of the convolution layer.
+
+        kernel_size (int): The size of the convolutional kernel to apply.
+
     """
 
     def __init__(
@@ -973,6 +1379,18 @@ class MultiHeadAtt2d(MultiHeadAtt):
         query: Tensor,
         value: Tensor,
     ) -> Tensor:
+        """
+        Applies frequency-domain multi-head self-attention.
+
+        Args:
+            key (Tensor): A tensor of shape [B, M, d].
+            query (Tensor): A tensor of shape [B, M, d].
+            value (Tensor): A tensor of shape [B, M, d].
+
+        Returns:
+            Tensor: A tensor of shape [B, M, d], representing the result
+            after performing the attention mechanism on the frequency domain.
+        """
         key = self._reshape(key)  # B, M, h, dk
         query = self._reshape(query)  # B, M, h, dk
         value = self._reshape(value)  # B, M, h, dk
@@ -991,8 +1409,27 @@ class MultiHeadAtt2d(MultiHeadAtt):
         key: Tensor,
         query: Tensor,
         value: Tensor,
-        mask: Union[Tensor, None] = None,
+        mask: Optional[Tensor] = None,
     ) -> Tensor:
+        """
+        Applies both time-domain and frequency-domain multi-head self-attention
+        on the input.
+
+        Args:
+
+            key (Tensor): A tensor of shape [B, M,d].
+
+            query (Tensor): A tensor of shape [B, M,d].
+
+            value (Tensor): A tensor of shape [B, M,d].
+
+            mask (Tensor, optional): Boolean tensor of shape [B, M], where
+            False for padding. If None is provided, no masking is applied.
+            Default is None.
+
+        Returns:
+            Tensor: The result tensor of shape [B, M, d].
+        """
         key = key.transpose(-1, -2)
         query = query.transpose(-1, -2)
         value = value.transpose(-1, -2)
@@ -1019,10 +1456,14 @@ class SpeechTransformerEncLayer(TransformerEncLayer):
 
     Args:
         d_model (int): The model dimensionality.
-        ff_size (int): The feed-forward inner layer dimensionality.
-        h (int): The number of heads.
-        out_channels (int): The number of output channels of the convolution
-        kernel_size (int): The convolutional layers' kernel size.
+
+        ff_size (int): The dimensionality of the inner layer of the feed-forward module.
+
+        h (int): The number of attention heads.
+
+        out_channels (int): The number of output channels of the convolution layer.
+
+        kernel_size (int): The kernel size of the convolutional layers.
     """
 
     def __init__(
@@ -1034,7 +1475,23 @@ class SpeechTransformerEncLayer(TransformerEncLayer):
             d_model=d_model, h=h, out_channels=out_channels, kernel_size=kernel_size
         )
 
-    def forward(self, x: Tensor, mask: Union[None, Tensor] = None) -> Tensor:
+    def forward(self, x: Tensor, mask: Optional[Tensor] = None) -> Tensor:
+        """
+        Passes the input tensor `x` through a single encoder layer of the speech
+        transformer.
+
+        Args:
+
+            x (Tensor): The input tensor of shape [B, M, d].
+
+            mask (Tensor, optional): The mask tensor of shape [B, M],
+            or None if no mask is needed. Default None.
+
+        Returns:
+
+            Tensor: The output tensor of shape [B, B, d].
+
+        """
         out = self.mhsa(key=x, query=x, value=x, mask=mask)
         out = self.add_and_norm1(x, out)
         result = self.ff(out)
@@ -1046,9 +1503,13 @@ class TransformerDecLayer(nn.Module):
     as described in https://arxiv.org/abs/1706.03762
 
     Args:
+
         d_model (int): The model dimensionality.
+
         ff_size (int): The feed forward inner layer dimensionality.
-        h (int): The number of heads.
+
+        h (int): The number of attention heads.
+
         masking_value (int): The masking value. Default -1e15
     """
 
@@ -1072,6 +1533,24 @@ class TransformerDecLayer(nn.Module):
         dec_inp: Tensor,
         dec_mask: Union[Tensor, None],
     ) -> Tensor:
+        """Applies a single decoder layer of the transformer to the input.
+
+        Args:
+            enc_out (Tensor): The output of the encoder. Its shape is [B, M_enc, d].
+
+            enc_mask (Tensor, optional): The mask tensor for the encoder output.
+            Its shape is [B, M_enc], where it is False for the padding positions.
+
+            dec_inp (Tensor): The input to the decoder layer. Its shape is
+            [B, M_dec, d_model].
+
+            dec_mask (Tensor, optional): The mask tensor for the decoder input.
+            Its shape is [B, M_dec], where it is False for the padding.
+
+        Returns:
+            The output of the decoder layer. Its shape is [B, M_dec, d_model].
+
+        """
         out = self.mmhsa(key=dec_inp, query=dec_inp, value=dec_inp, key_mask=dec_mask)
         out = self.add_and_norm1(out, dec_inp)
         out = self.add_and_norm2(
@@ -1092,9 +1571,12 @@ class PositionalEmbedding(nn.Module):
     """Implements the positional embedding proposed in
     https://arxiv.org/abs/1706.03762
 
+
     Args:
         vocab_size (int): The vocabulary size.
+
         embed_dim (int): The embedding size.
+
     """
 
     def __init__(self, vocab_size: int, embed_dim: int) -> None:
@@ -1103,6 +1585,17 @@ class PositionalEmbedding(nn.Module):
         self.d_model = embed_dim
 
     def forward(self, x: Tensor) -> Tensor:
+        """Applies the positional embedding to the input tensor.
+
+        Args:
+
+            x (Tensor): The input tensor of shape [B, M].
+
+        Returns:
+
+            Tensor: The output tensor of shape [B, M, d].
+
+        """
         out = self.emb(x)
         out = add_pos_enc(out)
         return out
@@ -1113,7 +1606,9 @@ class GroupsShuffle(nn.Module):
     https://arxiv.org/abs/1707.01083
 
     Args:
+
         groups (int): The groups size.
+
     """
 
     def __init__(self, groups: int) -> None:
@@ -1121,7 +1616,16 @@ class GroupsShuffle(nn.Module):
         self.groups = groups
 
     def forward(self, x: Tensor) -> Tensor:
-        # x of shape [B, C, ...]
+        """Applies the group shuffle on the input tensor `x`.
+
+        Args:
+
+            x (Tensor): The input tensor of shape [B, C, ...].
+
+        Returns:
+
+            Tensor: The output tensor after applying group shuffle of shape [B, C, ...].
+        """
         batch_size, channels, *_ = x.shape
         dims = x.shape[2:]
         x = x.view(batch_size, self.groups, channels // self.groups, *dims)
@@ -1132,17 +1636,24 @@ class GroupsShuffle(nn.Module):
 
 
 class QuartzSubBlock(JasperSubBlock):
-    """Implements Quartznet's subblock module
-    described in https://arxiv.org/abs/1910.10261
+    """Implements the subblock module of Quartznet as described in https://arxiv.org/abs/1910.10261
 
     Args:
-        in_channels (int): The number of the input's channels.
-        out_channels (int): The number of the output's channels.
-        kernel_size (int): The convolution layer's kernel size.
+
+        in_channels (int): The number of channels of the input.
+
+        out_channels (int): The number of channels of the output.
+
+        kernel_size (int): The kernel size of the convolution layer.
+
         p_dropout (float): The dropout rate.
-        groups (int): The groups size.
-        stride (int): The convolution layer's stride. Default 1.
-        padding (Union[str, int]): The padding mood/size. Default 'same'.
+
+        groups (int): The number of groups in the convolution layer.
+
+        stride (int): The stride of the convolution layer. Default is 1.
+
+        padding (Union[str, int]): The padding mode or size. Default is 'same'.
+
     """
 
     def __init__(
@@ -1176,23 +1687,40 @@ class QuartzSubBlock(JasperSubBlock):
         )
 
     def forward(self, x: Tensor, residual: Union[Tensor, None] = None) -> Tensor:
-        # x and residual of shape [B, d, M]
+        """The forward method applies the Quartznet's subblock module to the input tensor
+        x and an optional residual tensor.
+
+        Args:
+
+            x (Tensor): The input tensor of shape [B, in_channels, M].
+
+            residual (Tensor, optional): The residual tensor of shape [B, out_channels, M]. Default is None.
+
+        Returns:
+            Tensor: The output tensor of shape [B, out_channels, M].
+        """
         x = self.dwise_conv(x)
         return super().forward(x=x, residual=residual)
 
 
 class QuartzBlock(JasperBlock):
-    """Implements the main quartznet block of the quartznet
-    model as described in https://arxiv.org/abs/1904.03288
+    """Implements the main block of the QuartzNet model as described
+    in https://arxiv.org/abs/1904.03288
 
     Args:
-        num_sub_blocks (int): The number of subblocks, which is
-            denoted as 'R' in the paper.
-        in_channels (int): The number of the input's channels.
-        out_channels (int): The number of the output's channels.
-        kernel_size (int): The convolution layer's kernel size.
-        groups (int): The groups size.
-        p_dropout (float): The dropout rate.
+
+        num_sub_blocks (int): Number of subblocks, denoted as 'R' in the paper.
+
+        in_channels (int): Number of input channels of the convolution layer.
+
+        out_channels (int): Number of output channels of the convolution layer.
+
+        kernel_size (int): Convolution layer's kernel size.
+
+        groups (int): Group size for the convolution layer.
+
+        p_dropout (float): Dropout rate.
+
     """
 
     def __init__(
@@ -1222,22 +1750,29 @@ class QuartzBlock(JasperBlock):
 
 
 class QuartzBlocks(JasperBlocks):
-    """Implements the quartznet's series of blocks
-    as described in https://arxiv.org/abs/1910.10261
+    """Implements the series of blocks in the QuartzNet model, as described in
+    https://arxiv.org/abs/1910.10261
 
     Args:
-        num_blocks (int): The number of QuartzNet blocks, denoted
-            as 'B' in the paper.
-        block_repetition (int): The nubmer of times to repeat each block.
-            denoted as S in the paper.
-        num_sub_blocks (int): The number of QuartzNet subblocks, denoted
-            as 'R' in the paper.
-        in_channels (int): The number of the input's channels.
-        channels_size (List[int]): The channel size of each block.
-        kernel_size (Union[int, List[int]]): The convolution layer's
-            kernel size of each block.
-        groups (int): The groups size.
+
+        num_blocks (int): The number of QuartzNet blocks, denoted as 'B' in the paper.
+
+        block_repetition (int): The number of times to repeat each block, denoted as 'S' in the paper.
+
+        num_sub_blocks (int): The number of QuartzNet subblocks, denoted as 'R' in the paper.
+
+        in_channels (int): The number of channels in the input.
+
+        channels_size (List[int]): A list of integers representing the number of output channels
+        for each block.
+
+        kernel_size (Union[int, List[int]]): An integer or a list of integers representing the
+        kernel size(s) for each block's convolutional layer.
+
+        groups (int): The group size.
+
         p_dropout (float): The dropout rate.
+
     """
 
     def __init__(
@@ -1287,7 +1822,9 @@ class Scaling1d(nn.Module):
     https://arxiv.org/abs/2206.00888
 
     Args:
+
         d_model (int): The model dimension.
+
     """
 
     def __init__(self, d_model: int) -> None:
@@ -1296,18 +1833,30 @@ class Scaling1d(nn.Module):
         self.beta = nn.Parameter(torch.randn(1, 1, d_model))
 
     def forward(self, x: Tensor) -> Tensor:
+        """Scales the input x.
+
+        Args:
+            x (Tensor): The input tensor of shape [B, M, d].
+
+        Returns:
+            Tensor: The scaled and shifted tensor of shape [B, M, d].
+
+        """
         return self.gamma * x + self.beta
 
 
 class SqueezeformerConvModule(ConformerConvModule):
-    """Implements the conformer convolution module
-    with the modification as described in
+    """Implements the conformer convolution module with the modification as described in
     https://arxiv.org/abs/2206.00888
 
     Args:
+
         d_model (int): The model dimension.
-        kernel_size (int): The depth-wise convolution kernel size.
+
+        kernel_size (int): The size of the depth-wise convolution kernel.
+
         p_dropout (float): The dropout rate.
+
     """
 
     def __init__(self, d_model: int, kernel_size: int, p_dropout: float) -> None:
@@ -1320,7 +1869,15 @@ class SqueezeformerConvModule(ConformerConvModule):
         del self.lnorm
 
     def forward(self, x: Tensor) -> Tensor:
-        # x of shape [B, M, d]
+        """Passes the input x through the layers of the SqueezeformerConvModule.
+
+        Args:
+
+            x (torch.Tensor): A tensor of shape [B, M, d].
+
+        Returns:
+            Tensor: The result tensor of shape [B, M, d]
+        """
         out = self.scaler(x)
         out = out.transpose(-1, -2)
         out = self.pwise_conv1(out)
@@ -1339,10 +1896,15 @@ class SqueezeformerRelativeMHSA(MultiHeadAtt):
     relative positional encoding and pre-scaling module.
 
     Args:
+
         d_model (int): The model dimension.
-        h (int): The number of heads.
+
+        h (int): The number of attention heads.
+
         p_dropout (float): The dropout rate.
+
         masking_value (int): The masking value. Default -1e15
+
     """
 
     def __init__(
@@ -1352,7 +1914,22 @@ class SqueezeformerRelativeMHSA(MultiHeadAtt):
         self.dropout = nn.Dropout(p_dropout)
         self.scaler = Scaling1d(d_model=d_model)
 
-    def forward(self, x: Tensor, mask: Union[None, Tensor] = None) -> Tensor:
+    def forward(self, x: Tensor, mask: Optional[Tensor] = None) -> Tensor:
+        """computes the multi-head self-attention of the input tensor with
+        optional mask tensor.
+
+        Args:
+
+            x (Tensor): The input tensor of shape [B, M, d].
+
+            mask (Tensor, optional): Boolean tensor of shape [B, M], where
+            it's set to False for padding positions. If None is provided, no
+            masking is applied. Default is None.
+
+        Returns:
+            Tensor: A tensor of shape [B, M, d] representing the output of
+            the multi-head self-attention module.
+        """
         out = self.scaler(x)
         out = add_pos_enc(out)
         out = super().forward(
@@ -1363,15 +1940,16 @@ class SqueezeformerRelativeMHSA(MultiHeadAtt):
 
 
 class SqueezeformerFeedForward(ConformerFeedForward):
-    """Implements the conformer feed-forward module
-    with the modifications presented in
-    https://arxiv.org/abs/2206.00888
+    """Implements the conformer feed-forward module with the modifications
+    introduced in https://arxiv.org/abs/2206.00888
 
     Args:
         d_model (int): The model dimension.
-        expansion_factor (int): The linear layer's expansion
-            factor.
+
+        expansion_factor (int): The expansion factor of the linear layer.
+
         p_dropout (float): The dropout rate.
+
     """
 
     def __init__(self, d_model: int, expansion_factor: int, p_dropout: float) -> None:
@@ -1382,6 +1960,14 @@ class SqueezeformerFeedForward(ConformerFeedForward):
         self.scaler = Scaling1d(d_model=d_model)
 
     def forward(self, x: Tensor) -> Tensor:
+        """Passes the input to the feed-forward layers
+
+        Args:
+            x (Tensor): Input tensor of shape [B, M, d].
+
+        Returns:
+            Tensor: Output tensor of shape [B, M, d].
+        """
         out = self.scaler(x)
         out = self.fc1(out)
         out = self.swish(out)
@@ -1392,15 +1978,20 @@ class SqueezeformerFeedForward(ConformerFeedForward):
 
 
 class SqueezeformerBlock(nn.Module):
-    """Implements the Squeezeformer block
-    described in https://arxiv.org/abs/2206.00888
+    """Implements the Squeezeformer block described in
+    https://arxiv.org/abs/2206.00888
 
     Args:
         d_model (int): The model dimension.
+
         ff_expansion_factor (int): The linear layer's expansion factor.
-        h (int): The number of heads.
-        kernel_size (int): The depth-wise convolution kernel size.
+
+        h (int): The number of atention heads.
+
+        kernel_size (int): The kernel size of the depth-wise convolution layer.
+
         p_dropout (float): The dropout rate.
+
         masking_value (int): The masking value. Default -1e15
     """
 
@@ -1431,7 +2022,21 @@ class SqueezeformerBlock(nn.Module):
         )
         self.add_and_norm4 = AddAndNorm(d_model=d_model)
 
-    def forward(self, x: Tensor, mask: Tensor) -> Tensor:
+    def forward(self, x: Tensor, mask: Optional[Tensor] = None) -> Tensor:
+        """Forward pass of the Squeezeformer block.
+
+        Args:
+
+            x (Tensor): The input tensor of shape [B, M, d].
+
+            mask (Optional[Tensor]): The optional mask tensor of shape [B, M].
+            Default None.
+
+        Returns:
+
+            Tensor: The output tensor of shape [B, M, d].
+
+        """
         out = self.add_and_norm1(self.mhsa(x, mask), x)
         out = self.add_and_norm2(self.ff1(out), out)
         out = self.add_and_norm3(self.conv(out), out)
@@ -1440,12 +2045,13 @@ class SqueezeformerBlock(nn.Module):
 
 
 class SqueezeAndExcit1D(nn.Module):
-    """Implements the squeeze and excite module
-    proposed in https://arxiv.org/abs/1709.01507 and used
-    in https://arxiv.org/abs/2005.03191
+    """Implements the squeeze and excite module proposed in https://arxiv.org/abs/1709.01507
+    and used in https://arxiv.org/abs/2005.03191
 
     Args:
+
         in_feature (int): The number of channels or feature size.
+
         reduction_factor (int): The feature reduction size.
     """
 
@@ -1461,8 +2067,19 @@ class SqueezeAndExcit1D(nn.Module):
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, x: Tensor, mask: Tensor):
-        # x of shape [B, d, M]
-        # mask of shape [B, M]
+        """Applies the squeeze and excite operation to the input tensor.
+
+        Args:
+
+            x (Tensor): The input tensor of shape [B, d, M].
+
+            mask (Tensor): The masking tensor of shape [B, M].
+
+        Returns:
+            Tensor: The output tensor of shape [B, d, M] after applying the
+            squeeze and excite operation.
+
+        """
         lengths = mask.sum(dim=-1)  # [B]
         x = mask.unsqueeze(dim=1) * x  # zeroing out padded values
         x_pooled = x.sum(dim=-1)  # [B, d]
@@ -1476,15 +2093,19 @@ class SqueezeAndExcit1D(nn.Module):
 
 
 class ContextNetConvLayer(nn.Module):
-    """Implements the convolution layer of the ContextNet
-    model proposed in https://arxiv.org/abs/2005.03191
-    f(x) = Act(BN(Conv(x))
+    """Implements the convolution layer of the ContextNet model proposed in
+    https://arxiv.org/abs/2005.03191. This layer applies a convolution operation
+    followed by batch normalization and an activation function.
 
     Args:
-        in_channels (int): The input's channel size.
+
+        in_channels (int): The number of input channels.
+
         out_channels (int): The number of output channels.
-        kernel_size (int): The convolution kernel size.
-        stride (int): The convolution stride size. Default 1.
+
+        kernel_size (int): The convolution layer kernel size.
+
+        stride (int): The stride of the convolution layer. Default 1.
     """
 
     def __init__(
@@ -1503,6 +2124,24 @@ class ContextNetConvLayer(nn.Module):
         self.swish = nn.SiLU()
 
     def forward(self, x: Tensor, lengths: Tensor) -> Tuple[Tensor, Tensor]:
+        """Passes the input tensor to the ContextNet convolution layer and
+        returns a tuple of the output tensor and the updated lengths tensor.
+
+        Args:
+
+            x (Tensor): The input tensor of shape [B, in_channels, M].
+
+            lengths (Tensor): The tensor of shape [B] containing the lengths of
+            each sequence in x.
+
+        Returns:
+
+            Tuple[Tensor, Tensor]: A tuple of two tensors. The first tensor is
+            the output tensor after applying convolution of shape
+            [B, out_channels, N], and the second tensor is the updated lengths
+            tensor of shape [B], after applying the convolution layer.
+
+        """
         out = self.conv(x)
         out = self.bnorm(out)
         out = self.swish(out)
@@ -1522,9 +2161,13 @@ class ContextNetResidual(nn.Module):
     as proposed in https://arxiv.org/abs/2005.03191
 
     Args:
-        in_channels (int): The number of channels in the input.
+
+        in_channels (int): The number of input channels.
+
         out_channels (int): The number of output channels.
+
         kernel_size (int): The convolution kernel size.
+
         stride (int): The convolution stride size.
 
     """
@@ -1543,8 +2186,19 @@ class ContextNetResidual(nn.Module):
         self.bnorm = nn.BatchNorm1d(num_features=out_channels)
 
     def forward(self, x: Tensor, out: Tensor) -> Tensor:
-        # x of shape [B, d, M]
-        # out of shape [B, d/s, M]  s=1 if the block has no stride
+        """
+        Args:
+
+            x (Tensor): The input tensor of shape [B, d, M].
+
+            out (Tensor): The output tensor of the previous block of shape [B, d/s, M]
+            where s is the stride value. If the block has no stride, s is set to 1.
+
+        Returns:
+            Tensor: The output tensor after applying the residual connection of
+            shape [B, d, M].
+
+        """
         x = self.conv(x)
         x = self.bnorm(x)
         return x + out
@@ -1555,14 +2209,20 @@ class ContextNetBlock(nn.Module):
     model proposd in https://arxiv.org/abs/2005.03191
 
     Args:
-        n_layers (int): The number of convolution layers.
+
+        n_layers (int): The number of convolutional layers in the block.
+
         in_channels (int): The number of channels in the input.
+
         out_channels (int): The number of output channels.
+
         kernel_size (int): The convolution kernel size.
-        reduction_factor (int): The feature reduction size of the
-            Squeeze-and-excitation module.
-        add_residual (bool): A flag to include a residual connection or not.
-        last_layer_stride (int): The last convolution layer stride size.
+
+        reduction_factor (int):The reduction factor for the Squeeze-and-excitation module.
+
+        add_residual (bool):  A flag indicating whether to include a residual connection.
+
+        last_layer_stride (int): The stride size of the last convolutional layer.
     """
 
     def __init__(
@@ -1601,6 +2261,19 @@ class ContextNetBlock(nn.Module):
         self.add_residual = add_residual
 
     def forward(self, x: Tensor, lengths: Tensor) -> Tuple[Tensor, Tensor]:
+        """
+        Passes the input through the convolution block of the ContextNet.
+
+        Args:
+            x (Tensor): The input tensor of shape [B, in_channels, M].
+            lengths (Tensor): The tensor of shape [B] containing the lengths of each sequence in x.
+
+        Returns:
+            Tuple[Tensor, Tensor]: The output tensor after passing through the convolution block,
+            of shape [B, out_channels, N], and the updated lengths tensor of shape [B], after
+            passing through the convolution block.
+        """
+
         out = x
         for layer in self.conv_layers:
             out, lengths = layer(out, lengths)
