@@ -1,3 +1,23 @@
+"""This module provides various speech encoders.
+
+The available encoders are:
+
+- DeepSpeechV1Encoder: The encoder implementation of the DeepSpeech V1 model.
+- DeepSpeechV2Encoder: The encoder implementation of the DeepSpeech V2 model.
+- ConformerEncoder: The encoder implementation of the Conformer model.
+- JasperEncoder: The encoder implementation of the Jasper model.
+- Wav2LetterEncoder: The encoder implementation of the Wav2Letter model.
+- QuartzNetEncoder: The encoder implementation of the QuartzNet model.
+- SqueezeformerEncoder: The encoder implementation of the Squeezeformer model.
+- SpeechTransformerEncoder: The encoder implementation of the Speech Transformer model.
+- RNNEncoder: The encoder implementation of a general RNN model.
+- PyramidRNNEncoder: The encoder implementation of the Pyramid RNN model.
+- ContextNetEncoder: The encoder implementation of the ContextNet model.
+
+Each encoder takes a speech input of shape [B, M, d], and the lengths if
+shape [B], where B is the batch size, M is the length of
+the speech sequence, and d is the number of features.
+"""
 from typing import List, Optional, Tuple, Union
 
 import torch
@@ -25,12 +45,19 @@ class DeepSpeechV1Encoder(nn.Module):
     https://arxiv.org/abs/1412.5567
 
     Args:
+
         in_features (int): The input feature size.
-        hidden_size (int): The layers' hidden size.
+
+        hidden_size (int): The hidden size of the rnn layers.
+
         n_linear_layers (int): The number of feed-forward layers.
+
         bidirectional (bool): if the rnn is bidirectional or not.
-        max_clip_value (int): The maximum relu value.
-        rnn_type (str): rnn, gru or lstm.
+
+        max_clip_value (int): The maximum relu clipping value.
+
+        rnn_type (str): The RNN type it has to be one of rnn, gru or lstm.
+
         p_dropout (float): The dropout rate.
     """
 
@@ -74,8 +101,20 @@ class DeepSpeechV1Encoder(nn.Module):
     def forward(
         self, x: Tensor, mask: Tensor, *args, **kwargs
     ) -> Tuple[Tensor, Tensor]:
-        # mask of shape [B, M] and True if there's no padding
-        # x of shape [B, T, F]
+        """Passes the input `x` through the encoder layers.
+
+        Args:
+
+            x (Tensor): The input speech tensor of shape [B, M, d]
+
+            mask (Tensor): The input boolean input mask of shape [B, M], where it's True
+            if there is no padding.
+
+        Returns:
+
+            Tuple[Tensor, Tensor]: A tuple where the first element is the encoded speech of shape
+            [B, M, F] and the second element is the lengths of shape [B].
+        """
         lengths = mask.sum(dim=-1)
         for layer in self.ff_layers:
             x = layer(x)
@@ -87,21 +126,32 @@ class DeepSpeechV1Encoder(nn.Module):
 
 
 class DeepSpeechV2Encoder(nn.Module):
-    """Implements the deep speech 2 encoder
-    proposed in https://arxiv.org/abs/1512.02595
+    """Implements the deep speech 2 encoder proposed in
+    https://arxiv.org/abs/1512.02595
 
     Args:
         n_conv (int): The number of convolution layers.
-        kernel_size (int): The convolution layers' kernel size.
-        stride (int): The convolution layers' stride.
+
+        kernel_size (int): The kernel size of the convolution layers.
+
+        stride (int): The stride size of the convolution layer.
+
         in_features (int): The input/speech feature size.
-        hidden_size (int): The layers' hidden size.
-        bidirectional (bool): if the rnn is bidirectional or not.
+
+        hidden_size (int): The hidden size of the RNN layers.
+
+        bidirectional (bool): A flag indicating if the rnn is bidirectional or not.
+
         n_rnn (int): The number of RNN layers.
+
         n_linear_layers (int): The number of linear layers.
-        max_clip_value (int): The maximum relu value.
-        rnn_type (str): rnn, gru or lstm.
+
+        max_clip_value (int): The maximum relu clipping value.
+
+        rnn_type (str): The RNN type it has to be one of rnn, gru or lstm.
+
         tau (int): The future context size.
+
         p_dropout (float): The dropout rate.
     """
 
@@ -155,6 +205,20 @@ class DeepSpeechV2Encoder(nn.Module):
     def forward(
         self, x: Tensor, mask: Tensor, *args, **kwargs
     ) -> Tuple[Tensor, Tensor]:
+        """Passes the input `x` through the encoder layers.
+
+        Args:
+
+            x (Tensor): The input speech tensor of shape [B, M, d]
+
+            mask (Tensor): The input boolean input mask of shape [B, M], where it's True
+            if there is no padding.
+
+        Returns:
+
+            Tuple[Tensor, Tensor]: A tuple where the first element is the encoded speech of shape
+            [B, M, F] and the second element is the lengths of shape [B].
+        """
         lengths = mask.sum(dim=-1)
         lengths = lengths.cpu()
         out, lengths = self.conv(x, lengths)
@@ -177,15 +241,25 @@ class ConformerEncoder(nn.Module):
 
     Args:
         d_model (int): The model dimension.
+
         n_conf_layers (int): The number of conformer blocks.
+
         ff_expansion_factor (int): The feed-forward expansion factor.
-        h (int): The number of heads.
-        kernel_size (int): The kernel size of conv module.
-        ss_kernel_size (int): The kernel size of the subsampling layer.
-        ss_stride (int): The stride of the subsampling layer.
-        ss_num_conv_layers (int): The number of subsampling layers.
+
+        h (int): The number of attention heads.
+
+        kernel_size (int): The convolution module kernel size.
+
+        ss_kernel_size (int): The subsampling layer kernel size.
+
+        ss_stride (int): The subsampling layer stride size.
+
+        ss_num_conv_layers (int): The number of subsampling convolutional layers.
+
         in_features (int): The input/speech feature size.
+
         res_scaling (float): The residual connection multiplier.
+
         p_dropout (float): The dropout rate.
     """
 
@@ -229,6 +303,20 @@ class ConformerEncoder(nn.Module):
     def forward(
         self, x: Tensor, mask: Tensor, *args, **kwargs
     ) -> Tuple[Tensor, Tensor]:
+        """Passes the input `x` through the encoder layers.
+
+        Args:
+
+            x (Tensor): The input speech tensor of shape [B, M, d]
+
+            mask (Tensor): The input boolean input mask of shape [B, M], where it's True
+            if there is no padding.
+
+        Returns:
+
+            Tuple[Tensor, Tensor]: A tuple where the first element is the encoded speech of shape
+            [B, M, F] and the second element is the lengths of shape [B].
+        """
         lengths = mask.sum(dim=-1)
         lengths = lengths.cpu()
         out, lengths = self.sub_sampling(x, lengths)
@@ -240,25 +328,30 @@ class ConformerEncoder(nn.Module):
 
 
 class JasperEncoder(nn.Module):
-    """Implements Jasper model architecture's encoder proposed
-    in https://arxiv.org/abs/1904.03288
+    """Implements Jasper's encoder proposed in https://arxiv.org/abs/1904.03288
 
     Args:
+
         in_features (int): The input/speech feature size.
-        num_blocks (int): The number of jasper blocks, denoted
-            as 'B' in the paper.
-        num_sub_blocks (int): The number of jasper subblocks, denoted
-            as 'R' in the paper.
-        channel_inc (int): The rate to increase the number of channels
-            across the blocks.
-        epilog_kernel_size (int): The epilog block convolution's kernel size.
-        prelog_kernel_size (int): The prelog block convolution's kernel size.
-        prelog_stride (int): The prelog block convolution's stride.
-        prelog_n_channels (int): The prelog block convolution's number of
-            output channnels.
-        blocks_kernel_size (Union[int, List[int]]): The convolution layer's
-            kernel size of each jasper block.
+
+        num_blocks (int): The number of Jasper blocks (denoted as 'B' in the paper).
+
+        num_sub_blocks (int): The number of Jasper subblocks (denoted as 'R' in the paper).
+
+        channel_inc (int): The rate to increase the number of channels across the blocks.
+
+        epilog_kernel_size (int): The kernel size of the epilog block convolution layer.
+
+        prelog_kernel_size (int): The kernel size of the prelog block ocnvolution layer.
+
+        prelog_stride (int): The stride size of the prelog block convolution layer.
+
+        prelog_n_channels (int): The output channnels of the prelog block convolution layer.
+
+        blocks_kernel_size (Union[int, List[int]]): The kernel size(s) of the convolution layer for each block.
+
         p_dropout (float): The dropout rate.
+
     """
 
     def __init__(
@@ -309,7 +402,20 @@ class JasperEncoder(nn.Module):
     def forward(
         self, x: Tensor, mask: Tensor, *args, **kwargs
     ) -> Tuple[Tensor, Tensor]:
-        # x of shape [B, M, d]
+        """Passes the input `x` through the encoder layers.
+
+        Args:
+
+            x (Tensor): The input speech tensor of shape [B, M, d]
+
+            mask (Tensor): The input boolean input mask of shape [B, M], where it's True
+            if there is no padding.
+
+        Returns:
+
+            Tuple[Tensor, Tensor]: A tuple where the first element is the encoded speech of shape
+            [B, M, F] and the second element is the lengths of shape [B].
+        """
         lengths = mask.sum(dim=-1)
         lengths = lengths.cpu()
         x = x.transpose(-1, -2)
@@ -329,25 +435,35 @@ class JasperEncoder(nn.Module):
 
 
 class Wav2LetterEncoder(nn.Module):
-    """Implements Wav2Letter's encoder proposed in
+    """Implements the Wav2Letter encoder proposed in
     https://arxiv.org/abs/1609.03193
 
     Args:
+
         in_features (int): The input/speech feature size.
+
         n_conv_layers (int): The number of convolution layers.
-        layers_kernel_size (int): The convolution layers' kernel size.
-        layers_channels_size (int): The convolution layers' channel size.
-        pre_conv_stride (int): The prenet convolution stride.
-        pre_conv_kernel_size (int): The prenet convolution kernel size.
-        post_conv_channels_size (int): The postnet convolution channel size.
-        post_conv_kernel_size (int): The postnet convolution kernel size.
+
+        layers_kernel_size (int): The kernel size of the convolution layers.
+
+        layers_channels_size (int): The number of output channels of each convolution layer.
+
+        pre_conv_stride (int): The stride of the prenet convolution layer.
+
+        pre_conv_kernel_size (int): The kernel size of the prenet convolution layer.
+
+        post_conv_channels_size (int): The number of output channels of the
+        postnet convolution layer.
+
+        post_conv_kernel_size (int): The kernel size of the postnet convolution layer.
+
         p_dropout (float): The dropout rate.
-        wav_kernel_size (Optional[int]): The kernel size of the first
-            layer that processes the wav samples directly if wav is modeled.
-            Default None.
-        wav_stride (Optional[int]): The stride size of the first
-            layer that processes the wav samples directly if wav is modeled.
-            Default None.
+
+        wav_kernel_size (Optional[int]): The kernel size of the first layer that
+        processes the wav samples directly if wav is modeled. Default None.
+
+        wav_stride (Optional[int]): The stride size of the first layer that
+        processes the wav samples directly if wav is modeled. Default None.
     """
 
     def __init__(
@@ -411,7 +527,20 @@ class Wav2LetterEncoder(nn.Module):
     def forward(
         self, x: Tensor, mask: Tensor, *args, **kwargs
     ) -> Tuple[Tensor, Tensor]:
-        # x of shape [B, M, d]
+        """Passes the input `x` through the encoder layers.
+
+        Args:
+
+            x (Tensor): The input speech tensor of shape [B, M, d]
+
+            mask (Tensor): The input boolean input mask of shape [B, M], where it's True
+            if there is no padding.
+
+        Returns:
+
+            Tuple[Tensor, Tensor]: A tuple where the first element is the encoded speech of shape
+            [B, M, F] and the second element is the lengths of shape [B].
+        """
         lengths = mask.sum(dim=-1)
         lengths = lengths.cpu()
         x = x.transpose(-1, -2)
@@ -450,29 +579,41 @@ class Wav2LetterEncoder(nn.Module):
 
 
 class QuartzNetEncoder(JasperEncoder):
-    """Implements QuartzNet model architecture's encoder proposed
-    in https://arxiv.org/abs/1910.10261
+    """Implements QuartzNet encoder proposed in https://arxiv.org/abs/1910.10261
 
     Args:
+
         in_features (int): The input/speech feature size.
-        num_blocks (int): The number of QuartzNet blocks, denoted
-            as 'B' in the paper.
-        block_repetition (int): The nubmer of times to repeat each block.
-            denoted as S in the paper.
-        num_sub_blocks (int): The number of QuartzNet subblocks, denoted
-            as 'R' in the paper.
-        channels_size (List[int]): The channel size of each block. it has to
-            be of length equal to num_blocks
-        epilog_kernel_size (int): The epilog block convolution's kernel size.
-        epilog_channel_size (Tuple[int, int]): The epilog blocks channels size.
-        prelog_kernel_size (int): The prelog block convolution's kernel size.
-        prelog_stride (int): The prelog block convolution's stride.
-        prelog_n_channels (int): The prelog block convolution's number of
-            output channnels.
+
+        num_blocks (int): The number of QuartzNet blocks (denoted as 'B' in the paper).
+
+        block_repetition (int): The number of times to repeat each block (denoted as 'S' in the paper).
+
+        num_sub_blocks (int): The number of QuartzNet subblocks, (denoted as 'R' in the paper).
+
+        channels_size (List[int]): A list of integers representing the number of output channels
+        for each block.
+
+        epilog_kernel_size (int): The kernel size of the convolution layer in the epilog block.
+
+        epilog_channel_size (Tuple[int, int]): A tuple for both epilog layers
+        of the convolution layer .
+
+        prelog_kernel_size (int): The kernel size pf the convolution layer in the prelog block.
+
+        prelog_stride (int): The stride size of the of the convoltuional layer
+        in the prelog block.
+
+        prelog_n_channels (int): The number of output channels of the convolutional
+        layer in the prelog block.
+
         groups (int): The groups size.
-        blocks_kernel_size (Union[int, List[int]]): The convolution layer's
-            kernel size of each jasper block.
+
+        blocks_kernel_size (Union[int, List[int]]): An integer or a list of integers representing the
+        kernel size(s) for each block's convolutional layer.
+
         p_dropout (float): The dropout rate.
+
     """
 
     def __init__(
@@ -532,21 +673,34 @@ class SqueezeformerEncoder(nn.Module):
     as described in https://arxiv.org/abs/2206.00888
 
     Args:
+
         in_features (int): The input/speech feature size.
-        n (int): The number of layers per block, denoted as N in the paper.
+
+        n (int): The number of layers per block, (denoted as N in the paper).
+
         d_model (int): The model dimension.
-        ff_expansion_factor (int): The linear layer's expansion factor.
-        h (int): The number of heads.
-        kernel_size (int): The depth-wise convolution kernel size.
-        pooling_kernel_size (int): The pooling convolution kernel size.
-        pooling_stride (int): The pooling convolution stride size.
-        ss_kernel_size (Union[int, List[int]]): The kernel size of the
-            subsampling layer.
-        ss_stride (Union[int, List[int]]): The stride of the subsampling layer.
+
+        ff_expansion_factor (int): The expansion factor of linear layer in the
+        feed forward module.
+
+        h (int): The number of attention heads.
+
+        kernel_size (int): The kernel size of the depth-wise convolution layer.
+
+        pooling_kernel_size (int): The kernel size of the pooling convolution layer.
+
+        pooling_stride (int): The stride size of the pooling convolution layer.
+
+        ss_kernel_size (Union[int, List[int]]): The kernel size of the subsampling layer(s).
+
+        ss_stride (Union[int, List[int]]): The stride of the subsampling layer(s).
+
         ss_n_conv_layers (int): The number of subsampling convolutional layers.
+
         p_dropout (float): The dropout rate.
-        ss_groups (Union[int, List[int]]): The subsampling convolution groups
-            size.
+
+        ss_groups (Union[int, List[int]]): The subsampling convolution groups size(s).
+
         masking_value (int): The masking value. Default -1e15
     """
 
@@ -650,6 +804,20 @@ class SqueezeformerEncoder(nn.Module):
     def forward(
         self, x: Tensor, mask: Tensor, *args, **kwargs
     ) -> Tuple[Tensor, Tensor]:
+        """Passes the input `x` through the encoder layers.
+
+        Args:
+
+            x (Tensor): The input speech tensor of shape [B, M, d]
+
+            mask (Tensor): The input boolean input mask of shape [B, M], where it's True
+            if there is no padding.
+
+        Returns:
+
+            Tuple[Tensor, Tensor]: A tuple where the first element is the encoded speech of shape
+            [B, M, F] and the second element is the lengths of shape [B].
+        """
         lengths = mask.sum(dim=-1)
         out, lengths = self.subsampling(x, lengths)
         mask = get_mask_from_lens(lengths=lengths, max_len=out.shape[1])
@@ -675,18 +843,26 @@ class SpeechTransformerEncoder(nn.Module):
     described in https://ieeexplore.ieee.org/document/8462506
 
     Args:
+
         in_features (int): The input/speech feature size.
+
         n_conv_layers (int): The number of down-sampling convolutional layers.
-        kernel_size (int): The down-sampling convolutional layers kernel size.
-        stride (int): The down-sampling convolutional layers stride.
+
+        kernel_size (int): The kernel size of the down-sampling convolutional layers.
+
+        stride (int): The stride size of the down-sampling convolutional layers.
+
         d_model (int): The model dimensionality.
+
         n_layers (int): The number of encoder layers.
-        ff_size (int): The feed-forward inner layer dimensionality.
+
+        ff_size (int):  The dimensionality of the inner layer of the feed-forward module.
+
         h (int): The number of attention heads.
-        att_kernel_size (int): The attentional convolutional
-            layers' kernel size.
-        att_out_channels (int): The number of output channels of the
-            attentional convolution
+
+        att_kernel_size (int): The kernel size of the attentional convolutional layers.
+
+        att_out_channels (int): The number of output channels of the attentional convolution layers.
     """
 
     def __init__(
@@ -756,6 +932,20 @@ class SpeechTransformerEncoder(nn.Module):
     def forward(
         self, x: Tensor, mask: Tensor, *args, **kwargs
     ) -> Tuple[Tensor, Tensor]:
+        """Passes the input `x` through the encoder layers.
+
+        Args:
+
+            x (Tensor): The input speech tensor of shape [B, M, d]
+
+            mask (Tensor): The input boolean input mask of shape [B, M], where it's True
+            if there is no padding.
+
+        Returns:
+
+            Tuple[Tensor, Tensor]: A tuple where the first element is the encoded speech of shape
+            [B, M, F] and the second element is the lengths of shape [B].
+        """
         out, mask = self._pre_process(x, mask)
         for layer in self.layers:
             out = layer(out, mask)
@@ -767,12 +957,19 @@ class RNNEncoder(nn.Module):
     """Implements a stack of RNN layers.
 
     Args:
+
         in_features (int): The input features size.
+
         hidden_size (int): The RNN hidden size.
-        bidirectional (bool): If the RNN is bidirectional or not.
+
+        bidirectional (bool): A flag indicating if the rnn is bidirectional or not.
+
         n_layers (int): The number of RNN layers.
+
         p_dropout (float): The dropout rate.
-        rnn_type (str): The rnn type. default 'rnn'.
+
+        rnn_type (str): The RNN type it has to be one of rnn, gru or lstm.
+
     """
 
     def __init__(
@@ -807,6 +1004,20 @@ class RNNEncoder(nn.Module):
     def forward(
         self, x: Tensor, mask: Tensor, return_h=False, *args, **kwargs
     ) -> Tuple[Tensor, Tensor, Tensor]:
+        """Passes the input `x` through the encoder layers.
+
+        Args:
+
+            x (Tensor): The input speech tensor of shape [B, M, d]
+
+            mask (Tensor): The input boolean input mask of shape [B, M], where it's True
+            if there is no padding.
+
+        Returns:
+
+            Tuple[Tensor, Tensor]: A tuple where the first element is the encoded speech of shape
+            [B, M, F] and the second element is the lengths of shape [B].
+        """
         out = x
         lengths = mask.sum(dim=-1).cpu()
         for i, layer in enumerate(self.rnns):
@@ -823,13 +1034,21 @@ class PyramidRNNEncoder(nn.Module):
     https://arxiv.org/abs/1508.01211.
 
     Args:
+
         in_features (int): The input features size.
+
         hidden_size (int): The RNN hidden size.
+
         reduction_factor (int): The time resolution reduction factor.
-        bidirectional (bool): If the RNN is bidirectional or not.
+
+        bidirectional (bool): A flag indicating if the rnn is bidirectional or not.
+
         n_layers (int): The number of RNN layers.
+
         p_dropout (float): The dropout rate.
-        rnn_type (str): The rnn type. default 'rnn'.
+
+        rnn_type (str): The RNN type it has to be one of rnn, gru or lstm.
+
     """
 
     def __init__(
@@ -893,6 +1112,20 @@ class PyramidRNNEncoder(nn.Module):
     def forward(
         self, x: Tensor, mask: Tensor, return_h=False, *args, **kwargs
     ) -> Tuple[Tensor, Tensor, Tensor]:
+        """Passes the input `x` through the encoder layers.
+
+        Args:
+
+            x (Tensor): The input speech tensor of shape [B, M, d]
+
+            mask (Tensor): The input boolean input mask of shape [B, M], where it's True
+            if there is no padding.
+
+        Returns:
+
+            Tuple[Tensor, Tensor]: A tuple where the first element is the encoded speech of shape
+            [B, M, F] and the second element is the lengths of shape [B].
+        """
         out = x
         lengths = mask.sum(dim=-1).cpu()
         for i, layer in enumerate(self.rnns):
@@ -913,19 +1146,23 @@ class ContextNetEncoder(nn.Module):
 
     Args:
         in_features (int): The input feature size.
+
         n_layers (int): The number of ContextNet blocks.
+
         n_sub_layers (Union[int, List[int]]): The number of convolutional
-            layers per block, if list is passed, it has to be of length equal
-            to n_layers.
+        layers per block. If list is passed, it has to be of length equal to `n_layers`.
+
         stride (Union[int, List[int]]): The stride of the last convolutional
-            layers per block, if list is passed, it has to be of length equal
-            to n_layers.
+        layers per block. If list is passed, it has to be of length equal to
+        `n_layers`.
+
         out_channels (Union[int, List[int]]): The channels size of the
-            convolutional layers per block, if list is passed, it has to be of
-            length equal to n_layers.
+        convolutional layers per block. If list is passed, it has to be of
+        length equal to `n_layers`.
+
         kernel_size (int): The convolutional layers kernel size.
-        reduction_factor (int): The feature reduction size of the
-            Squeeze-and-excitation module.
+
+        reduction_factor (int): The feature reduction size of the Squeeze-and-excitation module.
     """
 
     def __init__(
@@ -995,7 +1232,20 @@ class ContextNetEncoder(nn.Module):
     def forward(
         self, x: Tensor, mask: Tensor, *args, **kwargs
     ) -> Tuple[Tensor, Tensor]:
-        # x of shape [B,  M, d]
+        """Passes the input `x` through the encoder layers.
+
+        Args:
+
+            x (Tensor): The input speech tensor of shape [B, M, d]
+
+            mask (Tensor): The input boolean input mask of shape [B, M], where it's True
+            if there is no padding.
+
+        Returns:
+
+            Tuple[Tensor, Tensor]: A tuple where the first element is the encoded speech of shape
+            [B, M, F] and the second element is the lengths of shape [B].
+        """
         lengths = mask.sum(dim=-1)
         out = x.transpose(-1, -2)  # [B, d, M]
         for layer in self.layers:
