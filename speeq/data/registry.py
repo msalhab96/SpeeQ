@@ -1,5 +1,20 @@
-"""The factory of all data related object
 """
+This module serves as a factory for creating objects/instances from other
+classes by abstracting the creation process. It contains several functions
+that return instances of classes such as tokenizer, ASR datasets, and data
+loaders, making it easier to manage dependencies and abstract away the details
+of object creation.
+
+Functions:
+
+- get_tokenizer: Returns an instance of a tokenizer object.
+- load_tokenizer: Loads and returns a pre-trained tokenizer instance.
+- get_asr_datasets: Returns instances of training and testing datasets for ASR tasks.
+- get_text_padder: Returns an instance of a text padder object.
+- get_speech_padder: Returns an instance of a speech padder object.
+- get_asr_loaders: Returns instances of training and testing data loaders for ASR tasks.
+"""
+
 import os
 from pathlib import Path
 from typing import List, Optional, Tuple, Union
@@ -113,10 +128,13 @@ def get_text_padder(data_config: object, pad_val: Union[float, int]) -> IPadder:
     Args:
         data_config (object): The data configuration object.
 
-        pad_val (Union[float, int]): The padding value.
+        pad_val (Union[float, int]): The value that will be used for padding.
 
     Returns:
-        IPadder: A padder object that pads the input on the zeroth dim.
+        IPadder: A padder object that can be used to pad sequences of variable
+        length to a fixed length, by adding padding values at the beginning or
+        end of the sequence. The padding is applied along the zeroth dimension
+        of the input tensor.
     """
     return PADDING_TYPES[data_config.padding_type](
         dim=0, pad_val=pad_val, max_len=data_config.text_pad_max_len
@@ -129,10 +147,13 @@ def get_speech_padder(data_config) -> IPadder:
     Args:
         data_config (object): The data configuration object.
 
-        pad_val (Union[float, int]): The padding value.
+        pad_val (Union[float, int]): The value that will be used for padding.
 
     Returns:
-        IPadder: A padder object that pads the input on the first dim.
+        IPadder: A padder object that can be used to pad sequences of variable
+        length to a fixed length, by adding padding values at the beginning or
+        end of the sequence. The padding is applied along the first dimension
+        of the input tensor.
     """
     return PADDING_TYPES[data_config.padding_type](
         dim=1, pad_val=0.0, max_len=data_config.speech_pad_max_len
