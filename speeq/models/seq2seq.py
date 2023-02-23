@@ -1,3 +1,13 @@
+"""
+The module contains implementations of various sequence-to-sequence (seq2seq) speech recognition models
+
+Classes:
+
+- BasicAttSeq2SeqRNN: A basic seq2seq model with an RNN encoder and an attention-based RNN decoder.
+- LAS: A Listen, Attend and Spell (LAS) model.
+- RNNWithLocationAwareAtt: An RNN-based seq2seq model with location-aware attention mechanism.
+- SpeechTransformer: A transformer-based seq2seq model for speech processing.
+"""
 from typing import Union
 
 from torch import Tensor, nn
@@ -13,18 +23,29 @@ class BasicAttSeq2SeqRNN(nn.Module):
     """Implements The basic RNN encoder decoder ASR.
 
     Args:
+
         in_features (int): The encoder's input feature speech size.
+
         n_classes (int): The number of classes/vocabulary.
-        hidden_size (int): The RNNs' hidden size.
-        enc_num_layers (int): The number of the encoder's layers.
-        bidirectional (bool): If the encoder's RNNs are bidirectional or not.
-        dec_num_layers (int): The number of the decoders' RNN layers.
+
+        hidden_size (int): The hidden size of the RNN layers.
+
+        enc_num_layers (int): The number of layers in the encoder.
+
+        bidirectional (bool): A flag indicating if the rnn is bidirectional or not.
+
+        dec_num_layers (int): The number of the RNN layers in the decoder.
+
         emb_dim (int): The embedding size.
+
         p_dropout (float): The dropout rate.
-        pred_activation (Module): An activation function instance to be applied
-            on the last dimension of the predicted logits.
+
+        pred_activation (Module): An instance of an activation function.
+
         teacher_forcing_rate (float): The teacher forcing rate. Default 0.0
-        rnn_type (str): The rnn type. default 'rnn'.
+
+        rnn_type (str): The RNN type it has to be one of rnn, gru or lstm.
+        Default 'rnn'.
     """
 
     def __init__(
@@ -72,6 +93,20 @@ class BasicAttSeq2SeqRNN(nn.Module):
     def forward(
         self, speech: Tensor, speech_mask: Tensor, text: Tensor, *args, **kwargs
     ) -> Tensor:
+        """Passes the input to the model
+
+        Args:
+            speech (Tensor): The input speech of shape [B, M, d]
+
+            mask (Union[Tensor, None]): The speech mask of shape [B, M],
+            which is True for the data positions and False for the padding ones.
+
+
+            text (Tensor): The text tensor of shape [B, M_dec]
+
+        Returns:
+            Tensor: The prediction tensor of shape [B, M_dec, C]
+        """
         out, h, lengths = self.encoder(speech, speech_mask, return_h=True)
         if self.bidirectional is True:
             if isinstance(h, tuple):
@@ -104,19 +139,33 @@ class LAS(BasicAttSeq2SeqRNN):
     proposed in https://arxiv.org/abs/1508.01211
 
     Args:
+
         in_features (int): The encoder's input feature speech size.
+
         n_classes (int): The number of classes/vocabulary.
-        hidden_size (int): The RNNs' hidden size.
-        enc_num_layers (int): The number of the encoder's layers.
+
+        hidden_size (int): The hidden size of the RNN layers.
+
+        enc_num_layers (int): The number of layers in the encoder.
+
         reduction_factor (int): The time resolution reduction factor.
-        bidirectional (bool): If the encoder's RNNs are bidirectional or not.
-        dec_num_layers (int): The number of the decoders' RNN layers.
+
+        bidirectional (bool): A flag indicating if the rnn is bidirectional or not.
+
+        dec_num_layers (int): The number of the RNN layers in the decoder.
+
         emb_dim (int): The embedding size.
+
         p_dropout (float): The dropout rate.
-        pred_activation (Module): An activation function instance to be applied
-            on the last dimension of the predicted logits.
+
+        pred_activation (Module): An instance of an activation function to be
+        applied on the last dimension of the predicted logits..
+
         teacher_forcing_rate (float): The teacher forcing rate. Default 0.0
-        rnn_type (str): The rnn type. default 'rnn'.
+
+        rnn_type (str): The RNN type it has to be one of rnn, gru or lstm.
+        Default 'rnn'.
+
     """
 
     def __init__(
@@ -164,23 +213,37 @@ class RNNWithLocationAwareAtt(BasicAttSeq2SeqRNN):
         in https://arxiv.org/abs/1506.07503
 
     Args:
+
         in_features (int): The encoder's input feature speech size.
+
         n_classes (int): The number of classes/vocabulary.
-        hidden_size (int): The RNNs' hidden size.
-        enc_num_layers (int): The number of the encoder's layers.
-        bidirectional (bool): If the encoder's RNNs are bidirectional or not.
-        dec_num_layers (int): The number of the decoders' RNN layers.
+
+        hidden_size (int): The hidden size of the RNN layers.
+
+        enc_num_layers (int): The number of layers in the encoder.
+
+        bidirectional (bool): A flag indicating if the rnn is bidirectional or not.
+
+        dec_num_layers (int): The number of the RNN layers in the decoder.
+
         emb_dim (int): The embedding size.
+
         kernel_size (int): The attention kernel size.
-        activation (str): The activation function to use in the
-            attention layer. it can be either softmax or sigmax.
+
+        activation (str): The activation function to use in the attention layer.
+        it can be either softmax or sigmax.
+
         p_dropout (float): The dropout rate.
-        pred_activation (Module): An activation function instance to be applied
-            on the last dimension of the predicted logits.
-        inv_temperature (Union[float, int]): The inverse temperature value of
-            the attention. Default 1.
+
+        pred_activation (Module): An instance of an activation function to be
+        applied on the last dimension of the predicted logits..
+
+        inv_temperature (Union[float, int]): The inverse temperature value. Default 1.
+
         teacher_forcing_rate (float): The teacher forcing rate. Default 0.0
-        rnn_type (str): The rnn type. default 'rnn'.
+
+        rnn_type (str): The RNN type it has to be one of rnn, gru or lstm.
+        Default 'rnn'.
     """
 
     def __init__(
@@ -231,22 +294,34 @@ class SpeechTransformer(nn.Module):
     https://ieeexplore.ieee.org/document/8462506
 
     Args:
+
         in_features (int): The input/speech feature size.
+
         n_classes (int): The number of classes.
+
         n_conv_layers (int): The number of down-sampling convolutional layers.
-        kernel_size (int): The down-sampling convolutional layers kernel size.
-        stride (int): The down-sampling convolutional layers stride.
+
+        kernel_size (int): The kernel size of the down-sampling convolutional layers.
+
+        stride (int): The stride size of the down-sampling convolutional layers.
+
         d_model (int): The model dimensionality.
+
         n_enc_layers (int): The number of encoder layers.
+
         n_dec_layers (int): The number of decoder layers.
-        ff_size (int): The feed-forward inner layer dimensionality.
+
+        ff_size (int):  The dimensionality of the inner layer of the feed-forward module.
+
         h (int): The number of attention heads.
-        att_kernel_size (int): The attentional convolutional
-            layers' kernel size.
-        att_out_channels (int): The number of output channels of the
-            attentional convolution
-        pred_activation (Module): An activation function instance to be applied
-            on the last dimension of the predicted logits.
+
+        att_kernel_size (int): The kernel size of the attentional convolutional layers.
+
+        att_out_channels (int): The number of output channels of the attentional convolution layers.
+
+        pred_activation (Module): An activation function instance to be applied on
+        the last dimension of the predicted logits.
+
         masking_value (int): The attentin masking value. Default -1e15
     """
 
@@ -300,6 +375,23 @@ class SpeechTransformer(nn.Module):
         *args,
         **kwargs
     ) -> Tensor:
+        """Passes the input to the model
+
+        Args:
+
+            speech (Tensor): The input speech of shape [B, M, d]
+
+            speech_mask (Union[Tensor, None]): The speech mask of shape [B, M],
+            which is True for the data positions and False for the padding ones.
+
+            text (Tensor): The text tensor of shape [B, M_dec]
+
+            text_mask (Union[Tensor, None]): The text mask of shape [B, M_dec],
+            which is True for the data positions and False for the padding ones.
+
+        Returns:
+            Tensor: The prediction tensor of shape [B, M_dec, C]
+        """
         speech, lengths = self.encoder(speech, speech_mask)
         speech_mask = get_mask_from_lens(lengths, speech.shape[1])
         preds = self.decoder(
