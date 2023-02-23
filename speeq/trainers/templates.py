@@ -1,3 +1,14 @@
+"""
+Defines configuration templates for learning rate schedulers.
+
+Classes:
+
+- BaseSchedulerTemplate(ITemplate): Base template for scheduler configuration.
+- NoamSchedulerTemp(BaseSchedulerTemplate): Template for Noam learning rate scheduler.
+- SqueezeformerNoamSchedulerTemp(BaseSchedulerTemplate): Template for modified Noam scheduler used in Squeezeformer models.
+
+"""
+
 from dataclasses import asdict, dataclass
 from numbers import Number
 
@@ -23,8 +34,11 @@ class NoamSchedulerTemp(BaseSchedulerTemplate):
     """Noam scheduler template
 
     Args:
+
         warmup_staps (int): The warmup steps.
+
         d_model (int): The model dimension.
+
     """
 
     warmup_staps: int
@@ -37,11 +51,15 @@ class SqueezeformerNoamSchedulerTemp(BaseSchedulerTemplate):
     """Noam scheduler with changes proposed in Squeezeformer paper template.
 
     Args:
+
         warmup_staps (int): The warmup steps.
+
         lr_peak (Number): The peak value of the learning rate.
+
         decay_rate (Number): The decay rate of the learning rate.
-        t_peak (Number): The number of steps to keep the peak learning
-            rate for.
+
+        t_peak (Number): The number of steps to keep the peak learning rate for.
+
     """
 
     warmup_staps: int
