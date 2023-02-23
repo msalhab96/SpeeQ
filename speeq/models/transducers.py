@@ -1,3 +1,13 @@
+"""The transducer module provides implementations for different models used
+in speech recognition based on the transducer architecture.
+
+Classes:
+
+- RNNTransducer: An implementation of the RNN transducer model.
+- ConformerTransducer: An implementation of the Conformer transducer model.
+- ContextNet: An implementation of the ContextNet transducer model.
+
+"""
 from typing import List, Tuple, Union
 
 import torch
@@ -31,6 +41,23 @@ class _BaseTransducer(nn.Module):
         *args,
         **kwargs
     ) -> Tuple[Tensor, Tensor, Tensor]:
+        """Passes the input to the model
+
+        Args:
+
+            speech (Tensor): The input speech of shape [B, M, d]
+
+            speech_mask (Tensor): The speech mask of shape [B, M]
+
+            text (Tensor): The text input of shape [B, N]
+
+            text_mask (Tensor): The text mask of shape [B, N]
+
+        Returns:
+            Tuple[Tensor, Tensor, Tensor]: A tuple of 3 tensors where the first
+            is the predictions of shape [B, M, N, C], the last two tensor are
+            the speech and text length of shape [B]
+        """
         speech, speech_len = self.encoder(speech, speech_mask)
         text, text_len = self.decoder(text, text_mask)
         speech = speech.unsqueeze(-2)
@@ -68,13 +95,21 @@ class RNNTransducer(_BaseTransducer):
     https://arxiv.org/abs/1211.3711
 
     Args:
+
         in_features (int): The input feature size.
+
         n_classes (int): The number of classes/vocabulary.
+
         emb_dim (int): The embedding layer's size.
-        n_layers (int): The number of the encoder's RNN layers.
-        hidden_size (int): The RNN's hidden size.
-        bidirectional (bool): If the RNN is bidirectional or not.
+
+        n_layers (int): The number of the RNN layers in the encoder.
+
+        hidden_size (int): The hidden size of the RNN layers.
+
+        bidirectional (bool): A flag indicating if the rnn is bidirectional or not.
+
         rnn_type (str): The RNN type.
+
         p_dropout (float): The dropout rate.
     """
 
@@ -112,18 +147,31 @@ class ConformerTransducer(RNNTransducer):
 
     Args:
         d_model (int): The model dimension.
+
         n_conf_layers (int): The number of conformer blocks.
+
         ff_expansion_factor (int): The feed-forward expansion factor.
-        h (int): The number of heads.
-        kernel_size (int): The kernel size of conv module.
-        ss_kernel_size (int): The kernel size of the subsampling layer.
-        ss_stride (int): The stride of the subsampling layer.
-        ss_num_conv_layers (int): The number of subsampling layers.
+
+        h (int): The number of attention heads.
+
+        kernel_size (int): The convolution module kernel size.
+
+        ss_kernel_size (int): The subsampling layer kernel size.
+
+        ss_stride (int): The subsampling layer stride size.
+
+        ss_num_conv_layers (int): The number of subsampling convolutional layers.
+
         in_features (int): The input/speech feature size.
+
         res_scaling (float): The residual connection multiplier.
+
         n_classes (int): The number of classes/vocabulary.
+
         emb_dim (int): The embedding layer's size.
-        rnn_type (str): The RNN type.
+
+        rnn_type (str): The RNN type it has to be one of rnn, gru or lstm.
+
         p_dropout (float): The dropout rate.
     """
 
@@ -167,23 +215,31 @@ class ContextNet(_BaseTransducer):
     https://arxiv.org/abs/2005.03191
 
     Args:
+
         in_features (int): The input feature size.
+
         n_classes (int): The number of classes/vocabulary.
+
         emb_dim (int): The embedding layer's size.
+
         n_layers (int): The number of ContextNet blocks.
+
         n_sub_layers (Union[int, List[int]]): The number of convolutional
-            layers per block, if list is passed, it has to be of length equal
-            to n_layers.
+        layers per block. If list is passed, it has to be of length equal to `n_layers`.
+
         stride (Union[int, List[int]]): The stride of the last convolutional
-            layers per block, if list is passed, it has to be of length equal
-            to n_layers.
+        layers per block. If list is passed, it has to be of length equal to
+        `n_layers`.
+
         out_channels (Union[int, List[int]]): The channels size of the
-            convolutional layers per block, if list is passed, it has to be of
-            length equal to n_layers.
+        convolutional layers per block. If list is passed, it has to be of
+        length equal to `n_layers`.
+
         kernel_size (int): The convolutional layers kernel size.
-        reduction_factor (int): The feature reduction size of the
-            Squeeze-and-excitation module.
-        rnn_type (str): The RNN type.
+
+        reduction_factor (int): The feature reduction size of the Squeeze-and-excitation module.
+
+        rnn_type (str): The RNN type it has to be one of rnn, gru or lstm.
     """
 
     def __init__(
