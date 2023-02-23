@@ -1,3 +1,17 @@
+"""This module provides various scheduler classes for adjusting learning rates during
+training, including the base `Scheduler` class and its implementation `NoamScheduler`.
+The `SqueezeformerNoamScheduler` is a modified version of the `NoamScheduler` specific
+to the Squeezeformer model.
+
+Classes:
+
+- Scheduler: Implements the base scheduler class.
+- NoamScheduler: Implements the Noam scheduler.
+- SqueezeformerNoamScheduler: Implements the Noam scheduler with modifications for the
+  Squeezeformer model.
+
+"""
+
 from math import sqrt
 from numbers import Number
 from typing import Iterable
@@ -10,9 +24,13 @@ class Scheduler(IScheduler):
     """Implements the base scheduler class.
 
     Args:
+
         params (Iterable): The mdoel's parameters.
-        optimizer (str): The optimizer's name.
+
+        optimizer (str): The name of the optimizer ot be used.
+
         optimizer_args (dict): The optimizer's arguments.
+
     """
 
     def __init__(self, params: Iterable, optimizer: str, optimizer_args: dict) -> None:
@@ -44,14 +62,19 @@ class Scheduler(IScheduler):
 
 
 class NoamScheduler(Scheduler):
-    """Implements the noam scheduler  proposed in
+    """Implements the noam scheduler proposed in
     https://arxiv.org/abs/1706.03762
 
     Args:
+
         params (Iterable): The mdoel's parameters.
-        optimizer (str): The optimizer's name.
+
+        optimizer (str): The name of the optimizer.
+
         optimizer_args (dict): The optimizer's arguments.
+
         warmup_staps (int): The warmup steps.
+
         d_model (int): The model dimension.
     """
 
@@ -92,12 +115,19 @@ class SqueezeformerNoamScheduler(NoamScheduler):
     presented in https://arxiv.org/abs/2206.00888
 
     Args:
+
         params (Iterable): The mdoel's parameters.
-        optimizer (str): The optimizer's name.
+
+        optimizer (str): The name of the optimizer.
+
         optimizer_args (dict): The optimizer's arguments.
+
         warmup_staps (int): The warmup steps.
+
         lr_peak (Number): The peak value of the learning rate.
+
         decay_rate (Number): The decay rate of the learning rate.
+
         t_peak (Number): The number of steps to keep the peak learning rate for.
     """
 
