@@ -1,3 +1,14 @@
+"""This module contains the main configuration objects for the trainer, data,
+and model. These configuration classes must be filled with appropriate values to
+launch any training or prediction jobs.
+
+Classes:
+
+- TrainerConfig: The configuration object for the trainer.
+- ASRDataConfig: The configuration object for ASR data.
+- ModelConfig: The configuration object for the model.
+- DistConfig: The configuration object for distributed data parallel.
+"""
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Union
@@ -10,28 +21,43 @@ class TrainerConfig:
     """The trainer configuration
 
     Args:
-        name (str): The trainer name.
+        name (str): The trainer name. it has to be one of ('seq2seq', 'ctc', 'transducer').
+
         batch_size (int): the batch size.
+
         epochs (int): The number of training epochs.
+
         outdir (Union[Path, str]): The path to save the results to.
+
         logdir (Union[Path, str]): The path to save the logs to.
+
         log_steps_frequency (int): The number of steps to log
         the results after.
+
         criterion (str): The criterion name to be used.
+
         optimizer (str): The name of the optimizer to be used.
+
         optim_args (dict): The optimizer arguments.
+
         scheduler_template (Union[IScheduler, None]): The scheduler template to be used.
         Default None.
+
         dist_config (Union[object, None]): The DDP configuration object,
         for a single node/GPU training use None. Default None.
+
         logger (str): The logger name to be used. Default 'tb'.
+
         n_logs (int): The number of steps to log. Default 5.
         clear_screen (bool): whether to clear the screen after each log or
         not. Default False.
+
         criterion_args (dict): The criterion arguments if there is any.
         Default {}.
+
         grad_clip_thresh (Union[None, float]): max norm of the gradients.
         Default None.
+
         grad_clip_norm_type (float): type of the used p-norm. Default 2.0.
     """
 
@@ -61,34 +87,50 @@ class ASRDataConfig:
 
     Args:
         training_path (Union[str, Path]): The training data path.
+
         testing_path (Union[str, Path]): The testing data path.
-        speech_processor (IProcessor): The speech processor.
+
+        speech_processor (IProcessor): The speech processor, where the `run` method
+        returns the speech data with shape [B] or [1, M], or [..., M, F].
+
         text_processor (IProcessor): The text processor.
-        tokenizer_path (Union[str, Path]): The path to load or save
-            the tokenizer.
-        tokenizer_type (str): The tokenizer type to be used. Default
-            `char_tokenizer`
-        sep (str): the csv file's fields seprator. Default ','.
-        type (str): the file type. Default 'csv'.
+
+        tokenizer_path (Union[str, Path]): The path to load or save the tokenizer.
+
+        tokenizer_type (str): The tokenizer type to be used. Default `char_tokenizer`
+
+        sep (str): The separator used in the CSV file.  Default ','.
+
+        type (str): the file and the dataset type. Default 'csv'.
+
         padding_type (str): The padding to use static or dynamic.
         Default 'dynamic'.
+
         text_pad_max_len (str): Used if padding_type is static, which
         set the maximum sequence length it has to be larger than
         the largest text sequence size in both training and testing data.
+
         speech_pad_max_len (str): Used if padding_type is static, which
         set the maximum sequence length it has to be larger than
         the largest speech sequence size in both training and testing data.
-        add_sos_token (bool): a flag if start of sentence token
-            shall be added to the text squences. Default True.
-        add_eos_token (bool): a flag if end of sentence token
-            shall be added to the text squences. Default True.
-        use_blank_as_pad (bool): A flag if the blank id to be used as padding.
-            Default False.
+
+        add_sos (bool): A flag that indicates whether to add the Start of
+        Sequence (SOS) token to the text sequence. Default is False.
+
+        add_eos (bool): A flag that indicates whether to add the End of Sequence
+        (EOS) token to the text sequence. Default is False.
+
+        use_blank_as_pad (bool): A flag if the blank id to be used as padding. Default False.
+
         sort_key (Optional[str]): The key to sort the data on. Default ''.
-        reverse (bool): Used if sorting key is passed, False will sort ascending,
-            True will sort descending. Default is False.
-        shuffle (bool): A flag indicating whether the dataset should be
-            shuffled at each iteration Default False.
+
+        reverse (bool): A flag used if a sorting key is passed. If set to False,
+        data will be sorted in ascending order. If set to True, data will be
+        sorted in descending order. Default is False.
+
+        shuffle (bool): A flag indicating whether the dataset should be shuffled
+        at each iteration. Default False.
+
     """
 
     training_path: Union[str, Path]
@@ -115,9 +157,12 @@ class ModelConfig:
     """The model configuration.
 
     Args:
+
         template (ITemplate): The model template.
-        model_path (Union[str, Path]): The pre-trained checkpoint
-            to load the weights from. Default ''.
+
+        model_path (Union[str, Path]): The pre-trained checkpoint to load the
+        weights from. Default ''.
+
     """
 
     template: ITemplate
@@ -129,10 +174,15 @@ class DistConfig:
     """The distributed data parallel configuration.
 
     Args:
+
         port (int): The port used.
+
         n_gpus (int): The number of nodes/GPUs.
+
         address (str): The master node address.
+
         backend (str): The backend to be used for DDP.
+
     """
 
     port: int
