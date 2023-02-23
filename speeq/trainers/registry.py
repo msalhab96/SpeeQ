@@ -1,10 +1,41 @@
+"""A factory for creating speech task trainers.
+
+This module provides functions to create various objects needed for training
+speech models, such as loss functions, optimizers, and trainers. The functions
+are implemented as factory methods, which allow for abstracting object creation
+and facilitate the creation of customized trainers.
+
+Functions:
+    get_criterion(name: str, blank_id: int, pad_id: int) -> torch.nn.Module:
+        Returns a PyTorch module that computes the loss for a speech recognition
+        task. The `name` argument specifies the type of loss to use, and the
+        `blank_id` and `pad_id` arguments are used to configure the loss
+        function.
+
+    get_optimizer(model: torch.nn.Module, trainer_config) -> Union[torch.optim.Optimizer, IScheduler]:
+        Returns a PyTorch optimizer or learning rate scheduler for training a
+        speech model. The `model` argument is the PyTorch module to be trained,
+        and the `trainer_config` argument is a configuration object containing
+        the hyperparameters for training.
+
+    get_trainer(trainer_config, data_config, model_config, rank=0, world_size=1) -> ITrainer:
+        Returns a speech task trainer object. The `trainer_config` argument is a
+        configuration object containing the hyperparameters for training, the
+        `data_config` argument is a configuration object containing the
+        parameters the training data, the `model_config` argument
+        is a configuration object containing the parameters for building the
+        speech model, and the `rank` and `world_size` arguments are used for
+        distributed training.
+"""
+
 import os
+from typing import Union
 
-from torch.optim import SGD, Adam, AdamW, RMSprop
+from torch.optim import SGD, Adam, AdamW, Optimizer, RMSprop
 
-from speeq.constants import FileKeys
+from speeq.config import ASRDataConfig, ModelConfig, TrainerConfig
 from speeq.data.registry import get_asr_loaders, get_tokenizer
-from speeq.interfaces import ITrainer
+from speeq.interfaces import IScheduler, ITrainer
 from speeq.models.registry import get_model
 from speeq.utils.loggers import get_logger
 from speeq.utils.utils import get_text_list, load_csv, set_state_dict
@@ -45,11 +76,41 @@ SCHEDULERS = {"noam": NoamScheduler, "squeezeformer_noam": SqueezeformerNoamSche
 
 
 def get_criterion(name: str, blank_id: int, pad_id: int, *args, **kwargs):
+    """This function generates and returns a module representing a criterion.
+
+    Args:
+
+        name (str): The name of the criterion.
+
+        blank_id (int): The ID for the blank symbol used in the criterion.
+
+        pad_id (int): The ID for the padding symbol used in the criterion.
+
+    Returns:
+
+        Module: The desired criterion module.
+
+    """
     assert name in CRITERIONS
     return CRITERIONS[name](blank_id=blank_id, pad_id=pad_id, *args, **kwargs)
 
 
-def get_optimizer(model, trainer_config):
+def get_optimizer(model, trainer_config) -> Union[Optimizer, IScheduler]:
+    """This function generates and provides an optimizer or scheduler, based on
+    the input model and training configuration.
+
+    Args:
+
+        model (Module): The model.
+
+        trainer_config (object): The configuration object for training.
+
+    Returns:
+
+        Union[Optimizer, IScheduler]: The optimizer or scheduler object that
+        will be used for training.
+
+    """
     if trainer_config.scheduler_template is not None:
         return SCHEDULERS[trainer_config.scheduler_template.name](
             params=model.parameters(),
@@ -63,7 +124,11 @@ def get_optimizer(model, trainer_config):
 
 
 def _get_asr_trainer_args(
-    rank: int, world_size: int, trainer_config, data_config, model_config
+    rank: int,
+    world_size: int,
+    trainer_config: TrainerConfig,
+    data_config: ASRDataConfig,
+    model_config: ModelConfig,
 ) -> dict:
     logger = get_logger(
         name=trainer_config.logger,
@@ -124,9 +189,35 @@ def _get_dist_args(trainer_config, rank: int, world_size: int) -> dict:
     }
 
 
-def get_asr_trainer(
-    rank: int, world_size: int, trainer_config, data_config, model_config
+def get_optimizer(
+    trainer_config: TrainerConfig,
+    data_config: ASRDataConfig,
+    model_config: ModelConfig,
+    rank: int = 0,
+    world_size: int = 1,
 ) -> ITrainer:
+    """Creates an ASR trainer object for training a speech recognition model.
+
+    Args:
+
+        trainer_config (TrainerConfig): A configuration object that specifies
+        settings for the trainer.
+
+        data_config (ASRDataConfig): A configuration object that specifies
+        settings for the data used in training.
+
+        model_config (ModelConfig): A configuration object that specifies
+        settings for the model architecture.
+
+        rank (int, optional): The rank of the current process, for distributed
+        training. Defaults to 0.
+
+        world_size (int, optional): The number of processes for distributed
+        training. Defaults to 1.
+
+    Returns:
+        ITrainer: An object that encapsulates the ASR trainer functionality.
+    """
     name = trainer_config.name
     base_args = _get_asr_trainer_args(
         rank=rank,
