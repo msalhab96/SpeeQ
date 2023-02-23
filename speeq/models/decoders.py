@@ -1,3 +1,13 @@
+"""This module contains various pre-implemented decoders used in differnet models.
+
+Classes:
+
+- GlobAttRNNDecoder: Implements a RNN decoder with global attention mechanism.
+- LocationAwareAttDecoder: Implements a RNN decoder with location aware attention mechanism.
+- TransducerRNNDecoder: Implements a simple RNN decoder with an embedding layer and a single RNN layer.
+- TransformerDecoder: Implements a transformer decoder.
+
+"""
 from typing import Tuple, Union
 
 import torch
@@ -18,13 +28,22 @@ class GlobAttRNNDecoder(nn.Module):
     """Implements RNN decoder with global attention.
 
     Args:
-        embed_dim (int): The embedding size.
-        hidden_size (int): The RNN hidden size.
+
+        embed_dim (int): The size of the embedding.
+
+        hidden_size (int): The size of the RNN hidden state.
+
         n_layers (int): The number of RNN layers.
-        n_classes (int): The number of classes.
-        pred_activation (Module): An activation function instance.
+
+        n_classes (int): The number of output classes.
+
+        pred_activation (Module): An instance of an activation function.
+
         teacher_forcing_rate (float): The teacher forcing rate. Default 0.0
-        rnn_type (str): The RNN type to use. Default 'rnn'.
+
+        rnn_type (str): The RNN type it has to be one of rnn, gru or lstm.
+        Default 'rnn'.
+
     """
 
     def __init__(
@@ -81,10 +100,13 @@ class GlobAttRNNDecoder(nn.Module):
         """Applies teacher forcing on the decoder's input.
 
         Args:
+
             y (Tensor): The original target labels.
+
             preds (Tensor): The latest prediction.
 
         Returns:
+
             Tensor: The new decoder input tensor.
         """
         mask = torch.rand(y.shape[0]) <= self.teacher_forcing_rate
@@ -109,8 +131,26 @@ class GlobAttRNNDecoder(nn.Module):
         *args,
         **kwargs
     ) -> Tensor:
-        # h is the encoder's last hidden state
-        # dec_inp of shape [B, M]
+        """Decodes the input regressivly.
+
+        Args:
+
+            h (Union[Tensor, Tuple[Tensor, Tensor], None]): The last hidden
+            state of the encoder. If not provided, set as None. Its shape is
+            [1, B, hidden_size].
+
+            enc_out (Tensor): The encoder output tensor of shape [B, M, h].
+
+            enc_mask (Tensor): The encoder mask tensor of shape [B, M], where
+            True denotes data positions and False denotes padding ones.
+
+            dec_inp (Tensor): The decoder input tensor of shape [B, M_dec].
+
+        Returns:
+            Tensor: A tensor of shape [B, M_dec, C], representing the output
+            of the forward pass.
+
+        """
         batch_size, max_len = dec_inp.shape
         if h is None:
             h = self._init_hidden_state(batch_size=batch_size, device=dec_inp.device)
@@ -167,18 +207,27 @@ class LocationAwareAttDecoder(GlobAttRNNDecoder):
     """Implements RNN decoder with location aware attention.
 
     Args:
+
         embed_dim (int): The embedding size.
+
         hidden_size (int): The RNN hidden size.
+
         n_layers (int): The number of RNN layers.
+
         n_classes (int): The number of classes.
+
         pred_activation (Module): An activation function instance.
+
         kernel_size (int): The attention kernel size.
-        activation (str): The activation function to use.
-            it can be either softmax or sigmax.
-        inv_temperature (Union[float, int]): The inverse temperature value.
-            Default 1.
+
+        activation (str): The activation function to use. it can be either softmax or sigmax.
+
+        inv_temperature (Union[float, int]): The inverse temperature value. Default 1.
+
         teacher_forcing_rate (float): The teacher forcing rate. Default 0.0
-        rnn_type (str): The RNN type to use. Default 'rnn'.
+
+        rnn_type (str): The RNN type it has to be one of rnn, gru or lstm.
+        Default 'rnn'.
     """
 
     def __init__(
@@ -225,7 +274,24 @@ class LocationAwareAttDecoder(GlobAttRNNDecoder):
         *args,
         **kwargs
     ) -> Tensor:
-        # dec_inp of shape [B, M]
+        """Runs the forward pass on the input.
+
+        Args:
+
+            h (Union[Tensor, Tuple[Tensor, Tensor], None]): The last hidden state of
+            the encoder if provided, which is of shape [1, B_enc, hidden_size].
+
+            enc_out (Tensor): The encoder outputs of shape [B, M, h].
+
+            enc_mask (Tensor): The encoder mask of shape [B, M], which is True for
+            the data positions and False for the padding ones.
+
+            dec_inp (Tensor): The decoder input of shape [B, M_dec].
+
+        Returns:
+
+            A tensor of shape [B, M_dec, C], which is the output of the LocationAwareAttDecoder module.
+        """
         batch_size, max_len = dec_inp.shape
         results = None
         if h is None:
@@ -289,10 +355,15 @@ class TransducerRNNDecoder(nn.Module):
     and a single RNN layer
 
     Args:
+
         vocab_size (int): The vocabulary size.
+
         emb_dim (int): The embedding dimension.
+
         hidden_size (int): The RNN's hidden size.
-        rnn_type (str): The RNN type.
+
+        rnn_type (str): The RNN type it has to be one of rnn, gru or lstm.
+        Default 'rnn'.
     """
 
     def __init__(
@@ -315,6 +386,23 @@ class TransducerRNNDecoder(nn.Module):
         x: Tensor,
         mask: Tensor,
     ) -> Tuple[Tensor, Tensor]:
+        """Runs the input tensor through the RNN transducer decoder.
+
+        Args:
+
+            x (Tensor): The input tensor of shape [B, M].
+
+            mask (Tensor): The encoder mask of shape [B, M]. It is True for
+                data positions and False for padding ones.
+
+        Returns:
+
+            Tuple[Tensor, Tensor]: A tuple containing two tensors. The first tensor
+            is the output tensor of shape [B, M, hidden_size] and the second tensor
+            is the length tensor of shape [B], representing the actual length of each
+            input sequence in the batch.
+
+        """
         lengths = mask.sum(dim=-1).cpu()
         out = self.emb(x)
         out, _, lens = self.rnn(out, lengths)
@@ -336,12 +424,18 @@ class TransformerDecoder(nn.Module):
     https://arxiv.org/abs/1706.03762
 
     Args:
-        n_classes (int): The number of classes.
-        n_layers (int): The nnumber of decoder layers.
+        n_classes (int): The number of classes the model will predict.
+
+        n_layers (int): The number of decoder layers.
+
         d_model (int): The model dimensionality.
-        ff_size (int): The feed-forward inner layer dimensionality.
-        h (int): The number of attentional heads.
+
+        ff_size (int): The dimensionality of the feed-forward inner layer.
+
+        h (int): The number of attention heads.
+
         pred_activation (Module): An activation function instance.
+
         masking_value (int): The attentin masking value. Default -1e15
     """
 
@@ -378,6 +472,24 @@ class TransformerDecoder(nn.Module):
         *args,
         **kwargs
     ) -> Tensor:
+        """Passes the inputs through the transformer decoder.
+
+        Args:
+
+            enc_out (Tensor): The output tensor of the encoder of shape [B, M_enc, d].
+
+            enc_mask (Union[Tensor, None]): The encoder mask of shape [B, M_enc],
+            which is True for the data positions and False for the padding ones.
+
+            dec_inp (Tensor): The input tensor of the decoder of shape [B, M_dec].
+
+            dec_mask (Union[Tensor, None]): The decoder mask of shape [B, M_dec],
+            which is True for the data positions and False for the padding ones.
+
+        Returns:
+
+            Tensor: The output tensor of the transformer decoder of shape [B, M_dec, C].
+        """
         out = self.emb(dec_inp)
         for layer in self.layers:
             out = layer(
