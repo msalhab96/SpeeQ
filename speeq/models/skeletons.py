@@ -1,3 +1,7 @@
+"""Builds the skeleton for CTC, seq2seq, and transducer models, this is used for
+building custom models where the user has the ability to combine or build
+custom encoder, or decoder.
+"""
 from typing import Union
 
 from torch import Tensor
@@ -13,20 +17,25 @@ class CTCSkeleton(CTCModel):
     """Builds the CTC-based model skeleton
 
     Args:
+
         encoder (Module): The speech encoder (acoustic model), such that
-            the forward of the encoder returns a tuple of the encoded speech
-            tensor and a length tensor for the encoded speech.
+        the forward of the encoder returns a tuple of the encoded speech
+        tensor and a length tensor for the encoded speech.
+
         has_bnorm (bool): A flag indicates whether the encoder or the decoder
-            has batch normalization.
+        has batch normalization.
+
         pred_net (Union[Module, None]): The prediction network. if provided
-            the forward of the prediction network expected to have log softmax
-            as an activation function, and the predictions of shape [B, T, C]
-            where T is the sequence length, B the batch size, and C the number
-            of classes. Default None.
+        the forward of the prediction network expected to have log softmax
+        as an activation function, and the predictions of shape [B, T, C]
+        where T is the sequence length, B the batch size, and C the number
+        of classes. Default None.
+
         feat_size (Union[Module, None]): Used if pred_net parameter is not None
-            where it's the encoder's output feature size. Default None.
+        where it's the encoder's output feature size. Default None.
+
         n_classes (Union[Module, None]): Used if pred_net parameter is not None
-            where it's the number of the classes/characters to be predicted.
+        where it's the number of the classes/characters to be predicted.
     """
 
     def __init__(
@@ -57,23 +66,28 @@ class TransducerSkeleton(_BaseTransducer):
 
     Args:
         encoder (Module): The speech encoder (acoustic model), such that
-            the forward method of the encoder returns a tuple of the encoded
-            speech tensor and a length tensor for the encoded speech.
+        the forward method of the encoder returns a tuple of the encoded
+        speech tensor and a length tensor for the encoded speech.
+
         decoder (Module): The text decoder such that
-            the forward method of the decoder returns a tuple of the encoded
-            text tensor and a length tensor for the encoded text.
+        the forward method of the decoder returns a tuple of the encoded
+        text tensor and a length tensor for the encoded text.
+
         has_bnorm (bool): A flag indicates whether the encoder, the decoder, or
-            the join network has batch normalization.
+        the join network has batch normalization.
+
         join_net (Union[Module, None]): The join network. if provided
-            the forward of the join network expected to have no activation
-            function, and the results of shape [B, Ts, Tt, C], where B the
-            batch size, Ts is the speech sequence length, Tt is the text
-            sequence length, and C the number of classes. Default None.
+        the forward of the join network expected to have no activation
+        function, and the results of shape [B, Ts, Tt, C], where B the
+        batch size, Ts is the speech sequence length, Tt is the text
+        sequence length, and C the number of classes. Default None.
+
         feat_size (Union[Module, None]): Used if join_net parameter is not None
-            where it's the encoder and the decoder's output feature size.
-            Default None.
+        where it's the encoder and the decoder's output feature size.
+        Default None.
+
         n_classes (Union[Module, None]): Used if join_net parameter is not None
-            where it's the number of the classes/characters to be predicted.
+        where it's the number of the classes/characters to be predicted.
     """
 
     def __init__(
@@ -106,16 +120,18 @@ class Seq2SeqSkeleton(Module):
 
     Args:
         encoder (Module): The speech encoder (acoustic model), such that
-            the forward method of the encoder returns a tuple of the encoded
-            speech tensor, the last encoder hidden state tensor/tuple if there
-            is any, and a length tensor for the encoded speech.
+        the forward method of the encoder returns a tuple of the encoded
+        speech tensor, the last encoder hidden state tensor/tuple if there
+        is any, and a length tensor for the encoded speech.
+
         decoder (Module): The text decoder such that
-            the forward method of the decoder takes the encoder's output, the
-            last encoder's hidden state (if there is any), the encoder mask,
-            the decoder input, and the decoder mask and returns the prediction
-            tensor.
+        the forward method of the decoder takes the encoder's output, the
+        last encoder's hidden state (if there is any), the encoder mask,
+        the decoder input, and the decoder mask and returns the prediction
+        tensor.
+
         has_bnorm (bool): A flag indicates whether the encoder, the decoder
-            has batch normalization.
+        has batch normalization.
     """
 
     def __init__(
@@ -150,6 +166,17 @@ class Seq2SeqSkeleton(Module):
         *args,
         **kwargs
     ) -> Tensor:
+        """Passes the input to the model.
+
+        Args:
+            speech (Tensor): The speech of shape [B, M, d]
+            speech_mask (Tensor): The speech mask of shape [B, M]
+            text (Tensor): The text tensor of shape [B, N]
+            text_mask (Tensor): The text mask tensor of shape [B, M]
+
+        Returns:
+            Tensor: The result tensor of shape [B, N, C]
+        """
         out = self.encoder(x=speech, mask=speech_mask, return_h=True)
         args = self._process_encoder_out(out)
         result = self.decoder(dec_inp=text, dec_mask=text_mask, **args)
