@@ -1,3 +1,17 @@
+"""This module contains various CTC (Connectionist Temporal Classification) models for speech recognition. The CTC models are implemented as subclasses of the base class CTCModel.
+
+Classes:
+
+- CTCModel(nn.Module): Base class for CTC models.
+- DeepSpeechV1(CTCModel): DeepSpeech version 1 model.
+- BERT(nn.Module): Bidirectional Encoder Representations from Transformers (BERT) model.
+- DeepSpeechV2(CTCModel): DeepSpeech version 2 model.
+- Conformer(CTCModel): Conformer model.
+- Jasper(CTCModel): Jasper model.
+- Wav2Letter(CTCModel): Wav2Letter model.
+- QuartzNet(CTCModel): QuartzNet model.
+- Squeezeformer(CTCModel): Squeezeformer model.
+"""
 from typing import List, Optional, Tuple, Union
 
 import torch
@@ -16,6 +30,10 @@ from .layers import ConvPredModule, PredModule, TransformerEncLayer
 
 
 class CTCModel(nn.Module):
+    """Builds the base of CTC model, if used encoder paramters has to be added,
+    otherwise the forward module will raise error.
+    """
+
     def __init__(self, pred_in_size: int, n_classes: int) -> None:
         super().__init__()
         self.has_bnorm = False
@@ -26,6 +44,19 @@ class CTCModel(nn.Module):
         )
 
     def forward(self, x: Tensor, mask: Tensor, *args, **kwargs):
+        """passes the speech input to the model.
+
+        Args:
+
+            x (Tensor): The input speech signal of shape [B, M, d]
+
+            mask (Tensor): The speech mask of shape [B, M], where it's false
+            for the positions that contains padding.
+
+        Returns:
+            Tuple[Tensor, Tensor]: A tuple where the first is the predictions of shape
+            [M, B, C], and the lengths tensor of shape [B].
+        """
         out, lengths = self.encoder(x, mask, *args, **kwargs)  # B, M, d
         preds = self.pred_net(out)  # B, M, C
         preds = preds.permute(1, 0, 2)  # M, B, C
@@ -38,13 +69,21 @@ class DeepSpeechV1(CTCModel):
 
     Args:
         in_features (int): The input feature size.
-        hidden_size (int): The layers' hidden size.
+
+        hidden_size (int): The hidden size of the rnn layers.
+
         n_linear_layers (int): The number of feed-forward layers.
-        bidirectional (bool): if the rnn is bidirectional or not.
+
+        bidirectional (bool): A flag indicating if the rnn is bidirectional or not.
+
         n_clases (int): The number of classes to predict.
-        max_clip_value (int): The maximum relu value.
-        rnn_type (str): rnn, gru or lstm.
+
+        max_clip_value (int): The maximum relu clipping value.
+
+        rnn_type (str): The RNN type it has to be one of rnn, gru or lstm.
+
         p_dropout (float): The dropout rate.
+
     """
 
     def __init__(
@@ -82,13 +121,21 @@ class BERT(nn.Module):
     described in https://arxiv.org/abs/1810.04805
 
     Args:
+
         max_len (int): The maximum length for positional encoding.
+
         in_features (int): The input/speech feature size.
+
         d_model (int): The model dimensionality.
-        h (int): The number of heads.
+
+        h (int): The number of attention heads.
+
         ff_size (int): The inner size of the feed forward module.
+
         n_layers (int): The number of transformer encoders.
+
         n_classes (int): The number of classes.
+
         p_dropout (float): The dropout rate.
     """
 
@@ -150,17 +197,29 @@ class DeepSpeechV2(CTCModel):
 
     Args:
         n_conv (int): The number of convolution layers.
-        kernel_size (int): The convolution layers' kernel size.
-        stride (int): The convolution layers' stride.
+
+        kernel_size (int): The kernel size of the convolution layers.
+
+        stride (int): The stride size of the convolution layer.
+
         in_features (int): The input/speech feature size.
-        hidden_size (int): The layers' hidden size.
-        bidirectional (bool): if the rnn is bidirectional or not.
+
+        hidden_size (int): The hidden size of the RNN layers.
+
+        bidirectional (bool): A flag indicating if the rnn is bidirectional or not.
+
         n_rnn (int): The number of RNN layers.
+
         n_linear_layers (int): The number of linear layers.
+
         n_classes (int): The number of classes.
-        max_clip_value (int): The maximum relu value.
-        rnn_type (str): rnn, gru or lstm.
+
+        max_clip_value (int): The maximum relu clipping value.
+
+        rnn_type (str): The RNN type it has to be one of rnn, gru or lstm.
+
         tau (int): The future context size.
+
         p_dropout (float): The dropout rate.
     """
 
@@ -203,17 +262,29 @@ class Conformer(CTCModel):
     with CTC, while in the paper used RNN-T.
 
     Args:
+
         n_classes (int): The number of classes.
+
         d_model (int): The model dimension.
+
         n_conf_layers (int): The number of conformer blocks.
+
         ff_expansion_factor (int): The feed-forward expansion factor.
-        h (int): The number of heads.
-        kernel_size (int): The kernel size of conv module.
-        ss_kernel_size (int): The kernel size of the subsampling layer.
-        ss_stride (int): The stride of the subsampling layer.
-        ss_num_conv_layers (int): The number of subsampling layers.
+
+        h (int): The number of attention heads.
+
+        kernel_size (int): The convolution module kernel size.
+
+        ss_kernel_size (int): The subsampling layer kernel size.
+
+        ss_stride (int): The subsampling layer stride size.
+
+        ss_num_conv_layers (int): The number of subsampling convolutional layers.
+
         in_features (int): The input/speech feature size.
+
         res_scaling (float): The residual connection multiplier.
+
         p_dropout (float): The dropout rate.
     """
 
@@ -254,21 +325,27 @@ class Jasper(CTCModel):
     in https://arxiv.org/abs/1904.03288
 
     Args:
+
         n_classes (int): The number of classes.
+
         in_features (int): The input/speech feature size.
-        num_blocks (int): The number of jasper blocks, denoted
-            as 'B' in the paper.
-        num_sub_blocks (int): The number of jasper subblocks, denoted
-            as 'R' in the paper.
-        channel_inc (int): The rate to increase the number of channels
-            across the blocks.
-        epilog_kernel_size (int): The epilog block convolution's kernel size.
-        prelog_kernel_size (int): The prelog block convolution's kernel size.
-        prelog_stride (int): The prelog block convolution's stride.
-        prelog_n_channels (int): The prelog block convolution's number of
-            output channnels.
-        blocks_kernel_size (Union[int, List[int]]): The convolution layer's
-            kernel size of each jasper block.
+
+        num_blocks (int): The number of Jasper blocks (denoted as 'B' in the paper).
+
+        num_sub_blocks (int): The number of Jasper subblocks (denoted as 'R' in the paper).
+
+        channel_inc (int): The rate to increase the number of channels across the blocks.
+
+        epilog_kernel_size (int): The kernel size of the epilog block convolution layer.
+
+        prelog_kernel_size (int): The kernel size of the prelog block ocnvolution layer.
+
+        prelog_stride (int): The stride size of the prelog block convolution layer.
+
+        prelog_n_channels (int): The output channnels of the prelog block convolution layer.
+
+        blocks_kernel_size (Union[int, List[int]]): The kernel size(s) of the convolution layer for each block.
+
         p_dropout (float): The dropout rate.
     """
 
@@ -316,22 +393,33 @@ class Wav2Letter(CTCModel):
     https://arxiv.org/abs/1609.03193
 
     Args:
+
         in_features (int): The input/speech feature size.
+
         n_classes (int): The number of classes.
+
         n_conv_layers (int): The number of convolution layers.
-        layers_kernel_size (int): The convolution layers' kernel size.
-        layers_channels_size (int): The convolution layers' channel size.
-        pre_conv_stride (int): The prenet convolution stride.
-        pre_conv_kernel_size (int): The prenet convolution kernel size.
-        post_conv_channels_size (int): The postnet convolution channel size.
-        post_conv_kernel_size (int): The postnet convolution kernel size.
+
+        layers_kernel_size (int): The kernel size of the convolution layers.
+
+        layers_channels_size (int): The number of output channels of each convolution layer.
+
+        pre_conv_stride (int): The stride of the prenet convolution layer.
+
+        pre_conv_kernel_size (int): The kernel size of the prenet convolution layer.
+
+        post_conv_channels_size (int): The number of output channels of the
+        postnet convolution layer.
+
+        post_conv_kernel_size (int): The kernel size of the postnet convolution layer.
+
         p_dropout (float): The dropout rate.
-        wav_kernel_size (Optional[int]): The kernel size of the first
-            layer that process the wav samples directly if wav is modeled.
-            Default None.
-        wav_stride (Optional[int]): The stride size of the first
-            layer that process the wav samples directly if wav is modeled.
-            Default None.
+
+        wav_kernel_size (Optional[int]): The kernel size of the first layer that
+        processes the wav samples directly if wav is modeled. Default None.
+
+        wav_stride (Optional[int]): The stride size of the first layer that
+        processes the wav samples directly if wav is modeled. Default None.
     """
 
     def __init__(
@@ -375,25 +463,38 @@ class QuartzNet(CTCModel):
     in https://arxiv.org/abs/1910.10261
 
     Args:
+
         n_classes (int): The number of classes.
+
         in_features (int): The input/speech feature size.
-        num_blocks (int): The number of QuartzNet blocks, denoted
-            as 'B' in the paper.
-        block_repetition (int): The nubmer of times to repeat each block.
-            denoted as S in the paper.
-        num_sub_blocks (int): The number of QuartzNet subblocks, denoted
-            as 'R' in the paper.
-        channels_size (List[int]): The channel size of each block. it has to
-            be of length equal to num_blocks
-        epilog_kernel_size (int): The epilog block convolution's kernel size.
-        epilog_channel_size (Tuple[int, int]): The epilog blocks channels size.
-        prelog_kernel_size (int): The prelog block convolution's kernel size.
-        prelog_stride (int): The prelog block convolution's stride.
-        prelog_n_channels (int): The prelog block convolution's number of
-            output channnels.
+
+        num_blocks (int): The number of QuartzNet blocks (denoted as 'B' in the paper).
+
+        block_repetition (int): The number of times to repeat each block (denoted as 'S' in the paper).
+
+        num_sub_blocks (int): The number of QuartzNet subblocks, (denoted as 'R' in the paper).
+
+        channels_size (List[int]): A list of integers representing the number of output channels
+        for each block.
+
+        epilog_kernel_size (int): The kernel size of the convolution layer in the epilog block.
+
+        epilog_channel_size (Tuple[int, int]): A tuple for both epilog layers
+        of the convolution layer .
+
+        prelog_kernel_size (int): The kernel size pf the convolution layer in the prelog block.
+
+        prelog_stride (int): The stride size of the of the convoltuional layer
+        in the prelog block.
+
+        prelog_n_channels (int): The number of output channels of the convolutional
+        layer in the prelog block.
+
         groups (int): The groups size.
-        blocks_kernel_size (Union[int, List[int]]): The convolution layer's
-            kernel size of each jasper block.
+
+        blocks_kernel_size (Union[int, List[int]]): An integer or a list of integers representing the
+        kernel size(s) for each block's convolutional layer.
+
         p_dropout (float): The dropout rate.
     """
 
@@ -442,22 +543,36 @@ class Squeezeformer(CTCModel):
     as described in https://arxiv.org/abs/2206.00888
 
     Args:
+
         n_classes (int): The number of classes.
+
         in_features (int): The input/speech feature size.
-        n (int): The number of layers per block, denoted as N in the paper.
+
+        n (int): The number of layers per block, (denoted as N in the paper).
+
         d_model (int): The model dimension.
-        ff_expansion_factor (int): The linear layer's expansion factor.
-        h (int): The number of heads.
-        kernel_size (int): The depth-wise convolution kernel size.
-        pooling_kernel_size (int): The pooling convolution kernel size.
-        pooling_stride (int): The pooling convolution stride size.
-        ss_kernel_size (Union[int, List[int]]): The kernel size of the
-            subsampling layer.
-        ss_stride (Union[int, List[int]]): The stride of the subsampling layer.
+
+        ff_expansion_factor (int): The expansion factor of linear layer in the
+        feed forward module.
+
+        h (int): The number of attention heads.
+
+        kernel_size (int): The kernel size of the depth-wise convolution layer.
+
+        pooling_kernel_size (int): The kernel size of the pooling convolution layer.
+
+        pooling_stride (int): The stride size of the pooling convolution layer.
+
+        ss_kernel_size (Union[int, List[int]]): The kernel size of the subsampling layer(s).
+
+        ss_stride (Union[int, List[int]]): The stride of the subsampling layer(s).
+
         ss_n_conv_layers (int): The number of subsampling convolutional layers.
+
         p_dropout (float): The dropout rate.
-        ss_groups (Union[int, List[int]]): The subsampling convolution groups
-            size.
+
+        ss_groups (Union[int, List[int]]): The subsampling convolution groups size(s).
+
         masking_value (int): The masking value. Default -1e15
     """
 
