@@ -1,3 +1,22 @@
+"""This module contains different trainer classes, some of which utilize
+distributed data parallelism (DDP), as well as a launch_training_job function.
+
+Trainers:
+
+- BaseTrainer: A basic trainer module.
+- BaseDistTrainer: A basic distributed data parallel trainer module that is a subclass of BaseTrainer.
+- CTCTrainer: A trainer module for CTC-based models that is a subclass of BaseTrainer.
+- DistCTCTrainer: A trainer module for CTC models that utilizes distributed data parallelism, which is a subclass of both BaseDistTrainer and CTCTrainer.
+- Seq2SeqTrainer: A trainer module for Seq2Seq models that is a subclass of BaseTrainer.
+- DistSeq2SeqTrainer: A trainer module for Seq2Seq models that utilizes distributed data parallelism, which is a subclass of both BaseDistTrainer and Seq2SeqTrainer.
+- TransducerTrainer: A trainer module for transducer-based models that is a subclass of BaseTrainer.
+- DistTransducerTrainer: A trainer module for transducer models that utilizes distributed data parallelism, which is a subclass of both BaseDistTrainer and TransducerTrainer.
+
+
+Function:
+
+- launch_training_job: A function that launches a training job for a given configuration of trainer, data, and model objects. It takes in three arguments: trainer_config which is an object containing the configuration for the trainer, data_config which is an object containing the configuration for the data, and model_config which is an object containing the configuration for the model. The function returns None.
+"""
 import os
 import time
 from functools import partial
@@ -14,6 +33,7 @@ from torch.nn.parallel import DistributedDataParallel
 from torch.optim import Optimizer
 from tqdm import tqdm
 
+from speeq.config import ASRDataConfig, ModelConfig, TrainerConfig
 from speeq.constants import HistoryKeys, LogCategories
 from speeq.interfaces import IDataLoader, IScheduler, ITrainer
 from speeq.utils.loggers import ILogger
@@ -28,22 +48,30 @@ class BaseTrainer(ITrainer):
     Args:
         optimizer (Union[Optimizer, IScheduler]): The optimizer or the wrapped
         optimizer that will be used during the training.
+
         criterion (Module): The loss fucntion that will be used
         during the training process.
+
         model (Module): The model.
-        train_loader (ILoader): The training data loader.
-        test_loader (ILoader): The testing data loader.
+
+        train_loader (ILoader): The loader for the training data.
+
+        test_loader (ILoader): The loader for the testing data.
+
         epochs (int): The number of epochs.
-        log_steps_frequency (int): The number of steps to log the
-        results after.
+
+        log_steps_frequency (int): The frequency at which to log results.
+
         logger (ILogger): The logger to be used.
-        outdir (Union[str, Path]): The output directory to save
-        checkpoints into.
-        grad_clip_thresh (Union[None, float]): max norm of the gradients.
+
+        outdir (Union[str, Path]):  The directory to save checkpoints.
+
+        grad_clip_thresh (Union[None, float]): The maximum norm of the gradients.
         Default None.
-        grad_clip_norm_type (float): type of the used p-norm. Default 2.0.
-        history (dict): The history of the training if there is
-        any. Default {}.
+
+        grad_clip_norm_type (float): The type of p-norm used. Default 2.0.
+
+        history (dict): The training history, if available. Default {}.
     """
 
     def __init__(
@@ -78,6 +106,12 @@ class BaseTrainer(ITrainer):
         self.min_loss = inf
 
     def backward_pass(self, loss: Tensor) -> None:
+        """This method performs a backward pass on the model parameters to update
+        them based on the provided loss tensor.
+
+        Args:
+            loss (Tensor): The loss tensor.
+        """
         if self.grad_clip_thresh is not None:
             torch.nn.utils.clip_grad_norm_(
                 self.model,
@@ -89,6 +123,7 @@ class BaseTrainer(ITrainer):
         self.optimizer.zero_grad()
 
     def fit(self):
+        """Fits the model on the training data."""
         for _ in range(self.epochs):
             self.train()
             self.logger.log(self.history)
@@ -103,12 +138,31 @@ class BaseTrainer(ITrainer):
 
     @step_log(key=HistoryKeys.train_loss.value, category=LogCategories.batches.value)
     def train_step(self, batch: Tuple[Tensor]) -> float:
+        """This method represents a single step in the training process. It
+        performs a forward pass, calculates the loss, and then performs a
+        backward pass to update the model parameters.
+
+            Args:
+
+            batch (Tuple[Tensor]): The input batch to be processed.
+            Returns:
+
+            float: The loss value for this step.
+        """
         loss = self.forward_pass(batch)
         self.backward_pass(loss)
         return loss.item()
 
     @step_log(key=HistoryKeys.train_loss.value, category=LogCategories.epochs.value)
     def train(self) -> float:
+        """The main training loop, where the function iterate over the training
+        examples and perform forward and backward pass.
+
+        Returns:
+
+            float: The average loss over all training examples.
+
+        """
         self.model.train()
         total_loss = 0.0
         for i, batch in enumerate(tqdm(self.train_loader)):
@@ -129,6 +183,11 @@ class BaseTrainer(ITrainer):
     @step_log(key=HistoryKeys.test_loss.value, category=LogCategories.steps.value)
     @torch.no_grad()
     def test(self) -> float:
+        """Performing a model test on the testing data
+
+        Returns:
+            float: The average test loss.
+        """
         self.model.eval()
         total_loss = 0.0
         for batch in self.test_loader:
@@ -148,27 +207,40 @@ class BaseDistTrainer(BaseTrainer):
     Args:
         optimizer (Union[Optimizer, IScheduler]): The optimizer or the wrapped
         optimizer that will be used during the training.
+
         criterion (Module): The loss fucntion that will be used
         during the training process.
+
         model (Module): The model.
-        train_loader (ILoader): The training data loader.
-        test_loader (ILoader): The testing data loader.
+
+        train_loader (ILoader): The loader for the training data.
+
+        test_loader (ILoader): The loader for the testing data.
+
         epochs (int): The number of epochs.
-        log_steps_frequency (int): The number of steps to log the
-        results after.
+
+        log_steps_frequency (int): The frequency at which to log results.
+
         logger (ILogger): The logger to be used.
-        outdir (Union[str, Path]): The output directory to save
-        checkpoints into.
+
+        outdir (Union[str, Path]):  The directory to save checkpoints.
+
         rank (int): The process index.
+
         world_size (int): The number of nodes/processes.
+
         dist_address (str): The address of the master node.
+
         dist_port (int): The port of the master node.
+
         dist_backend (str): The backend used for DDP.
-        grad_clip_thresh (Union[None, float]): max norm of the gradients.
+
+        grad_clip_thresh (Union[None, float]): The maximum norm of the gradients.
         Default None.
-        grad_clip_norm_type (float): type of the used p-norm. Default 2.0.
-        history (dict): The history of the training if there is
-        any. Default {}.
+
+        grad_clip_norm_type (float): The type of p-norm used. Default 2.0.
+
+        history (dict): The training history, if available. Default {}.
     """
 
     def __init__(
@@ -218,6 +290,7 @@ class BaseDistTrainer(BaseTrainer):
         self.model = DistributedDataParallel(self.model, device_ids=[self.rank])
 
     def init_dist(self):
+        """initialize the distributed training process"""
         os.environ["MASTER_ADDR"] = self.dist_address
         os.environ["MASTER_PORT"] = str(self.dist_port)
         init_process_group(
@@ -238,6 +311,14 @@ class BaseDistTrainer(BaseTrainer):
 
     @step_log(key=HistoryKeys.train_loss.value, category=LogCategories.epochs.value)
     def train(self) -> float:
+        """The main training loop that run on one of the processes, where the
+        function iterate over the training examples and perform forward and backward pass.
+
+        Returns:
+
+            float: The average loss over all training examples from all processes.
+
+        """
         self.model.train()
         total_loss = 0.0
         for i, batch in enumerate(tqdm(self.train_loader)):
@@ -265,6 +346,9 @@ class BaseDistTrainer(BaseTrainer):
         return self._all_reduce_loss(total_loss, len(self.train_loader)).item()
 
     def fit(self):
+        """Fits the model on the training data, and logs the results on the master
+        node only.
+        """
         for _ in range(self.epochs):
             self.train()
             if self.is_master or self.has_bnorm is True:
@@ -278,6 +362,37 @@ class BaseDistTrainer(BaseTrainer):
 
 
 class CTCTrainer(BaseTrainer):
+    """A trainer module for CTC-based models.
+
+    Args:
+        optimizer (Union[Optimizer, IScheduler]): The optimizer or the wrapped
+        optimizer that will be used during the training.
+
+        criterion (Module): The loss fucntion that will be used
+        during the training process.
+
+        model (Module): The model.
+
+        train_loader (ILoader): The loader for the training data.
+
+        test_loader (ILoader): The loader for the testing data.
+
+        epochs (int): The number of epochs.
+
+        log_steps_frequency (int): The frequency at which to log results.
+
+        logger (ILogger): The logger to be used.
+
+        outdir (Union[str, Path]):  The directory to save checkpoints.
+
+        grad_clip_thresh (Union[None, float]): The maximum norm of the gradients.
+        Default None.
+
+        grad_clip_norm_type (float): The type of p-norm used. Default 2.0.
+
+        history (dict): The training history, if available. Default {}.
+    """
+
     def __init__(
         self,
         optimizer: Union[Optimizer, IScheduler],
@@ -322,6 +437,47 @@ class CTCTrainer(BaseTrainer):
 
 
 class DistCTCTrainer(BaseDistTrainer, CTCTrainer):
+    """A trainer module for CTC models that utilizes distributed data parallelism.
+
+    Args:
+        optimizer (Union[Optimizer, IScheduler]): The optimizer or the wrapped
+        optimizer that will be used during the training.
+
+        criterion (Module): The loss fucntion that will be used
+        during the training process.
+
+        model (Module): The model.
+
+        train_loader (ILoader): The loader for the training data.
+
+        test_loader (ILoader): The loader for the testing data.
+
+        epochs (int): The number of epochs.
+
+        log_steps_frequency (int): The frequency at which to log results.
+
+        logger (ILogger): The logger to be used.
+
+        outdir (Union[str, Path]):  The directory to save checkpoints.
+
+        rank (int): The process index.
+
+        world_size (int): The number of nodes/processes.
+
+        dist_address (str): The address of the master node.
+
+        dist_port (int): The port of the master node.
+
+        dist_backend (str): The backend used for DDP.
+
+        grad_clip_thresh (Union[None, float]): The maximum norm of the gradients.
+        Default None.
+
+        grad_clip_norm_type (float): The type of p-norm used. Default 2.0.
+
+        history (dict): The training history, if available. Default {}.
+    """
+
     def __init__(
         self,
         optimizer: Union[Optimizer, IScheduler],
@@ -381,6 +537,37 @@ class DistCTCTrainer(BaseDistTrainer, CTCTrainer):
 
 
 class Seq2SeqTrainer(BaseTrainer):
+    """A trainer module for Seq2Seq models.
+
+    Args:
+        optimizer (Union[Optimizer, IScheduler]): The optimizer or the wrapped
+        optimizer that will be used during the training.
+
+        criterion (Module): The loss fucntion that will be used
+        during the training process.
+
+        model (Module): The model.
+
+        train_loader (ILoader): The loader for the training data.
+
+        test_loader (ILoader): The loader for the testing data.
+
+        epochs (int): The number of epochs.
+
+        log_steps_frequency (int): The frequency at which to log results.
+
+        logger (ILogger): The logger to be used.
+
+        outdir (Union[str, Path]):  The directory to save checkpoints.
+
+        grad_clip_thresh (Union[None, float]): The maximum norm of the gradients.
+        Default None.
+
+        grad_clip_norm_type (float): The type of p-norm used. Default 2.0.
+
+        history (dict): The training history, if available. Default {}.
+    """
+
     def __init__(
         self,
         optimizer: Union[Optimizer, IScheduler],
@@ -420,10 +607,57 @@ class Seq2SeqTrainer(BaseTrainer):
         [speech, speech_mask, text, text_mask] = batch
         preds = self.model(speech, speech_mask, text, text_mask)
         loss = self.criterion(preds, text, text_mask)
+        import random
+
+        if random.random() > 0.98:
+            print(torch.argmax(preds[0, :, :], dim=-1))
+            print(text[0])
+            print("-" * 10)
         return loss
 
 
 class DistSeq2SeqTrainer(BaseDistTrainer, Seq2SeqTrainer):
+    """A trainer module for Seq2Seq models that utilizes distributed data parallelism.
+
+    Args:
+        optimizer (Union[Optimizer, IScheduler]): The optimizer or the wrapped
+        optimizer that will be used during the training.
+
+        criterion (Module): The loss fucntion that will be used
+        during the training process.
+
+        model (Module): The model.
+
+        train_loader (ILoader): The loader for the training data.
+
+        test_loader (ILoader): The loader for the testing data.
+
+        epochs (int): The number of epochs.
+
+        log_steps_frequency (int): The frequency at which to log results.
+
+        logger (ILogger): The logger to be used.
+
+        outdir (Union[str, Path]):  The directory to save checkpoints.
+
+        rank (int): The process index.
+
+        world_size (int): The number of nodes/processes.
+
+        dist_address (str): The address of the master node.
+
+        dist_port (int): The port of the master node.
+
+        dist_backend (str): The backend used for DDP.
+
+        grad_clip_thresh (Union[None, float]): The maximum norm of the gradients.
+        Default None.
+
+        grad_clip_norm_type (float): The type of p-norm used. Default 2.0.
+
+        history (dict): The training history, if available. Default {}.
+    """
+
     def __init__(
         self,
         optimizer: Union[Optimizer, IScheduler],
@@ -483,6 +717,37 @@ class DistSeq2SeqTrainer(BaseDistTrainer, Seq2SeqTrainer):
 
 
 class TransducerTrainer(BaseTrainer):
+    """A trainer module for transducer-based models.
+
+    Args:
+        optimizer (Union[Optimizer, IScheduler]): The optimizer or the wrapped
+        optimizer that will be used during the training.
+
+        criterion (Module): The loss fucntion that will be used
+        during the training process.
+
+        model (Module): The model.
+
+        train_loader (ILoader): The loader for the training data.
+
+        test_loader (ILoader): The loader for the testing data.
+
+        epochs (int): The number of epochs.
+
+        log_steps_frequency (int): The frequency at which to log results.
+
+        logger (ILogger): The logger to be used.
+
+        outdir (Union[str, Path]):  The directory to save checkpoints.
+
+        grad_clip_thresh (Union[None, float]): The maximum norm of the gradients.
+        Default None.
+
+        grad_clip_norm_type (float): The type of p-norm used. Default 2.0.
+
+        history (dict): The training history, if available. Default {}.
+    """
+
     def __init__(
         self,
         optimizer: Union[Optimizer, IScheduler],
@@ -518,6 +783,17 @@ class TransducerTrainer(BaseTrainer):
         self.model.to(device)
 
     def forward_pass(self, batch: Tuple[Tensor]) -> Tensor:
+        """This method conducts a forward pass on the CTC model.
+
+        Args:
+
+            batch (Tuple[Tensor]): The input batch containing the speech, speech
+            length, text, and text length tensors, in that order.
+
+        Returns:
+
+            Tensor: A tensor representing the loss.
+        """
         batch = [item.to(self.device) for item in batch]
         [speech, speech_mask, text, text_mask] = batch
         preds, speech_len, text_len = self.model(speech, speech_mask, text, text_mask)
@@ -527,6 +803,47 @@ class TransducerTrainer(BaseTrainer):
 
 
 class DistTransducerTrainer(BaseDistTrainer, TransducerTrainer):
+    """A trainer module for transducer models that utilizes distributed data parallelism.
+
+    Args:
+        optimizer (Union[Optimizer, IScheduler]): The optimizer or the wrapped
+        optimizer that will be used during the training.
+
+        criterion (Module): The loss fucntion that will be used
+        during the training process.
+
+        model (Module): The model.
+
+        train_loader (ILoader): The loader for the training data.
+
+        test_loader (ILoader): The loader for the testing data.
+
+        epochs (int): The number of epochs.
+
+        log_steps_frequency (int): The frequency at which to log results.
+
+        logger (ILogger): The logger to be used.
+
+        outdir (Union[str, Path]):  The directory to save checkpoints.
+
+        rank (int): The process index.
+
+        world_size (int): The number of nodes/processes.
+
+        dist_address (str): The address of the master node.
+
+        dist_port (int): The port of the master node.
+
+        dist_backend (str): The backend used for DDP.
+
+        grad_clip_thresh (Union[None, float]): The maximum norm of the gradients.
+        Default None.
+
+        grad_clip_norm_type (float): The type of p-norm used. Default 2.0.
+
+        history (dict): The training history, if available. Default {}.
+    """
+
     def __init__(
         self,
         optimizer: Union[Optimizer, IScheduler],
@@ -586,7 +903,11 @@ class DistTransducerTrainer(BaseDistTrainer, TransducerTrainer):
 
 
 def _run_trainer(
-    rank: int, world_size: int, trainer_config, data_config, model_config
+    rank: int,
+    world_size: int,
+    trainer_config: TrainerConfig,
+    data_config: ASRDataConfig,
+    model_config: ModelConfig,
 ) -> None:
     if rank != 0:
         # To make sure the master node created any dependancies
