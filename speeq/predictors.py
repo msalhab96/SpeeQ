@@ -2,8 +2,9 @@ from pathlib import Path
 from typing import Union
 
 import torch
-from config import ModelConfig
-from constants import (
+
+from .config import ModelConfig
+from .constants import (
     ENC_OUT_KEY,
     HIDDEN_STATE_KEY,
     PREDS_KEY,
@@ -11,7 +12,6 @@ from constants import (
     SPEECH_IDX_KEY,
     TERMINATION_STATE_KEY,
 )
-
 from .data.registry import load_tokenizer
 from .interfaces import IProcessor
 from .models.registry import get_model
