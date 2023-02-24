@@ -1,14 +1,13 @@
-from setuptools import find_packages, setup
+from setuptools import setup
 
-with open(".version", "r", encoding="utf-8") as f:
-    version = f.read()
+from speeq._version import __version__
 
 with open("requirements.txt", "r", encoding="utf-8") as f:
     requirements = f.readlines()
 
 setup(
     name="speeq",
-    version=version,
+    version=__version__,
     author="Mahmoud Salhab",
     author_email="mahmoud@salhab.work",
     url="https://github.com/msalhab96/SpeeQ",
