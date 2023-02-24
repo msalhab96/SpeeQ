@@ -30,7 +30,6 @@ extensions = [
 templates_path = ["_templates"]
 exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 
-import sphinx_theme
 
 html_theme = "sphinx_rtd_theme"
 # html_theme_path = [sphinx_theme.get_html_theme_path("stanford-theme")]

@@ -13,47 +13,30 @@ recognition models quickly and easily. With SpeeQ, you can easily run various
 pre-implemented model architectures with just a few lines of code, making it an
 ideal choice for those who want to quickly prototype and test different
 speech recognition models.
-For a quick start navigate to the :doc:`quick_start` page!
+For a quick start navigate to the :doc:`files/quick_start` page!
 
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
 
-   intro
-   contribution
-   quick_start
-   tutorials
+   files/intro
+   files/contribution
+   files/quick_start
+   tutorials/tutorials
 
 .. toctree::
    :maxdepth: 2
    :caption: Modules:
 
-   Data <speeq.data>
-   Models <speeq.models>
-   Configs <speeq.config>
-   Trainers <speeq.trainers>
-   Utils <speeq.utils>
-   Predictors <speeq.predictors>
+   Data <files/data>
+   Models <files/models>
+   Configs <files/config>
+   Trainers <files/trainers>
+   Utils <files/utils>
+   Predictors <files/predictors>
 
 .. toctree::
    :maxdepth: 2
    :caption: Links:
 
    Github <https://github.com/msalhab96/SpeeQ>
-
-
-.. Indices and tables
-.. ==================
-
-.. * :ref:`genindex`
-.. * :ref:`genindex`
-.. * :ref:`modindex`
-.. * :ref:`search`
-
-.. Trainers
-.. ========
-
-.. * :ref:`speeq.trainers`
-.. * :ref:`speeq.data.html`
-.. * :ref:`trainers`
-.. * :ref:`speeq`
