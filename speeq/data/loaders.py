@@ -37,7 +37,7 @@ class CSVDataset(IDataset):
     Args:
         data_path (Union[str, Path]): The file path of the CSV dataset.
 
-        sep (str): The separator used in the CSV file.
+        sep (str): The separator used in the CSV file. Default is ','.
 
         encoding (str): The encoding of the CSV file. Default is "utf-8".
 
@@ -51,7 +51,7 @@ class CSVDataset(IDataset):
     def __init__(
         self,
         data_path: Union[str, Path],
-        sep: str,
+        sep: str = ',',
         encoding="utf-8",
         sort_key: Optional[str] = "",
         reverse: bool = False,
