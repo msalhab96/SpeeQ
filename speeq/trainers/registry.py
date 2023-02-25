@@ -189,7 +189,7 @@ def _get_dist_args(trainer_config, rank: int, world_size: int) -> dict:
     }
 
 
-def get_optimizer(
+def get_asr_trainer(
     trainer_config: TrainerConfig,
     data_config: ASRDataConfig,
     model_config: ModelConfig,
