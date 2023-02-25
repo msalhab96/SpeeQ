@@ -13,16 +13,15 @@ recognition models quickly and easily. With SpeeQ, you can easily run various
 pre-implemented model architectures with just a few lines of code, making it an
 ideal choice for those who want to quickly prototype and test different
 speech recognition models.
-For a quick start navigate to the :doc:`files/quick_start` page!
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 5
    :caption: Contents:
 
    files/intro
    files/contribution
-   files/quick_start
    tutorials/tutorials
+   recipes/recipes
 
 .. toctree::
    :maxdepth: 2
