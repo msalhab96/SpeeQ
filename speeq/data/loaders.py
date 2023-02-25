@@ -51,7 +51,7 @@ class CSVDataset(IDataset):
     def __init__(
         self,
         data_path: Union[str, Path],
-        sep: str = ',',
+        sep: str = ",",
         encoding="utf-8",
         sort_key: Optional[str] = "",
         reverse: bool = False,
@@ -366,6 +366,7 @@ class SpeechTextLoader(_DataLoader):
 
     def _get_mask(self, batch: List[Tuple[Tensor, int]], max_len_dim: int) -> Tensor:
         def get_mask(x: Tuple[Tensor, int]):
+            print(speech.shape, speech_len)
             (example, pad_len) = x
             seq_len = example.shape[max_len_dim]
             return get_pad_mask(seq_len=seq_len - pad_len, pad_len=pad_len)
@@ -389,7 +390,6 @@ class SpeechTextLoader(_DataLoader):
         texts = []
         for idx in self.indices[self.start_idx : self.end_idx]:
             speech, speech_len, text, text_len = self.data[idx]
-            print(speech.shape, speech_len)
             max_speech_len = max(max_speech_len, speech_len)
             max_text_len = max(max_text_len, text_len)
             speeches.append(speech)
