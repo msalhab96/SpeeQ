@@ -46,11 +46,15 @@ class CTCPredictor(_ASRBasePredictor):
     """Implements CTC based model predictor
 
     Args:
-        speech_processor (IProcessor): The speech/file pre-processing
-            processor.
+
+        speech_processor (IProcessor): The speech/file pre-processing processor.
+
         tokenizer_path (Union[str, Path]): The trained tokenizer path.
+
         model_config (ModelConfig): The model configuration.
+
         device (str): The device to map the operations to.
+
     """
 
     def __init__(
@@ -89,12 +93,17 @@ class Seq2SeqPredictor(_ASRBasePredictor):
     """Implements Seq2Seq-Based models predictor
 
     Args:
-        speech_processor (IProcessor): The speech/file pre-processing
-            processor.
+
+        speech_processor (IProcessor): The speech/file pre-processing processor.
+
         tokenizer_path (Union[str, Path]): The trained tokenizer path.
+
         model_config (ModelConfig): The model configuration.
+
         device (str): The device to map the operations to.
+
         max_len (int): The maximum decoding length.
+
     """
 
     def __init__(
@@ -136,11 +145,15 @@ class TransducerPredictor(_ASRBasePredictor):
     """Implements transducer-Based models predictor
 
     Args:
-        speech_processor (IProcessor): The speech/file pre-processing
-            processor.
+
+        speech_processor (IProcessor): The speech/file pre-processing processor.
+
         tokenizer_path (Union[str, Path]): The trained tokenizer path.
+
         model_config (ModelConfig): The model configuration.
+
         device (str): The device to map the operations to.
+
     """
 
     def __init__(
