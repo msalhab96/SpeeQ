@@ -117,19 +117,24 @@ def calc_data_len(
     kernel_size: int,
     stride: int,
 ) -> Union[Tensor, int]:
-    """Calculates the new data portion size
-    after applying convolution on a padded tensor
+    """Calculates the new data portion size after applying convolution on a padded tensor
 
     Args:
-        result_len int: The length after the
-            convolution iss applied.
+
+        result_len int: The length after the convolution iss applied.
+
         pad_len Union[Tensor, int]: The original padding portion length.
+
         data_len Union[Tensor, int]: The original data portion legnth.
+
         kernel_size (int): The convolution kernel size.
+
         stride (int): The convolution stride.
 
     Returns:
+
         Union[Tensor, int]: The new data portion length.
+
     """
     if type(pad_len) != type(data_len):
         raise ValueError(
@@ -155,11 +160,17 @@ def calc_data_len(
 def get_positional_encoding(max_length: int, d_model: int) -> Tensor:
     """Create positional encoding tensor as described in
     https://arxiv.org/abs/1706.03762
+
     Args:
+
         max_length (int): The maximum length of the positionals sequence.
+
         d_model (int): The dimensionality of the positionals sequence.
+
     Returns:
+
         Tensor: Positional tensor of shape [1, max_length, d_model]
+
     """
     if d_model % 2 == 1:
         raise ValueError("Even number is expected for d_model, but odd is given!")
@@ -178,11 +189,11 @@ def get_mask_from_lens(lengths: Tensor, max_len: int) -> Tensor:
 
     Args:
         lengths (Tensor): The lengths of the original tensors of shape [B].
+
         max_len (int): the maximum lengths.
 
     Returns:
-        Tensor: The mask of shape [B, max_len] and True whenever the index
-            in the data portion.
+        Tensor: The mask of shape [B, max_len] and True whenever the index in the data portion.
     """
     indices = torch.arange(max_len).to(lengths.device)
     indices = indices.expand(len(lengths), max_len)
@@ -193,10 +204,13 @@ def add_pos_enc(x: Tensor) -> Tensor:
     """Adds positional encodings to the input tensor x.
 
     Args:
+
         x (Tensor): The input tensor of shape [B, M, d].
 
     Returns:
+
         Tensor: The input added to at the positional encoding.
+
     """
     d_model = x.shape[-1]
     pe = get_positional_encoding(x.shape[1], d_model)
