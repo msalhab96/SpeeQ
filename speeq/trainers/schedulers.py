@@ -161,7 +161,7 @@ class SqueezeformerNoamScheduler(NoamScheduler):
         if self.counter < self.plateau_region:
             return self.lr_peak
         numerator = self.lr_peak * pow(self.warmup_staps, self.decay_rate)
-        denominator = self.counter / pow(self.counter - self.t_peak)
+        denominator = self.counter / pow(self.counter - self.t_peak, self.decay_rate)
         return numerator / denominator
 
     def state_dict(self) -> dict:
