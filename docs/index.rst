@@ -21,7 +21,7 @@ speech recognition models.
    files/intro
    files/contribution
    tutorials/tutorials
-   recipes/recipes
+   .. recipes/recipes
 
 .. toctree::
    :maxdepth: 2
