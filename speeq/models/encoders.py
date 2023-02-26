@@ -191,11 +191,17 @@ class DeepSpeechV2Encoder(nn.Module):
                 for _ in range(n_rnn)
             ]
         )
+        self.rnn_bnorms = nn.ModuleList(
+            [nn.BatchNorm1d(num_features=hidden_size) for _ in range(n_rnn)]
+        )
         self.linear_layers = nn.ModuleList(
             [
                 nn.Linear(in_features=hidden_size, out_features=hidden_size)
                 for _ in range(n_linear_layers)
             ]
+        )
+        self.linear_bnorms = nn.ModuleList(
+            [nn.BatchNorm1d(num_features=hidden_size) for _ in range(n_linear_layers)]
         )
         self.crelu = CReLu(max_val=max_clip_value)
         self.context_conv = RowConv1D(tau=tau, feat_size=hidden_size)
@@ -223,14 +229,20 @@ class DeepSpeechV2Encoder(nn.Module):
         lengths = lengths.cpu()
         out, lengths = self.conv(x, lengths)
         out = self.crelu(out)
-        for layer in self.rnns:
+        for bnorm, layer in zip(self.rnn_bnorms, self.rnns):
+            out = out.transpose(-1, -2)
+            out = bnorm(out)
+            out = out.transpose(-1, -2)
             out, _, lengths = layer(out, lengths)
             if self.bidirectional is True:
                 out = out[..., : self.hidden_size] + out[..., self.hidden_size :]
             out = self.crelu(out)
         out = self.context_conv(out)
-        for layer in self.linear_layers:
+        for bnorm, layer in zip(self.linear_bnorms, self.linear_layers):
             out = layer(out)
+            out = out.transpose(-1, -2)
+            out = bnorm(out)
+            out = out.transpose(-1, -2)
             out = self.crelu(out)
         return out, lengths
 

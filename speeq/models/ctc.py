@@ -240,6 +240,7 @@ class DeepSpeechV2(CTCModel):
         p_dropout: float,
     ) -> None:
         super().__init__(pred_in_size=hidden_size, n_classes=n_classes)
+        self.has_bnorm = True
         self.encoder = DeepSpeechV2Encoder(
             n_conv=n_conv,
             kernel_size=kernel_size,
