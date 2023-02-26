@@ -366,7 +366,6 @@ class SpeechTextLoader(_DataLoader):
 
     def _get_mask(self, batch: List[Tuple[Tensor, int]], max_len_dim: int) -> Tensor:
         def get_mask(x: Tuple[Tensor, int]):
-            print(speech.shape, speech_len)
             (example, pad_len) = x
             seq_len = example.shape[max_len_dim]
             return get_pad_mask(seq_len=seq_len - pad_len, pad_len=pad_len)
