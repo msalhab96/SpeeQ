@@ -4,6 +4,7 @@ to create the trainer configuration, which specifies the training settings:
 
 
 .. code-block:: python
+
     from speeq.config import TrainerConfig, DistConfig
 
     # create a single-GPU training configuration
