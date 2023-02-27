@@ -626,9 +626,8 @@ class Conv1DLayers(nn.Module):
         _stride = stride
         _groups = groups
         for i in range(n_layers):
-
             in_channels = out_size
-            if i == 0 :
+            if i == 0:
                 in_channels = in_size
             elif isinstance(out_size, list):
                 in_channels = out_size[i - 1]
@@ -640,20 +639,21 @@ class Conv1DLayers(nn.Module):
             if isinstance(kernel_size, list):
                 _kernel_size = kernel_size[i]
 
-            if isinstance(stride, list): 
-                _stride = stride[i]  
+            if isinstance(stride, list):
+                _stride = stride[i]
 
-            if isinstance(groups, list): 
+            if isinstance(groups, list):
                 _groups = groups[i]
-            
-            self.layers.append(nn.Conv1d(
-                in_channels=in_channels,
-                out_channels=out_channels,
-                kernel_size=_kernel_size,
-                stride=_stride,
-                groups=_groups
-            ))
-        print(self.layers)
+
+            self.layers.append(
+                nn.Conv1d(
+                    in_channels=in_channels,
+                    out_channels=out_channels,
+                    kernel_size=_kernel_size,
+                    stride=_stride,
+                    groups=_groups,
+                )
+            )
         self.dropout = nn.Dropout(p_dropout)
 
     def forward(self, x: Tensor, data_len: Tensor) -> Tuple[Tensor, Tensor]:
@@ -1604,7 +1604,6 @@ class SpeechTransformerDecLayer(TransformerDecLayer):
         super().__init__(d_model, ff_size, h, masking_value)
         self.layer_norm = nn.LayerNorm(normalized_shape=d_model)
         del self.add_and_norm3
-        
 
     def forward(
         self,
