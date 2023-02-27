@@ -21,6 +21,7 @@ from .layers import (
     PositionalEmbedding,
     PredModule,
     TransformerDecLayer,
+    SpeechTransformerDecLayer
 )
 
 
@@ -505,6 +506,98 @@ class TransformerDecoder(nn.Module):
             out = layer(
                 enc_out=state[ENC_OUT_KEY], enc_mask=None, dec_inp=out, dec_mask=None
             )
+        out = self.pred_net(out[:, -1:, :])
+        last_pred = torch.argmax(out, dim=-1)
+        state[PREDS_KEY] = torch.cat([state[PREDS_KEY], last_pred], dim=-1)
+        return state
+
+
+class SpeechTransformerDecoder(TransformerDecoder):
+    """Implements the speech transformer decoder as described in
+    https://ieeexplore.ieee.org/document/8462506
+
+    Args:
+        n_classes (int): The number of classes the model will predict.
+
+        n_layers (int): The number of decoder layers.
+
+        d_model (int): The model dimensionality.
+
+        ff_size (int): The dimensionality of the feed-forward inner layer.
+
+        h (int): The number of attention heads.
+
+        pred_activation (Module): An activation function instance.
+
+        masking_value (int): The attentin masking value. Default -1e15
+    """
+
+    def __init__(
+        self,
+        n_classes: int,
+        n_layers: int,
+        d_model: int,
+        ff_size: int,
+        h: int,
+        pred_activation: nn.Module,
+        masking_value: int = -1e15,
+    ) -> None:
+        super().__init__(n_classes, n_layers, d_model, 
+                         ff_size, h, pred_activation, masking_value)
+        self.layers = nn.ModuleList(
+            [
+                SpeechTransformerDecLayer(
+                    d_model=d_model, ff_size=ff_size, h=h, masking_value=masking_value
+                )
+                for _ in range(n_layers)
+            ]
+        )
+        self.layer_norm = nn.LayerNorm(normalized_shape=d_model)
+
+    def forward(
+        self,
+        enc_out: Tensor,
+        enc_mask: Union[Tensor, None],
+        dec_inp: Tensor,
+        dec_mask: Union[Tensor, None],
+        *args,
+        **kwargs
+    ) -> Tensor:
+        """Passes the inputs through the speech transformer decoder.
+
+        Args:
+
+            enc_out (Tensor): The output tensor of the encoder of shape [B, M_enc, d].
+
+            enc_mask (Union[Tensor, None]): The encoder mask of shape [B, M_enc],
+            which is True for the data positions and False for the padding ones.
+
+            dec_inp (Tensor): The input tensor of the decoder of shape [B, M_dec].
+
+            dec_mask (Union[Tensor, None]): The decoder mask of shape [B, M_dec],
+            which is True for the data positions and False for the padding ones.
+
+        Returns:
+
+            Tensor: The output tensor of the speech transformer decoder of shape [B, M_dec, C].
+        """
+        out = self.emb(dec_inp)
+        for layer in self.layers:
+            out = layer(
+                enc_out=enc_out, enc_mask=enc_mask, dec_inp=out, dec_mask=dec_mask
+            )
+        out = self.layer_norm(out)
+        out = self.pred_net(out)
+        return out
+
+    def predict(self, state: dict) -> dict:
+        preds = state[PREDS_KEY]
+        out = self.emb(preds)
+        for layer in self.layers:
+            out = layer(
+                enc_out=state[ENC_OUT_KEY], enc_mask=None, dec_inp=out, dec_mask=None
+            )
+        out = self.layer_norm(out)
         out = self.pred_net(out[:, -1:, :])
         last_pred = torch.argmax(out, dim=-1)
         state[PREDS_KEY] = torch.cat([state[PREDS_KEY], last_pred], dim=-1)

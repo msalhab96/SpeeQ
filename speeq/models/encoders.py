@@ -918,6 +918,7 @@ class SpeechTransformerEncoder(nn.Module):
                 for _ in range(n_layers)
             ]
         )
+        self.layer_norm = nn.LayerNorm(normalized_shape=d_model)
         self.d_model = d_model
 
     def _pre_process(self, x: Tensor, mask: Tensor) -> Tuple[Tensor, Tensor]:
@@ -962,6 +963,7 @@ class SpeechTransformerEncoder(nn.Module):
         for layer in self.layers:
             out = layer(out, mask)
         lengths = mask.sum(dim=-1)
+        out = self.layer_norm(out)
         return out, lengths
 
 

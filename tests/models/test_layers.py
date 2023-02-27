@@ -1126,6 +1126,55 @@ class TestTransformerDecLayer:
         check_grad(result=result, model=model)
 
 
+class TestSpeechTransformerDecLayer:
+    @pytest.mark.parametrize(
+        (
+            "d_model",
+            "ff_size",
+            "h",
+            "enc_seq_len",
+            "dec_seq_len",
+            "batch_size",
+            "enc_pad_lens",
+            "dec_pad_lens",
+        ),
+        (
+            (16, 32, 2, 8, 3, 3, [3, 5, 8], [3, 2, 1]),
+            (16, 32, 2, 8, 3, 3, None, [3, 2, 1]),
+            (16, 32, 2, 8, 3, 3, [3, 5, 8], None),
+            (16, 32, 2, 8, 3, 3, None, None),
+            (16, 32, 2, 8, 3, 1, None, None),
+            (16, 32, 2, 8, 3, 1, [8], [3]),
+        ),
+    )
+    def test_forward(
+        self,
+        batcher,
+        d_model,
+        ff_size,
+        h,
+        enc_seq_len,
+        dec_seq_len,
+        batch_size,
+        enc_pad_lens,
+        dec_pad_lens,
+    ):
+        """Tests the returned shape and the gradients of the model's forward"""
+        shape = (batch_size, dec_seq_len, d_model)
+        enc_mask = None
+        dec_mask = None
+        model = layers.SpeechTransformerDecLayer(d_model=d_model, ff_size=ff_size, h=h)
+        if enc_pad_lens is not None:
+            enc_mask = get_mask(enc_seq_len, enc_pad_lens)
+        if dec_pad_lens is not None:
+            dec_mask = get_mask(dec_seq_len, dec_pad_lens)
+        enc = batcher(batch_size, enc_seq_len, d_model)
+        dec = batcher(*shape)
+        result = model(enc_out=enc, enc_mask=enc_mask, dec_inp=dec, dec_mask=dec_mask)
+        assert result.shape == shape
+        check_grad(result=result, model=model)
+
+
 class TestPositionalEmbedding:
     @pytest.mark.parametrize(
         ("vocab_size", "batch_size", "embed_dim", "seq_len"),

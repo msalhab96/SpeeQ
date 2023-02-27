@@ -328,3 +328,64 @@ class TestTransformerDecoder:
         check_grad(result=result, model=model)
         assert result.shape == expected_shape
         assert torch.allclose(result.sum(dim=-1), torch.ones_like(target).float())
+
+
+class TestSpeechTransformerDecoder:
+    @pytest.mark.filterwarnings(IGNORE_USERWARNING)
+    @pytest.mark.parametrize(
+        (
+            "n_classes",
+            "n_layers",
+            "d_model",
+            "ff_size",
+            "h",
+            "pred_activation",
+            "batch_size",
+            "enc_len",
+            "target_len",
+            "enc_pad_lens",
+            "dec_pad_lens",
+        ),
+        (
+            (6, 2, 8, 4, 2, Softmax(dim=-1), 3, 4, 5, [0, 1, 3], [0, 1, 0]),
+            (6, 2, 8, 4, 2, Softmax(dim=-1), 3, 4, 1, [0, 1, 3], [0, 0, 0]),
+            (6, 2, 8, 4, 2, Softmax(dim=-1), 3, 1, 5, [0, 0, 0], [0, 1, 0]),
+            (6, 2, 8, 4, 2, Softmax(dim=-1), 3, 4, 5, [0, 1, 0], [0, 1, 0]),
+            (6, 2, 8, 4, 2, Softmax(dim=-1), 3, 4, 5, [0, 1, 3], [0, 1, 3]),
+        ),
+    )
+    def test_forward(
+        self,
+        batcher,
+        int_batcher,
+        n_classes,
+        n_layers,
+        d_model,
+        ff_size,
+        h,
+        pred_activation,
+        batch_size,
+        enc_len,
+        target_len,
+        enc_pad_lens,
+        dec_pad_lens,
+    ):
+        expected_shape = (batch_size, target_len, n_classes)
+        target = int_batcher(batch_size, target_len, n_classes)
+        enc_out = batcher(batch_size, enc_len, d_model)
+        model = decoders.SpeechTransformerDecoder(
+            n_classes=n_classes,
+            n_layers=n_layers,
+            d_model=d_model,
+            ff_size=ff_size,
+            h=h,
+            pred_activation=pred_activation,
+        )
+        enc_mask = get_mask(enc_len, enc_pad_lens)
+        dec_mask = get_mask(target_len, dec_pad_lens)
+        result = model(
+            enc_out=enc_out, enc_mask=enc_mask, dec_inp=target, dec_mask=dec_mask
+        )
+        check_grad(result=result, model=model)
+        assert result.shape == expected_shape
+        assert torch.allclose(result.sum(dim=-1), torch.ones_like(target).float())

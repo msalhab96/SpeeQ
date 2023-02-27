@@ -1471,9 +1471,11 @@ class SpeechTransformerEncLayer(TransformerEncLayer):
     ) -> None:
         # TODO: pass masking value
         super().__init__(d_model=d_model, ff_size=ff_size, h=h)
+        del self.add_and_norm2
         self.mhsa = MultiHeadAtt2d(
             d_model=d_model, h=h, out_channels=out_channels, kernel_size=kernel_size
         )
+        self.layer_norm = nn.LayerNorm(normalized_shape=d_model)
 
     def forward(self, x: Tensor, mask: Optional[Tensor] = None) -> Tensor:
         """
@@ -1492,10 +1494,11 @@ class SpeechTransformerEncLayer(TransformerEncLayer):
             Tensor: The output tensor of shape [B, B, d].
 
         """
-        out = self.mhsa(key=x, query=x, value=x, mask=mask)
+        out = self.layer_norm(x)
+        out = self.mhsa(key=out, query=out, value=out, mask=mask)
         out = self.add_and_norm1(x, out)
         result = self.ff(out)
-        return self.add_and_norm2(out, result)
+        return out + result
 
 
 class TransformerDecLayer(nn.Module):
@@ -1564,6 +1567,71 @@ class TransformerDecLayer(nn.Module):
             out,
         )
         out = self.add_and_norm3(self.ff(out), out)
+        return out
+
+
+class SpeechTransformerDecLayer(TransformerDecLayer):
+    """Implements a single decoder layer of the speech transformer
+    as described in https://ieeexplore.ieee.org/document/8462506
+
+    Args:
+
+        d_model (int): The model dimensionality.
+
+        ff_size (int): The feed forward inner layer dimensionality.
+
+        h (int): The number of attention heads.
+
+        masking_value (int): The masking value. Default -1e15
+    """
+
+    def __init__(
+        self, d_model: int, ff_size: int, h: int, masking_value: int = -1e15
+    ) -> None:
+        super().__init__(d_model, ff_size, h, masking_value)
+        self.layer_norm = nn.LayerNorm(normalized_shape=d_model)
+        del self.add_and_norm3
+        
+
+    def forward(
+        self,
+        enc_out: Tensor,
+        enc_mask: Union[Tensor, None],
+        dec_inp: Tensor,
+        dec_mask: Union[Tensor, None],
+    ) -> Tensor:
+        """Applies a single decoder layer of speech transformer to the input.
+
+        Args:
+            enc_out (Tensor): The output of the encoder. Its shape is [B, M_enc, d].
+
+            enc_mask (Tensor, optional): The mask tensor for the encoder output.
+            Its shape is [B, M_enc], where it is False for the padding positions.
+
+            dec_inp (Tensor): The input to the decoder layer. Its shape is
+            [B, M_dec, d_model].
+
+            dec_mask (Tensor, optional): The mask tensor for the decoder input.
+            Its shape is [B, M_dec], where it is False for the padding.
+
+        Returns:
+            The output of the decoder layer. Its shape is [B, M_dec, d_model].
+
+        """
+        out = self.layer_norm(dec_inp)
+        out = self.mmhsa(key=out, query=out, value=out, key_mask=dec_mask)
+        out = self.add_and_norm1(out, dec_inp)
+        out = self.add_and_norm2(
+            self.mha(
+                key=enc_out,
+                query=out,
+                value=enc_out,
+                key_mask=enc_mask,
+                query_mask=dec_mask,
+            ),
+            out,
+        )
+        out = self.ff(out) + out
         return out
 
 

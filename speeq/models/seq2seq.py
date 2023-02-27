@@ -15,7 +15,7 @@ from torch import Tensor, nn
 from speeq.constants import ENC_OUT_KEY, HIDDEN_STATE_KEY
 from speeq.utils.utils import get_mask_from_lens
 
-from .decoders import GlobAttRNNDecoder, LocationAwareAttDecoder, TransformerDecoder
+from .decoders import GlobAttRNNDecoder, LocationAwareAttDecoder, SpeechTransformerDecoder
 from .encoders import PyramidRNNEncoder, RNNEncoder, SpeechTransformerEncoder
 
 
@@ -356,7 +356,7 @@ class SpeechTransformer(nn.Module):
             att_kernel_size=att_kernel_size,
             att_out_channels=att_out_channels,
         )
-        self.decoder = TransformerDecoder(
+        self.decoder = SpeechTransformerDecoder(
             n_classes=n_classes,
             n_layers=n_dec_layers,
             d_model=d_model,
