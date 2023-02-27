@@ -621,26 +621,39 @@ class Conv1DLayers(nn.Module):
         groups: Union[List[int], int] = 1,
     ) -> None:
         super().__init__()
-        self.layers = nn.ModuleList(
-            [
-                nn.Conv1d(
-                    in_channels=in_size
-                    if i == 0
-                    else out_size[i - 1]
-                    if isinstance(out_size, list)
-                    else out_size,
-                    out_channels=out_size[i]
-                    if isinstance(out_size, list)
-                    else out_size,
-                    kernel_size=kernel_size[i]
-                    if isinstance(kernel_size, list)
-                    else kernel_size,
-                    stride=stride[i] if isinstance(stride, list) else stride,
-                    groups=groups[i] if isinstance(groups, list) else groups,
-                )
-                for i in range(n_layers)
-            ]
-        )
+        self.layers = nn.ModuleList()
+        _kernel_size = kernel_size
+        _stride = stride
+        _groups = groups
+        for i in range(n_layers):
+
+            in_channels = out_size
+            if i == 0 :
+                in_channels = in_size
+            elif isinstance(out_size, list):
+                in_channels = out_size[i - 1]
+
+            out_channels = out_size
+            if isinstance(out_size, list):
+                out_channels = out_size[i]
+
+            if isinstance(kernel_size, list):
+                _kernel_size = kernel_size[i]
+
+            if isinstance(stride, list): 
+                _stride = stride[i]  
+
+            if isinstance(groups, list): 
+                _groups = groups[i]
+            
+            self.layers.append(nn.Conv1d(
+                in_channels=in_channels,
+                out_channels=out_channels,
+                kernel_size=_kernel_size,
+                stride=_stride,
+                groups=_groups
+            ))
+        print(self.layers)
         self.dropout = nn.Dropout(p_dropout)
 
     def forward(self, x: Tensor, data_len: Tensor) -> Tuple[Tensor, Tensor]:
