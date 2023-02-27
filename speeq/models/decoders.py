@@ -597,6 +597,7 @@ class SpeechTransformerDecoder(TransformerDecoder):
             out = layer(
                 enc_out=state[ENC_OUT_KEY], enc_mask=None, dec_inp=out, dec_mask=None
             )
+        out = self.layer_norm(out)
         out = self.pred_net(out[:, -1:, :])
         last_pred = torch.argmax(out, dim=-1)
         state[PREDS_KEY] = torch.cat([state[PREDS_KEY], last_pred], dim=-1)
