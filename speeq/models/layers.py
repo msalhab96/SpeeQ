@@ -1570,6 +1570,71 @@ class TransformerDecLayer(nn.Module):
         return out
 
 
+class SpeechTransformerDecLayer(TransformerDecLayer):
+    """Implements a single decoder layer of the speech transformer
+    as described in https://ieeexplore.ieee.org/document/8462506
+
+    Args:
+
+        d_model (int): The model dimensionality.
+
+        ff_size (int): The feed forward inner layer dimensionality.
+
+        h (int): The number of attention heads.
+
+        masking_value (int): The masking value. Default -1e15
+    """
+
+    def __init__(
+        self, d_model: int, ff_size: int, h: int, masking_value: int = -1e15
+    ) -> None:
+        super().__init__(d_model, ff_size, h, masking_value)
+        self.layer_norm = nn.LayerNorm(normalized_shape=d_model)
+        del self.add_and_norm3
+        
+
+    def forward(
+        self,
+        enc_out: Tensor,
+        enc_mask: Union[Tensor, None],
+        dec_inp: Tensor,
+        dec_mask: Union[Tensor, None],
+    ) -> Tensor:
+        """Applies a single decoder layer of speech transformer to the input.
+
+        Args:
+            enc_out (Tensor): The output of the encoder. Its shape is [B, M_enc, d].
+
+            enc_mask (Tensor, optional): The mask tensor for the encoder output.
+            Its shape is [B, M_enc], where it is False for the padding positions.
+
+            dec_inp (Tensor): The input to the decoder layer. Its shape is
+            [B, M_dec, d_model].
+
+            dec_mask (Tensor, optional): The mask tensor for the decoder input.
+            Its shape is [B, M_dec], where it is False for the padding.
+
+        Returns:
+            The output of the decoder layer. Its shape is [B, M_dec, d_model].
+
+        """
+        out = self.layer_norm(dec_inp)
+        out = self.mmhsa(key=out, query=out, value=out, key_mask=dec_mask)
+        out = self.add_and_norm1(out, dec_inp)
+        out = self.add_and_norm2(
+            self.mha(
+                key=enc_out,
+                query=out,
+                value=enc_out,
+                key_mask=enc_mask,
+                query_mask=dec_mask,
+            ),
+            out,
+        )
+        out = self.ff(out) + out
+        return out
+
+
 class PositionalEmbedding(nn.Module):
     """Implements the positional embedding proposed in
     https://arxiv.org/abs/1706.03762
