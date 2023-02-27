@@ -26,7 +26,7 @@ class CTCBaseTest:
         check_grad(result=results, model=model)
 
 
-class TestCTCModel():
+class TestCTCModel:
     def test_create_object(self):
         with pytest.raises(NotImplementedError):
             ctc.CTCModel(1, 1)
