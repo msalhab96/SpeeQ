@@ -121,7 +121,7 @@ def calc_data_len(
 
     Args:
 
-        result_len int: The length after the convolution iss applied.
+        result_len (int): The length after the convolution is applied.
 
         pad_len Union[Tensor, int]: The original padding portion length.
 
