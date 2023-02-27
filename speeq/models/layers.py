@@ -1471,9 +1471,11 @@ class SpeechTransformerEncLayer(TransformerEncLayer):
     ) -> None:
         # TODO: pass masking value
         super().__init__(d_model=d_model, ff_size=ff_size, h=h)
+        del self.add_and_norm2
         self.mhsa = MultiHeadAtt2d(
             d_model=d_model, h=h, out_channels=out_channels, kernel_size=kernel_size
         )
+        self.layer_norm = nn.LayerNorm(normalized_shape=d_model)
 
     def forward(self, x: Tensor, mask: Optional[Tensor] = None) -> Tensor:
         """
@@ -1492,10 +1494,11 @@ class SpeechTransformerEncLayer(TransformerEncLayer):
             Tensor: The output tensor of shape [B, B, d].
 
         """
-        out = self.mhsa(key=x, query=x, value=x, mask=mask)
+        out = self.layer_norm(x)
+        out = self.mhsa(key=out, query=out, value=out, mask=mask)
         out = self.add_and_norm1(x, out)
         result = self.ff(out)
-        return self.add_and_norm2(out, result)
+        return out + result
 
 
 class TransformerDecLayer(nn.Module):
