@@ -1639,6 +1639,7 @@ class PositionalEmbedding(nn.Module):
     """Implements the positional embedding proposed in
     https://arxiv.org/abs/1706.03762
 
+    output = positional_encoding + Embedding(input)
 
     Args:
         vocab_size (int): The vocabulary size.
