@@ -996,7 +996,7 @@ class ConformerPreNet(nn.Module):
             groups=groups,
         )
         self.fc = nn.Linear(in_features=d_model, out_features=d_model)
-        self.drpout = nn.Dropout(p_dropout)
+        self.dropout = nn.Dropout(p_dropout)
 
     def forward(self, x: Tensor, lengths: Tensor) -> Tuple[Tensor, Tensor]:
         """Passes the input `x` to the pre-conformer blocks that contains
@@ -1018,7 +1018,7 @@ class ConformerPreNet(nn.Module):
         """
         out, lengths = self.layers(x, lengths)
         out = self.fc(out)
-        out = self.drpout(out)
+        out = self.dropout(out)
         return out, lengths
 
 
