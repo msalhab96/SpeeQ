@@ -34,6 +34,12 @@ class CTCModel(nn.Module):
     otherwise the forward module will raise error.
     """
 
+    def __new__(cls, *args, **kwargs):
+        if cls is CTCModel:
+            raise NotImplementedError(
+                f"Cannot create object of type `{cls.__name__}`")
+        return object.__new__(cls)
+    
     def __init__(self, pred_in_size: int, n_classes: int) -> None:
         super().__init__()
         self.has_bnorm = False

@@ -621,26 +621,39 @@ class Conv1DLayers(nn.Module):
         groups: Union[List[int], int] = 1,
     ) -> None:
         super().__init__()
-        self.layers = nn.ModuleList(
-            [
+        self.layers = nn.ModuleList()
+        _kernel_size = kernel_size
+        _stride = stride
+        _groups = groups
+        for i in range(n_layers):
+            in_channels = out_size
+            if i == 0:
+                in_channels = in_size
+            elif isinstance(out_size, list):
+                in_channels = out_size[i - 1]
+
+            out_channels = out_size
+            if isinstance(out_size, list):
+                out_channels = out_size[i]
+
+            if isinstance(kernel_size, list):
+                _kernel_size = kernel_size[i]
+
+            if isinstance(stride, list):
+                _stride = stride[i]
+
+            if isinstance(groups, list):
+                _groups = groups[i]
+
+            self.layers.append(
                 nn.Conv1d(
-                    in_channels=in_size
-                    if i == 0
-                    else out_size[i - 1]
-                    if isinstance(out_size, list)
-                    else out_size,
-                    out_channels=out_size[i]
-                    if isinstance(out_size, list)
-                    else out_size,
-                    kernel_size=kernel_size[i]
-                    if isinstance(kernel_size, list)
-                    else kernel_size,
-                    stride=stride[i] if isinstance(stride, list) else stride,
-                    groups=groups[i] if isinstance(groups, list) else groups,
+                    in_channels=in_channels,
+                    out_channels=out_channels,
+                    kernel_size=_kernel_size,
+                    stride=_stride,
+                    groups=_groups,
                 )
-                for i in range(n_layers)
-            ]
-        )
+            )
         self.dropout = nn.Dropout(p_dropout)
 
     def forward(self, x: Tensor, data_len: Tensor) -> Tuple[Tensor, Tensor]:
@@ -996,7 +1009,7 @@ class ConformerPreNet(nn.Module):
             groups=groups,
         )
         self.fc = nn.Linear(in_features=d_model, out_features=d_model)
-        self.drpout = nn.Dropout(p_dropout)
+        self.dropout = nn.Dropout(p_dropout)
 
     def forward(self, x: Tensor, lengths: Tensor) -> Tuple[Tensor, Tensor]:
         """Passes the input `x` to the pre-conformer blocks that contains
@@ -1018,7 +1031,7 @@ class ConformerPreNet(nn.Module):
         """
         out, lengths = self.layers(x, lengths)
         out = self.fc(out)
-        out = self.drpout(out)
+        out = self.dropout(out)
         return out, lengths
 
 
@@ -1591,7 +1604,6 @@ class SpeechTransformerDecLayer(TransformerDecLayer):
         super().__init__(d_model, ff_size, h, masking_value)
         self.layer_norm = nn.LayerNorm(normalized_shape=d_model)
         del self.add_and_norm3
-        
 
     def forward(
         self,
@@ -1639,6 +1651,7 @@ class PositionalEmbedding(nn.Module):
     """Implements the positional embedding proposed in
     https://arxiv.org/abs/1706.03762
 
+    output = positional_encoding + Embedding(input)
 
     Args:
         vocab_size (int): The vocabulary size.
