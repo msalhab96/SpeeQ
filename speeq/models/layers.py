@@ -2364,3 +2364,76 @@ class ContextNetBlock(nn.Module):
             out = self.residual(x, out)
         out = self.swish(out)
         return out, lengths
+
+
+class CausalVGGBlock(nn.Module):
+    """Implements a causal VGG block consisting of causal 2D convolution layers,
+    as described in the paper https://arxiv.org/pdf/1910.12977.pdf.
+
+
+
+    Args:
+        n_conv (int): Specifies the number of convolution layers.
+
+        in_channels (int): Specifies the number of input channels.
+
+        out_channels (List[int]): A list of integers that specifies the number
+        of channels in each convolution layer
+
+        kernel_sizes (List[int]): A list of integers that specifies the kernel size of each convolution layer.
+
+        pooling_kernel_size (int): Specifies the kernel size of the pooling layer.
+
+    """
+
+    def __init__(
+        self,
+        n_conv: int,
+        in_channels: int,
+        out_channels: List[int],
+        kernel_sizes: List[int],
+        pooling_kernel_size: int,
+    ) -> None:
+        super().__init__()
+        self.conv_layers = nn.ModuleList(
+            [
+                nn.Conv2d(
+                    in_channels=in_channels if i == 0 else out_channels[i - 1],
+                    out_channels=out_channels[i],
+                    kernel_size=kernel_sizes[i],
+                )
+                for i in range(n_conv)
+            ]
+        )
+        self.pooling = nn.MaxPool2d(kernel_size=pooling_kernel_size)
+
+    def _pad(self, x: Tensor, kernel_size: Tuple[int, int]):
+        batch_size, channels, max_len, feat_size = x.shape
+        seq_pad = torch.zeros(batch_size, channels, kernel_size[0] - 1, feat_size).to(
+            x.device
+        )
+        feat_pad = torch.zeros(
+            batch_size, channels, kernel_size[0] - 1 + max_len, kernel_size[1] - 1
+        ).to(x.device)
+        x = torch.cat([seq_pad, x], dim=2)
+        x = torch.cat([feat_pad, x], dim=3)
+        return x
+
+    def forward(self, x: Tensor, lengths: Tensor) -> Tuple[Tensor, Tensor]:
+        """passes the input x of shape [B, C, M, f] to the network.
+
+        Args:
+            x (Tensor): The input tensor if shape [B, C, M, f].
+            lengths (Tensor): The legnths tensor of shape [B].
+
+        Returns:
+            Tuple[Tensor, Tensor]: A tuple where the first is the result of shape
+            [B, C', M', f'] and the updated lengths of shape [B]
+        """
+        for conv_layer in self.conv_layers:
+            kernel_size = conv_layer.kernel_size
+            x = self._pad(x, kernel_size=kernel_size)
+            x = conv_layer(x)
+        x = self.pooling(x)
+        lengths = lengths // self.pooling.kernel_size
+        return x, lengths
