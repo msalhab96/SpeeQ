@@ -119,6 +119,7 @@ class DeepSpeechV1Encoder(nn.Module):
         for layer in self.ff_layers:
             x = layer(x)
         out, _, lengths = self.rnn(x, lengths.cpu())
+        out = self.crelu(out)
         if self.bidirectional is True:
             out = out[..., : self.hidden_size] + out[..., self.hidden_size :]
         out = self.crelu(self.fc(out))
