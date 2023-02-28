@@ -2510,3 +2510,66 @@ class TruncatedSelfAttention(MultiHeadAtt):
         return super().forward(
             key=x, query=x, value=x, key_mask=mask, query_mask=query_mask
         )
+
+
+class TransformerEncLayerWithAttTruncation(TransformerEncLayer):
+    """Implements a single encoder layer of the transformer
+    with truncated self attention as described in https://arxiv.org/abs/1910.12977
+
+    Args:
+
+        d_model (int): The model dimensionality.
+
+        ff_size (int): The feed forward inner layer dimensionality.
+
+        h (int): The number of heads in the attention mechanism.
+
+        left_size (int): The size of the left window that each time step is
+        allowed to look at.
+
+        right_size (int): The size of the right window that each time step is
+        allowed to look at.
+
+        masking_value (float, optional): The value to use for masking padded
+        elements. Defaults to -1e15.
+    """
+
+    def __init__(
+        self,
+        d_model: int,
+        ff_size: int,
+        h: int,
+        left_size: int,
+        right_size: int,
+        masking_value: int = -1e15,
+    ) -> None:
+        super().__init__(
+            d_model=d_model, ff_size=ff_size, h=h, masking_value=masking_value
+        )
+        self.mhsa = TruncatedSelfAttention(
+            d_model=d_model,
+            h=h,
+            left_size=left_size,
+            right_size=right_size,
+            masking_value=masking_value,
+        )
+
+    def forward(self, x: Tensor, mask: Union[Tensor, None] = None) -> Tensor:
+        """Performs a forward pass of the transformer encoder layer.
+
+        Args:
+
+            x (Tensor): The input tensor of shape [B, M, d].
+
+            mask (Union[Tensor, None], optional): Boolean tensor of the input of shape
+            [B, M] where True indicates that the corresponding key position
+            contains data not padding and therefore should not be masked.
+            If None, the function will act as a normal multi-head attention. Defaults to None.
+
+        Returns:
+            Tensor: Result tensor of the same shape as x.
+        """
+        out = self.mhsa(x=x, mask=mask)
+        out = self.add_and_norm1(x, out)
+        result = self.ff(out)
+        return self.add_and_norm2(out, result)
