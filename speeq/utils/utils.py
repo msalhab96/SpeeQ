@@ -216,3 +216,51 @@ def add_pos_enc(x: Tensor) -> Tensor:
     pe = get_positional_encoding(x.shape[1], d_model)
     pe = pe.to(x.device)
     return pe + x
+
+
+def truncate_attention_mask(mask: Tensor, right_size: int, left_size: int) -> Tensor:
+    """creates a truncation mask that can be used to mask attention to only look
+    at the time steps with a certain range. Specifically, it allows attention
+    to look at right_size steps to the right and left_size steps to the left of
+    each time step.
+
+
+    Args:
+
+        mask (Tensor): The original mask, which is True for the data positions
+        and False for the padding ones. It has a shape of [B, M].
+
+        right_size (int): The size of the right window that each time step is
+        allowed to look at.
+
+        left_size (int): The size of the left window that each time step is
+        allowed to look at.
+
+
+    Returns:
+        Tensor: The new mask tensor of shape [B, M, M]
+    """
+    max_len = mask.shape[1]
+    window_size = right_size + left_size + 1
+    new_mask = torch.zeros(max_len**2, dtype=torch.bool)
+    # creating the original positions that will be the center of the window
+    centers = torch.arange(0, max_len, device=mask.device)
+
+    # the start and the end of each window
+    start = torch.clamp_min(centers - left_size, 0)
+    end = torch.clamp_max(centers + right_size, max_len - 1)
+
+    # defining the indices in each window
+    indices = (
+        torch.arange(0, window_size, device=mask.device)
+        .repeat(max_len)
+        .view(max_len, -1)
+    )
+    indices = torch.clamp_max(start.view(-1, 1) + indices, end.view(-1, 1))
+    indices += (torch.arange(0, max_len, device=mask.device) * max_len).view(-1, 1)
+
+    # setting the indices to True
+    new_mask = new_mask.index_put((indices,), torch.tensor(True)).view(max_len, max_len)
+
+    # merging the original tensor with the new one
+    return mask.unsqueeze(dim=1) & new_mask.unsqueeze(dim=0)
