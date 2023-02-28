@@ -51,7 +51,12 @@ import torch.nn as nn
 from torch import Tensor
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 
-from speeq.utils.utils import add_pos_enc, calc_data_len, get_mask_from_lens
+from speeq.utils.utils import (
+    add_pos_enc,
+    calc_data_len,
+    get_mask_from_lens,
+    truncate_attention_mask,
+)
 
 from .activations import Sigmax
 
@@ -2437,3 +2442,71 @@ class CausalVGGBlock(nn.Module):
         x = self.pooling(x)
         lengths = lengths // self.pooling.kernel_size
         return x, lengths
+
+
+class TruncatedSelfAttention(MultiHeadAtt):
+    """Builds the truncated self attention module used
+    in https://arxiv.org/abs/1910.12977
+
+    Args:
+
+        d_model (int): The model dimension.
+
+        h (int): The number of attention heads.
+
+        left_size (int): The size of the left window that each time step is
+        allowed to look at.
+
+        right_size (int): The size of the right window that each time step is
+        allowed to look at.
+
+        masking_value (float): The attention masking value.
+    """
+
+    def __init__(
+        self,
+        d_model: int,
+        h: int,
+        left_size: int,
+        right_size: int,
+        masking_value: float = -1e15,
+    ) -> None:
+        super().__init__(d_model=d_model, h=h, masking_value=masking_value)
+        self.left_size = left_size
+        self.right_size = right_size
+
+    def get_looking_ahead_mask(self, mask: Tensor) -> Tensor:
+        truncated_mask = truncate_attention_mask(mask, self.right_size, self.left_size)
+        return truncated_mask & mask.unsqueeze(dim=-1)
+
+    def _mask(self, att: Tensor, query_mask: Tensor, *args, **kwargs) -> Tensor:
+        query_mask = query_mask.unsqueeze(dim=1)
+        return att.masked_fill(~query_mask, self.masking_value)
+
+    def forward(
+        self,
+        x: Tensor,
+        mask: Union[Tensor, None],
+    ) -> Tensor:
+        """Applies truncated masked multi-head self attention to the input.
+
+        Args:
+
+            x (Tensor): The input tensor of shape [B, M, d].
+
+            mask (Union[Tensor, None]): The mask tensor of the input of shape
+            [B, M] where True indicates that the corresponding input position
+            contains data not padding and therefore should not be masked.
+            If None, the function will act as a normal multi-head self attention.
+
+        Returns:
+
+            Tensor: The attention result tensor of shape [B, M, d].
+
+        """
+        query_mask = None
+        if mask is not None:
+            query_mask = self.get_looking_ahead_mask(mask=mask)
+        return super().forward(
+            key=x, query=x, value=x, key_mask=mask, query_mask=query_mask
+        )
