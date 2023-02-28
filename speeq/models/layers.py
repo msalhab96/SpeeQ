@@ -2573,3 +2573,86 @@ class TransformerEncLayerWithAttTruncation(TransformerEncLayer):
         out = self.add_and_norm1(x, out)
         result = self.ff(out)
         return self.add_and_norm2(out, result)
+
+
+class VGGTransformerPreNet(nn.Module):
+    """Implements the VGGTransformer prenet module as described in
+    https://arxiv.org/abs/1910.12977
+
+    Args:
+
+    in_features (int): The input feature size.
+
+    n_vgg_blocks (int): The number of VGG blocks to use.
+
+    n_layers_per_block (List[int]): A list of integers that specifies the number
+    of convolution layers in each block.
+
+    kernel_sizes_per_block (List[List[int]]): A list of lists that contains the
+    kernel size for each layer in each block. The length of the outer list
+    should match `n_vgg_blocks`, and each inner list should be the same length
+    as the corresponding block's number of layers.
+
+    n_channels_per_block (List[List[int]]): A list of lists that contains the
+    number of channels for each convolution layer in each block. This argument
+    should also have length equal to `n_vgg_blocks`, and each sublist should
+    have length equal to the number of layers in the corresponding block.
+
+    pooling_kernel_size (List[int]): A list of integers that specifies the size
+    of the max pooling layer in each block. The length of this list should be
+    equal to `n_vgg_blocks`.
+
+    d_model (int): The size of the output feature
+
+    """
+
+    def __init__(
+        self,
+        in_features: int,
+        n_vgg_blocks: int,
+        n_layers_per_block: List[int],
+        kernel_sizes_per_block: List[List[int]],
+        n_channels_per_block: List[List[int]],
+        pooling_kernel_size: List[int],
+        d_model: int,
+    ) -> None:
+        super().__init__()
+        self.vgg_blocks = nn.ModuleList(
+            [
+                CausalVGGBlock(
+                    n_conv=n_layers_per_block[i],
+                    in_channels=1 if i == 0 else n_channels_per_block[i - 1][-1],
+                    out_channels=n_channels_per_block[i],
+                    kernel_sizes=kernel_sizes_per_block[i],
+                    pooling_kernel_size=pooling_kernel_size[i],
+                )
+                for i in range(n_vgg_blocks)
+            ]
+        )
+        for i in range(n_vgg_blocks):
+            in_features //= pooling_kernel_size[i]
+        in_features *= n_channels_per_block[-1][-1]
+        self.fc = nn.Linear(in_features=in_features, out_features=d_model)
+
+    def forward(self, x: Tensor, lengths: Tensor) -> Tuple[Tensor, Tensor]:
+        """Passes the input `x` through the VGGTransformer prenet and returns
+        a tuple of tensors.
+
+        Args:
+            x (Tensor): Input tensor of shape [B, M, in_features].
+
+            lengths (Tensor): Lengths of shape [B] that has the length for each
+            sequence in `x`.
+
+        Returns:
+            A tuple of tensors (output, updated_lengths).
+            - output (Tensor): Output tensor of shape [B, M, d_model].
+            - updated_lengths (Tensor): Updated lengths of shape [B].
+        """
+        x = x.unsqueeze(dim=1)  # [B, 1, M, d]
+        for block in self.vgg_blocks:
+            x, lengths = block(x, lengths)
+        x = x.permute(0, 2, 1, 3)
+        x = x.contiguous()
+        x = x.view(*x.shape[:2], -1)
+        return self.fc(x), lengths
