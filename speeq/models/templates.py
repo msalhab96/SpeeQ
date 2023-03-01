@@ -840,6 +840,7 @@ class Seq2SeqBuilderTemp(BaseTemplate):
     _type = MODEL_BUILDER_TYPE
 
 
+@dataclass
 class VGGTransformerTransducerTemp(BaseTemplate):
     """VGG Transformer transducer model template
     https://arxiv.org/abs/1910.12977
