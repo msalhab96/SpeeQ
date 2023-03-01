@@ -349,7 +349,6 @@ class VGGTransformerTransducer(RNNTransducer):
 
         ff_size (int): The feed forward inner layer dimensionality.
 
-
         h (int): The number of heads in the attention mechanism.
 
         joint_size (int): The joint layer feature size (denoted as do in the paper).
@@ -414,7 +413,7 @@ class VGGTransformerTransducer(RNNTransducer):
             right_size=right_size,
             masking_value=masking_value,
         )
-        self.joint_size = nn.Sequential(
+        self.join_net = nn.Sequential(
             nn.Linear(in_features=d_model, out_features=joint_size),
             nn.ReLU(),
             nn.Linear(in_features=joint_size, out_features=n_classes),
