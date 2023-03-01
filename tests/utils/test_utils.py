@@ -259,3 +259,67 @@ def test_add_pos_enc_shape(
     batch = batched_speech_feat(*shape)
     result = utils.add_pos_enc(batch)
     assert result.shape == shape
+
+
+@pytest.mark.parametrize(
+    ("mask", "right_size", "left_size", "expected"),
+    (
+        (
+            torch.BoolTensor(
+                [
+                    [
+                        1,
+                    ]
+                ]
+            ),
+            0,
+            0,
+            torch.BoolTensor(
+                [
+                    [
+                        1,
+                    ]
+                ]
+            ),
+        ),
+        (
+            torch.BoolTensor([[1, 1, 0]]),
+            0,
+            0,
+            torch.BoolTensor([[1, 0, 0], [0, 1, 0], [0, 0, 0]]),
+        ),
+        (
+            torch.BoolTensor([[1, 1, 0]]),
+            1,
+            0,
+            torch.BoolTensor([[1, 1, 0], [0, 1, 0], [0, 0, 0]]),
+        ),
+        (
+            torch.BoolTensor([[1, 1, 0]]),
+            1,
+            1,
+            torch.BoolTensor([[1, 1, 0], [1, 1, 0], [0, 0, 0]]),
+        ),
+        (
+            torch.BoolTensor([[1, 1, 0], [1, 1, 1]]),
+            1,
+            1,
+            torch.BoolTensor(
+                [[[1, 1, 0], [1, 1, 0], [0, 0, 0]], [[1, 1, 0], [1, 1, 1], [0, 1, 1]]]
+            ),
+        ),
+        (
+            torch.BoolTensor([[1, 1, 0], [1, 1, 1]]),
+            3,
+            3,
+            torch.BoolTensor(
+                [[[1, 1, 0], [1, 1, 0], [0, 0, 0]], [[1, 1, 1], [1, 1, 1], [1, 1, 1]]]
+            ),
+        ),
+    ),
+)
+def test_truncate_attention_mask(mask, right_size, left_size, expected):
+    result = utils.truncate_attention_mask(
+        mask=mask, left_size=left_size, right_size=right_size
+    )
+    assert torch.all(result == expected)
