@@ -1,6 +1,6 @@
-Having the data in the CSV format as mentioned erlier we can use now the data loaders
-that built in the framework, in-order to train a model or launche a training job
-we have to define speech and text processor first and after that the `speeq.config.ASRDataConfig` object.
+Having the data in the CSV format as mentioned earlier, we can use now the data loaders
+that built in the framework, in-order to train a model or launch a training job
+we have to define a speech and text processor first and after that the `speeq.config.ASRDataConfig` object.
 
 Defining Speech and Text processor
 **********************************

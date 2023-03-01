@@ -4,7 +4,7 @@ transcription. If you want to sort the data, add a sorting column to the CSV
 file. It's crucial to verify that all paths are valid and that the corresponding
 files exist.
 
-Here is an exampel of a CSV file
+Here is an example of a CSV file
 
 .. code-block:: bash
 
