@@ -6,7 +6,7 @@ Classes:
 - RNNTransducer: An implementation of the RNN transducer model.
 - ConformerTransducer: An implementation of the Conformer transducer model.
 - ContextNet: An implementation of the ContextNet transducer model.
-
+- VGGTransformerTransducer: An implementation of the VGGTransformer transducer model with truncated self attention.
 """
 from typing import List, Tuple, Union
 

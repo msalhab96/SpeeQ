@@ -43,6 +43,10 @@ Layers:
 - ContextNetConvLayer: ContextNet convolution layer.
 - ContextNetResidual: ContextNet residual module.
 - ContextNetBlock: ContextNet block.
+- CausalVGGBlock: Causal VGG Block.
+- TruncatedSelfAttention: Truncated self attention.
+- TransformerEncLayerWithAttTruncation: Transformer Encoder layer with truncated self attention.
+- VGGTransformerPreNet: VGG Transformer prenet.
 """
 from typing import List, Optional, Tuple, Union
 
