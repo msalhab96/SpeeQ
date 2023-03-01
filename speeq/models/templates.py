@@ -18,7 +18,7 @@ Classes:
 - RNNTTemp: Template for configuring RNNT model.
 - ConformerTransducerTemp: Template for configuring Conformer Transducer model.
 - ContextNetTemp: Template for configuring ContextNet model.
-
+- VGGTransformerTransducerTemp: Template for configuring the VGG transformer with truncated self attention model.
 
 Builder:
 
