@@ -125,7 +125,6 @@ class TestAddAndNorm:
 
 
 class TestMultiHeadAtt:
-
     model_args = ("d_model", "h", "masking_value")
     masking_input = torch.tensor(
         [
@@ -277,7 +276,6 @@ class TestMultiHeadAtt:
 
 
 class TestMaskedMultiHeadAtt:
-
     key_mask1 = torch.BoolTensor(
         [
             [True, True, False],
@@ -366,7 +364,6 @@ class TestRowConv1D:
 
 
 class TestConv1DLayers:
-
     model_args = (
         "in_size",
         "out_size",
@@ -1689,6 +1686,243 @@ class TestContextNetBlock:
             reduction_factor=reduction_factor,
             add_residual=add_residual,
             last_layer_stride=last_layer_stride,
+        )
+        result, lengths = model(input, lengths)
+        assert result.shape == expected_shape
+        assert torch.all(lengths == expected_lengths)
+        check_grad(result=result, model=model)
+
+
+class TestCausalVGGBlock:
+    @pytest.mark.parametrize(
+        (
+            "n_conv",
+            "in_channels",
+            "out_channels",
+            "kernel_sizes",
+            "pooling_kernel_size",
+            "lengths",
+            "feat_size",
+            "expected_lengths",
+            "expected_shape",
+        ),
+        (
+            (
+                1,
+                1,
+                [4],
+                [3],
+                2,
+                torch.LongTensor([2, 2, 3]),
+                16,
+                torch.LongTensor([1, 1, 1]),
+                (3, 4, 1, 8),
+            ),
+            (
+                1,
+                6,
+                [4],
+                [3],
+                2,
+                torch.LongTensor([2, 2, 3]),
+                16,
+                torch.LongTensor([1, 1, 1]),
+                (3, 4, 1, 8),
+            ),
+            (
+                2,
+                1,
+                [4, 4],
+                [3, 2],
+                2,
+                torch.LongTensor([2, 2, 3]),
+                16,
+                torch.LongTensor([1, 1, 1]),
+                (3, 4, 1, 8),
+            ),
+        ),
+    )
+    def test_forward(
+        self,
+        n_conv,
+        in_channels,
+        out_channels,
+        kernel_sizes,
+        pooling_kernel_size,
+        lengths,
+        feat_size,
+        expected_lengths,
+        expected_shape,
+    ):
+        batch_size = lengths.shape[0]
+        seq_len = lengths.max()
+        input = torch.randn(batch_size, in_channels, seq_len, feat_size)
+        model = layers.CausalVGGBlock(
+            n_conv=n_conv,
+            in_channels=in_channels,
+            out_channels=out_channels,
+            kernel_sizes=kernel_sizes,
+            pooling_kernel_size=pooling_kernel_size,
+        )
+        result, lengths = model(input, lengths)
+        assert result.shape == expected_shape
+        assert torch.all(lengths == expected_lengths)
+        check_grad(result=result, model=model)
+
+
+class TestTruncatedSelfAttention:
+    @pytest.mark.parametrize(
+        (
+            "d_model",
+            "h",
+            "left_size",
+            "right_size",
+            "pad_lens",
+            "seq_len",
+            "expected_shape",
+        ),
+        (
+            (16, 4, 2, 3, [1, 0, 3], 6, (3, 6, 16)),
+            (16, 4, 0, 3, [1, 0, 3], 6, (3, 6, 16)),
+            (16, 4, 3, 0, [1, 0, 3], 6, (3, 6, 16)),
+        ),
+    )
+    def test_forward(
+        self,
+        batcher,
+        d_model,
+        h,
+        left_size,
+        right_size,
+        pad_lens,
+        seq_len,
+        expected_shape,
+    ):
+        batch_size = len(pad_lens)
+        input = batcher(batch_size, seq_len, d_model)
+        model = layers.TruncatedSelfAttention(
+            d_model=d_model,
+            h=h,
+            left_size=left_size,
+            right_size=right_size,
+        )
+        mask = get_mask(seq_len=seq_len, pad_lens=pad_lens)
+        result = model(input, mask)
+        assert result.shape == expected_shape
+        check_grad(result=result, model=model)
+
+
+class TestTransformerEncLayerWithAttTruncation:
+    @pytest.mark.parametrize(
+        (
+            "d_model",
+            "ff_size",
+            "h",
+            "left_size",
+            "right_size",
+            "pad_lens",
+            "seq_len",
+            "expected_shape",
+        ),
+        (
+            (16, 12, 4, 2, 3, [1, 0, 3], 6, (3, 6, 16)),
+            (16, 12, 4, 0, 3, [1, 0, 3], 6, (3, 6, 16)),
+            (16, 12, 4, 3, 0, [1, 0, 3], 6, (3, 6, 16)),
+        ),
+    )
+    def test_forward(
+        self,
+        batcher,
+        d_model,
+        ff_size,
+        h,
+        left_size,
+        right_size,
+        pad_lens,
+        seq_len,
+        expected_shape,
+    ):
+        batch_size = len(pad_lens)
+        input = batcher(batch_size, seq_len, d_model)
+        model = layers.TransformerEncLayerWithAttTruncation(
+            d_model=d_model,
+            ff_size=ff_size,
+            h=h,
+            left_size=left_size,
+            right_size=right_size,
+        )
+        mask = get_mask(seq_len=seq_len, pad_lens=pad_lens)
+        result = model(input, mask)
+        assert result.shape == expected_shape
+        check_grad(result=result, model=model)
+
+
+class TestVGGTransformerPreNet:
+    @pytest.mark.parametrize(
+        (
+            "n_vgg_blocks",
+            "n_layers_per_block",
+            "n_channels_per_block",
+            "kernel_sizes_per_block",
+            "pooling_kernel_size",
+            "d_model",
+            "lengths",
+            "feat_size",
+            "expected_lengths",
+            "expected_shape",
+        ),
+        (
+            (
+                1,
+                [2],
+                [[4, 8]],
+                [[2, 3]],
+                [2],
+                16,
+                torch.LongTensor([2, 2, 3]),
+                16,
+                torch.LongTensor([1, 1, 1]),
+                (3, 1, 16),
+            ),
+            (
+                2,
+                [2, 1],
+                [[4, 8], [16]],
+                [[2, 3], [2]],
+                [2, 1],
+                16,
+                torch.LongTensor([2, 2, 3]),
+                16,
+                torch.LongTensor([1, 1, 1]),
+                (3, 1, 16),
+            ),
+        ),
+    )
+    def test_forward(
+        self,
+        batcher,
+        n_vgg_blocks,
+        n_layers_per_block,
+        n_channels_per_block,
+        kernel_sizes_per_block,
+        pooling_kernel_size,
+        d_model,
+        lengths,
+        feat_size,
+        expected_lengths,
+        expected_shape,
+    ):
+        batch_size = lengths.shape[0]
+        seq_len = lengths.max()
+        input = batcher(batch_size, seq_len, feat_size)
+        model = layers.VGGTransformerPreNet(
+            in_features=feat_size,
+            n_vgg_blocks=n_vgg_blocks,
+            n_layers_per_block=n_layers_per_block,
+            kernel_sizes_per_block=kernel_sizes_per_block,
+            n_channels_per_block=n_channels_per_block,
+            pooling_kernel_size=pooling_kernel_size,
+            d_model=d_model,
         )
         result, lengths = model(input, lengths)
         assert result.shape == expected_shape
