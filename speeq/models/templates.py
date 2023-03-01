@@ -838,3 +838,81 @@ class Seq2SeqBuilderTemp(BaseTemplate):
     has_bnorm: bool
     _name = SEQ2SEQ_TYPE
     _type = MODEL_BUILDER_TYPE
+
+
+class VGGTransformerTransducerTemp(BaseTemplate):
+    """VGG Transformer transducer model template
+    https://arxiv.org/abs/1910.12977
+
+    Args:
+
+        in_features (int): The input feature size.
+
+        emb_dim (int): The embedding layer's size.
+
+        n_layers (int): The number of transformer encoder layers with truncated
+        self attention.
+
+        n_dec_layers (int): The number of RNNs in the decoder (predictor).
+
+        rnn_type (str): The RNN type.
+
+        n_vgg_blocks (int): The number of VGG blocks to use.
+
+        n_conv_layers_per_vgg_block (List[int]): A list of integers that specifies the number
+        of convolution layers in each block.
+
+        kernel_sizes_per_vgg_block (List[List[int]]): A list of lists that contains the
+        kernel size for each layer in each block. The length of the outer list
+        should match `n_vgg_blocks`, and each inner list should be the same length
+        as the corresponding block's number of layers.
+
+        n_channels_per_vgg_block (List[List[int]]): A list of lists that contains the
+        number of channels for each convolution layer in each block. This argument
+        should also have length equal to `n_vgg_blocks`, and each sublist should
+        have length equal to the number of layers in the corresponding block.
+
+        vgg_pooling_kernel_size (List[int]): A list of integers that specifies the size
+        of the max pooling layer in each block. The length of this list should be
+        equal to `n_vgg_blocks`.
+
+        d_model (int): The model dimensionality.
+
+        ff_size (int): The feed forward inner layer dimensionality.
+
+        h (int): The number of heads in the attention mechanism.
+
+        joint_size (int): The joint layer feature size (denoted as do in the paper).
+
+        left_size (int): The size of the left window that each time step is
+        allowed to look at.
+
+        right_size (int): The size of the right window that each time step is
+        allowed to look at.
+
+        p_dropout (float): The dropout rate.
+
+        masking_value (float, optional): The value to use for masking padded
+        elements. Defaults to -1e15.
+    """
+
+    in_features: int
+    emb_dim: int
+    n_layers: int
+    n_dec_layers: int
+    rnn_type: str
+    n_vgg_blocks: int
+    n_conv_layers_per_vgg_block: List[int]
+    kernel_sizes_per_vgg_block: List[List[int]]
+    n_channels_per_vgg_block: List[List[int]]
+    vgg_pooling_kernel_size: List[int]
+    d_model: int
+    ff_size: int
+    h: int
+    joint_size: int
+    left_size: int
+    right_size: int
+    p_dropout: float
+    masking_value: int = -1e15
+    _name = "vgg_transformer"
+    _type = TRANSDUCER_TYPE
