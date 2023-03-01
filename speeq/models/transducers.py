@@ -65,15 +65,18 @@ class _BaseTransducer(nn.Module):
         """
         speech, speech_len = self.encoder(speech, speech_mask)
         text, text_len = self.decoder(text, text_mask)
-        speech = speech.unsqueeze(-2)
-        text = text.unsqueeze(1)
-        result = speech + text
+        result = self._join(encoder_out=speech, deocder_out=text)
         result = self.join_net(result)
         speech_len, text_len = (
             speech_len.to(speech.device),
             text_len.to(speech.device),
         )
         return result, speech_len, text_len
+
+    def _join(self, encoder_out: Tensor, deocder_out: Tensor) -> Tensor:
+        encoder_out = encoder_out.unsqueeze(-2)
+        deocder_out = deocder_out.unsqueeze(1)
+        return encoder_out + deocder_out
 
     def predict(self, x: Tensor, mask: Tensor, state: dict) -> dict:
         if ENC_OUT_KEY not in state:
