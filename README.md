@@ -17,7 +17,7 @@ source env/bin/activate
 2. Install the packge either from source or from pypi
 
   * from PyPI
-  
+
     ```bash
     pip install speeq
     ```
@@ -45,10 +45,8 @@ source env/bin/activate
 | RNNTransducer | [Sequence Transduction with Recurrent Neural Networks](https://arxiv.org/abs/1211.3711) | Transducer |
 | ConformerTransducer | [Conformer: Convolution-augmented Transformer for Speech Recognition](https://arxiv.org/abs/2005.08100) | Transducer |
 | ContextNet | [ContextNet: Improving Convolutional Neural Networks for Automatic Speech Recognition with Global Context](https://arxiv.org/abs/2005.03191) | Transducer |
+| Transformer-Transducer | [Transformer-Transducer: End-to-End Speech Recognition with Self-Attention](https://arxiv.org/abs/1910.12977) | Transducer |
 | BasicAttSeq2SeqRNN | N/A | Seq2Seq (encoder/decoder) |
 | LAS | [Listen, Attend and Spell](https://arxiv.org/abs/1508.01211) | Seq2Seq (encoder/decoder) |
 | RNNWithLocationAwareAtt | [Attention-Based Models for Speech Recognition](https://arxiv.org/abs/1506.07503) | Seq2Seq (encoder/decoder) |
 | SpeechTransformer | [Speech-Transformer: A No-Recurrence Sequence-to-Sequence Model for Speech Recognition](https://ieeexplore.ieee.org/document/8462506) | Seq2Seq (encoder/decoder) |
-
-
-
