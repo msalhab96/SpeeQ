@@ -20,8 +20,8 @@ from .layers import (
     LocAwareGlobalAddAttention,
     PositionalEmbedding,
     PredModule,
+    SpeechTransformerDecLayer,
     TransformerDecLayer,
-    SpeechTransformerDecLayer
 )
 
 
@@ -365,21 +365,33 @@ class TransducerRNNDecoder(nn.Module):
 
         rnn_type (str): The RNN type it has to be one of rnn, gru or lstm.
         Default 'rnn'.
+
+        n_layers (int): The number of RNN layers to use. Default 1.
     """
 
     def __init__(
-        self, vocab_size: int, emb_dim: int, hidden_size: int, rnn_type: str
+        self,
+        vocab_size: int,
+        emb_dim: int,
+        hidden_size: int,
+        rnn_type: str,
+        n_layers: int = 1,
     ) -> None:
         super().__init__()
         self.emb = nn.Embedding(num_embeddings=vocab_size, embedding_dim=emb_dim)
         from .registry import PACKED_RNN_REGISTRY
 
-        self.rnn = PACKED_RNN_REGISTRY[rnn_type](
-            input_size=emb_dim,
-            hidden_size=hidden_size,
-            batch_first=True,
-            enforce_sorted=False,
-            bidirectional=False,
+        self.layers = nn.ModuleList(
+            [
+                PACKED_RNN_REGISTRY[rnn_type](
+                    input_size=emb_dim if i == 0 else hidden_size,
+                    hidden_size=hidden_size,
+                    batch_first=True,
+                    enforce_sorted=False,
+                    bidirectional=False,
+                )
+                for i in range(n_layers)
+            ]
         )
 
     def forward(
@@ -406,7 +418,8 @@ class TransducerRNNDecoder(nn.Module):
         """
         lengths = mask.sum(dim=-1).cpu()
         out = self.emb(x)
-        out, _, lens = self.rnn(out, lengths)
+        for rnn in self.layers:
+            out, _, lens = rnn(out, lengths)
         return out, lens
 
     def predict(self, state: dict) -> dict:
@@ -542,8 +555,9 @@ class SpeechTransformerDecoder(TransformerDecoder):
         pred_activation: nn.Module,
         masking_value: int = -1e15,
     ) -> None:
-        super().__init__(n_classes, n_layers, d_model, 
-                         ff_size, h, pred_activation, masking_value)
+        super().__init__(
+            n_classes, n_layers, d_model, ff_size, h, pred_activation, masking_value
+        )
         self.layers = nn.ModuleList(
             [
                 SpeechTransformerDecLayer(

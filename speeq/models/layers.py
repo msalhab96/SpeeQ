@@ -43,6 +43,10 @@ Layers:
 - ContextNetConvLayer: ContextNet convolution layer.
 - ContextNetResidual: ContextNet residual module.
 - ContextNetBlock: ContextNet block.
+- CausalVGGBlock: Causal VGG Block.
+- TruncatedSelfAttention: Truncated self attention.
+- TransformerEncLayerWithAttTruncation: Transformer Encoder layer with truncated self attention.
+- VGGTransformerPreNet: VGG Transformer prenet.
 """
 from typing import List, Optional, Tuple, Union
 
@@ -51,7 +55,12 @@ import torch.nn as nn
 from torch import Tensor
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 
-from speeq.utils.utils import add_pos_enc, calc_data_len, get_mask_from_lens
+from speeq.utils.utils import (
+    add_pos_enc,
+    calc_data_len,
+    get_mask_from_lens,
+    truncate_attention_mask,
+)
 
 from .activations import Sigmax
 
@@ -2364,3 +2373,290 @@ class ContextNetBlock(nn.Module):
             out = self.residual(x, out)
         out = self.swish(out)
         return out, lengths
+
+
+class CausalVGGBlock(nn.Module):
+    """Implements a causal VGG block consisting of causal 2D convolution layers,
+    as described in the paper https://arxiv.org/pdf/1910.12977.pdf.
+
+
+
+    Args:
+        n_conv (int): Specifies the number of convolution layers.
+
+        in_channels (int): Specifies the number of input channels.
+
+        out_channels (List[int]): A list of integers that specifies the number
+        of channels in each convolution layer
+
+        kernel_sizes (List[int]): A list of integers that specifies the kernel size of each convolution layer.
+
+        pooling_kernel_size (int): Specifies the kernel size of the pooling layer.
+
+    """
+
+    def __init__(
+        self,
+        n_conv: int,
+        in_channels: int,
+        out_channels: List[int],
+        kernel_sizes: List[int],
+        pooling_kernel_size: int,
+    ) -> None:
+        super().__init__()
+        self.conv_layers = nn.ModuleList(
+            [
+                nn.Conv2d(
+                    in_channels=in_channels if i == 0 else out_channels[i - 1],
+                    out_channels=out_channels[i],
+                    kernel_size=kernel_sizes[i],
+                )
+                for i in range(n_conv)
+            ]
+        )
+        self.pooling = nn.MaxPool2d(kernel_size=pooling_kernel_size)
+
+    def _pad(self, x: Tensor, kernel_size: Tuple[int, int]):
+        batch_size, channels, max_len, feat_size = x.shape
+        seq_pad = torch.zeros(batch_size, channels, kernel_size[0] - 1, feat_size).to(
+            x.device
+        )
+        feat_pad = torch.zeros(
+            batch_size, channels, kernel_size[0] - 1 + max_len, kernel_size[1] - 1
+        ).to(x.device)
+        x = torch.cat([seq_pad, x], dim=2)
+        x = torch.cat([feat_pad, x], dim=3)
+        return x
+
+    def forward(self, x: Tensor, lengths: Tensor) -> Tuple[Tensor, Tensor]:
+        """passes the input x of shape [B, C, M, f] to the network.
+
+        Args:
+            x (Tensor): The input tensor if shape [B, C, M, f].
+            lengths (Tensor): The legnths tensor of shape [B].
+
+        Returns:
+            Tuple[Tensor, Tensor]: A tuple where the first is the result of shape
+            [B, C', M', f'] and the updated lengths of shape [B]
+        """
+        for conv_layer in self.conv_layers:
+            kernel_size = conv_layer.kernel_size
+            x = self._pad(x, kernel_size=kernel_size)
+            x = conv_layer(x)
+        x = self.pooling(x)
+        lengths = lengths // self.pooling.kernel_size
+        return x, lengths
+
+
+class TruncatedSelfAttention(MultiHeadAtt):
+    """Builds the truncated self attention module used
+    in https://arxiv.org/abs/1910.12977
+
+    Args:
+
+        d_model (int): The model dimension.
+
+        h (int): The number of attention heads.
+
+        left_size (int): The size of the left window that each time step is
+        allowed to look at.
+
+        right_size (int): The size of the right window that each time step is
+        allowed to look at.
+
+        masking_value (float): The attention masking value.
+    """
+
+    def __init__(
+        self,
+        d_model: int,
+        h: int,
+        left_size: int,
+        right_size: int,
+        masking_value: float = -1e15,
+    ) -> None:
+        super().__init__(d_model=d_model, h=h, masking_value=masking_value)
+        self.left_size = left_size
+        self.right_size = right_size
+
+    def get_looking_ahead_mask(self, mask: Tensor) -> Tensor:
+        truncated_mask = truncate_attention_mask(mask, self.right_size, self.left_size)
+        return truncated_mask
+
+    def _mask(self, att: Tensor, query_mask: Tensor, *args, **kwargs) -> Tensor:
+        query_mask = query_mask.unsqueeze(dim=1)
+        return att.masked_fill(~query_mask, self.masking_value)
+
+    def forward(
+        self,
+        x: Tensor,
+        mask: Union[Tensor, None],
+    ) -> Tensor:
+        """Applies truncated masked multi-head self attention to the input.
+
+        Args:
+
+            x (Tensor): The input tensor of shape [B, M, d].
+
+            mask (Union[Tensor, None]): The mask tensor of the input of shape
+            [B, M] where True indicates that the corresponding input position
+            contains data not padding and therefore should not be masked.
+            If None, the function will act as a normal multi-head self attention.
+
+        Returns:
+
+            Tensor: The attention result tensor of shape [B, M, d].
+
+        """
+        query_mask = None
+        if mask is not None:
+            query_mask = self.get_looking_ahead_mask(mask=mask)
+        return super().forward(
+            key=x, query=x, value=x, key_mask=mask, query_mask=query_mask
+        )
+
+
+class TransformerEncLayerWithAttTruncation(TransformerEncLayer):
+    """Implements a single encoder layer of the transformer
+    with truncated self attention as described in https://arxiv.org/abs/1910.12977
+
+    Args:
+
+        d_model (int): The model dimensionality.
+
+        ff_size (int): The feed forward inner layer dimensionality.
+
+        h (int): The number of heads in the attention mechanism.
+
+        left_size (int): The size of the left window that each time step is
+        allowed to look at.
+
+        right_size (int): The size of the right window that each time step is
+        allowed to look at.
+
+        masking_value (float, optional): The value to use for masking padded
+        elements. Defaults to -1e15.
+    """
+
+    def __init__(
+        self,
+        d_model: int,
+        ff_size: int,
+        h: int,
+        left_size: int,
+        right_size: int,
+        masking_value: int = -1e15,
+    ) -> None:
+        super().__init__(
+            d_model=d_model, ff_size=ff_size, h=h, masking_value=masking_value
+        )
+        self.mhsa = TruncatedSelfAttention(
+            d_model=d_model,
+            h=h,
+            left_size=left_size,
+            right_size=right_size,
+            masking_value=masking_value,
+        )
+
+    def forward(self, x: Tensor, mask: Union[Tensor, None] = None) -> Tensor:
+        """Performs a forward pass of the transformer encoder layer.
+
+        Args:
+
+            x (Tensor): The input tensor of shape [B, M, d].
+
+            mask (Union[Tensor, None], optional): Boolean tensor of the input of shape
+            [B, M] where True indicates that the corresponding key position
+            contains data not padding and therefore should not be masked.
+            If None, the function will act as a normal multi-head attention. Defaults to None.
+
+        Returns:
+            Tensor: Result tensor of the same shape as x.
+        """
+        out = self.mhsa(x=x, mask=mask)
+        out = self.add_and_norm1(x, out)
+        result = self.ff(out)
+        return self.add_and_norm2(out, result)
+
+
+class VGGTransformerPreNet(nn.Module):
+    """Implements the VGGTransformer prenet module as described in
+    https://arxiv.org/abs/1910.12977
+
+    Args:
+
+    in_features (int): The input feature size.
+
+    n_vgg_blocks (int): The number of VGG blocks to use.
+
+    n_layers_per_block (List[int]): A list of integers that specifies the number
+    of convolution layers in each block.
+
+    kernel_sizes_per_block (List[List[int]]): A list of lists that contains the
+    kernel size for each layer in each block. The length of the outer list
+    should match `n_vgg_blocks`, and each inner list should be the same length
+    as the corresponding block's number of layers.
+
+    n_channels_per_block (List[List[int]]): A list of lists that contains the
+    number of channels for each convolution layer in each block. This argument
+    should also have length equal to `n_vgg_blocks`, and each sublist should
+    have length equal to the number of layers in the corresponding block.
+
+    pooling_kernel_size (List[int]): A list of integers that specifies the size
+    of the max pooling layer in each block. The length of this list should be
+    equal to `n_vgg_blocks`.
+
+    d_model (int): The size of the output feature
+
+    """
+
+    def __init__(
+        self,
+        in_features: int,
+        n_vgg_blocks: int,
+        n_layers_per_block: List[int],
+        kernel_sizes_per_block: List[List[int]],
+        n_channels_per_block: List[List[int]],
+        pooling_kernel_size: List[int],
+        d_model: int,
+    ) -> None:
+        super().__init__()
+        self.vgg_blocks = nn.ModuleList(
+            [
+                CausalVGGBlock(
+                    n_conv=n_layers_per_block[i],
+                    in_channels=1 if i == 0 else n_channels_per_block[i - 1][-1],
+                    out_channels=n_channels_per_block[i],
+                    kernel_sizes=kernel_sizes_per_block[i],
+                    pooling_kernel_size=pooling_kernel_size[i],
+                )
+                for i in range(n_vgg_blocks)
+            ]
+        )
+        for i in range(n_vgg_blocks):
+            in_features //= pooling_kernel_size[i]
+        in_features *= n_channels_per_block[-1][-1]
+        self.fc = nn.Linear(in_features=in_features, out_features=d_model)
+
+    def forward(self, x: Tensor, lengths: Tensor) -> Tuple[Tensor, Tensor]:
+        """Passes the input `x` through the VGGTransformer prenet and returns
+        a tuple of tensors.
+
+        Args:
+            x (Tensor): Input tensor of shape [B, M, in_features].
+
+            lengths (Tensor): Lengths of shape [B] that has the length for each
+            sequence in `x`.
+
+        Returns:
+            A tuple of tensors (output, updated_lengths).
+            - output (Tensor): Output tensor of shape [B, M, d_model].
+            - updated_lengths (Tensor): Updated lengths of shape [B].
+        """
+        x = x.unsqueeze(dim=1)  # [B, 1, M, d]
+        for block in self.vgg_blocks:
+            x, lengths = block(x, lengths)
+        x = x.permute(0, 2, 1, 3)
+        x = x.contiguous()
+        x = x.view(*x.shape[:2], -1)
+        return self.fc(x), lengths
