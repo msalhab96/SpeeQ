@@ -242,7 +242,7 @@ def truncate_attention_mask(mask: Tensor, right_size: int, left_size: int) -> Te
     """
     max_len = mask.shape[1]
     window_size = right_size + left_size + 1
-    new_mask = torch.zeros(max_len**2, dtype=torch.bool)
+    new_mask = torch.zeros(max_len**2, dtype=torch.bool).to(mask.device)
     # creating the original positions that will be the center of the window
     centers = torch.arange(0, max_len, device=mask.device)
 
