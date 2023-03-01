@@ -22,7 +22,7 @@ All other templates within the module are Static templates.
 Example on Static templates:
 
 let's assume you want to experiment with Speech transformer model to build its
-template, you can easily do the below, and it's the same for any model architecture.
+template, you can easily do the below, and it is the same for any model's architecture.
 
 .. code-block:: python
 
@@ -82,7 +82,7 @@ template, you can easily do the below.
     )
 
 
-Once you have defined the model structure and architecture using template, it is time to create
+Once you have defined the model structure and architecture using template, it is the time to create
 the model. This can be accomplished by creating a configuration object that
 includes the template and the path of a pre-trained model, if available. You can
 then pass the model configuration object to the `get_model` method found in the
