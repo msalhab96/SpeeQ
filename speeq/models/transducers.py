@@ -112,6 +112,8 @@ class RNNTransducer(_BaseTransducer):
 
         n_layers (int): The number of the RNN layers in the encoder.
 
+        n_dec_layers (int): The number of RNNs in the decoder (predictor).
+
         hidden_size (int): The hidden size of the RNN layers.
 
         bidirectional (bool): A flag indicating if the rnn is bidirectional or not.
@@ -127,6 +129,7 @@ class RNNTransducer(_BaseTransducer):
         n_classes: int,
         emb_dim: int,
         n_layers: int,
+        n_dec_layers: int,
         hidden_size: int,
         bidirectional: bool,
         rnn_type: str,
@@ -146,6 +149,7 @@ class RNNTransducer(_BaseTransducer):
             emb_dim=emb_dim,
             hidden_size=hidden_size,
             rnn_type=rnn_type,
+            n_layers=n_dec_layers,
         )
 
 
@@ -157,6 +161,8 @@ class ConformerTransducer(RNNTransducer):
         d_model (int): The model dimension.
 
         n_conf_layers (int): The number of conformer blocks.
+
+        n_dec_layers (int): The number of RNNs in the decoder (predictor).
 
         ff_expansion_factor (int): The feed-forward expansion factor.
 
@@ -187,6 +193,7 @@ class ConformerTransducer(RNNTransducer):
         self,
         d_model: int,
         n_conf_layers: int,
+        n_dec_layers: int,
         ff_expansion_factor: int,
         h: int,
         kernel_size: int,
@@ -201,7 +208,15 @@ class ConformerTransducer(RNNTransducer):
         p_dropout: float,
     ) -> None:
         super().__init__(
-            in_features, n_classes, emb_dim, 1, d_model, False, rnn_type, p_dropout
+            in_features,
+            n_classes,
+            emb_dim,
+            1,
+            n_dec_layers,
+            d_model,
+            False,
+            rnn_type,
+            p_dropout,
         )
         self.encoder = ConformerEncoder(
             d_model=d_model,
@@ -232,6 +247,8 @@ class ContextNet(_BaseTransducer):
 
         n_layers (int): The number of ContextNet blocks.
 
+        n_dec_layers (int): The number of RNNs in the decoder (predictor).
+
         n_sub_layers (Union[int, List[int]]): The number of convolutional
         layers per block. If list is passed, it has to be of length equal to `n_layers`.
 
@@ -256,6 +273,7 @@ class ContextNet(_BaseTransducer):
         n_classes: int,
         emb_dim: int,
         n_layers: int,
+        n_dec_layers: int,
         n_sub_layers: Union[int, List[int]],
         stride: Union[int, List[int]],
         out_channels: Union[int, List[int]],
@@ -284,6 +302,7 @@ class ContextNet(_BaseTransducer):
             if isinstance(out_channels, list)
             else out_channels,
             rnn_type=rnn_type,
+            n_layers=n_dec_layers,
         )
 
 
@@ -301,6 +320,8 @@ class VGGTransformerTransducer(RNNTransducer):
 
         n_layers (int): The number of transformer encoder layers with truncated
         self attention.
+
+        n_dec_layers (int): The number of RNNs in the decoder (predictor).
 
         rnn_type (str): The RNN type.
 
@@ -347,6 +368,7 @@ class VGGTransformerTransducer(RNNTransducer):
         n_classes: int,
         emb_dim: int,
         n_layers: int,
+        n_dec_layers: int,
         rnn_type: str,
         n_vgg_blocks: int,
         n_conv_layers_per_vgg_block: List[int],
@@ -366,6 +388,7 @@ class VGGTransformerTransducer(RNNTransducer):
             n_classes=n_classes,
             emb_dim=emb_dim,
             n_layers=1,
+            n_dec_layers=n_dec_layers,
             hidden_size=d_model,
             bidirectional=False,
             rnn_type=rnn_type,
