@@ -66,7 +66,6 @@ class _BaseTransducer(nn.Module):
         speech, speech_len = self.encoder(speech, speech_mask)
         text, text_len = self.decoder(text, text_mask)
         result = self._join(encoder_out=speech, deocder_out=text)
-        result = self.join_net(result)
         speech_len, text_len = (
             speech_len.to(speech.device),
             text_len.to(speech.device),
@@ -76,7 +75,9 @@ class _BaseTransducer(nn.Module):
     def _join(self, encoder_out: Tensor, deocder_out: Tensor) -> Tensor:
         encoder_out = encoder_out.unsqueeze(-2)
         deocder_out = deocder_out.unsqueeze(1)
-        return encoder_out + deocder_out
+        result = encoder_out + deocder_out
+        result = self.join_net(result)
+        return result
 
     def predict(self, x: Tensor, mask: Tensor, state: dict) -> dict:
         if ENC_OUT_KEY not in state:
@@ -348,7 +349,10 @@ class VGGTransformerTransducer(RNNTransducer):
 
         ff_size (int): The feed forward inner layer dimensionality.
 
+
         h (int): The number of heads in the attention mechanism.
+
+        joint_size (int): The joint layer feature size (denoted as do in the paper).
 
         left_size (int): The size of the left window that each time step is
         allowed to look at.
@@ -378,6 +382,7 @@ class VGGTransformerTransducer(RNNTransducer):
         d_model: int,
         ff_size: int,
         h: int,
+        joint_size: int,
         left_size: int,
         right_size: int,
         p_dropout: float,
@@ -408,4 +413,9 @@ class VGGTransformerTransducer(RNNTransducer):
             left_size=left_size,
             right_size=right_size,
             masking_value=masking_value,
+        )
+        self.joint_size = nn.Sequential(
+            nn.Linear(in_features=d_model, out_features=joint_size),
+            nn.ReLU(),
+            nn.Linear(in_features=joint_size, out_features=n_classes),
         )
