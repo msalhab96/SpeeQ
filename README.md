@@ -1,8 +1,7 @@
 # SpeeQ
+<p style='text-align: justify;'>"SpeeQ", pronounced as "speekiu", is a Python-based speech recognition framework that allows developers and researchers to experiment and train various speech recognition models. It offers pre-implemented model architectures that can be trained with just a few lines of code, making it a suitable option for quick prototyping and testing of speech recognition models.</p>
 
-"SpeeQ", pronounced as "speekiu", is a Python-based speech recognition framework that allows developers and researchers to experiment and train various speech recognition models. It offers pre-implemented model architectures that can be trained with just a few lines of code, making it a suitable option for quick prototyping and testing of speech recognition models.
-
-# installation
+# Installation
 
 To install this package, you can follow the steps below:
 
@@ -10,11 +9,11 @@ To install this package, you can follow the steps below:
 
 
 ```bash
-python -m venv env
+python3 -m venv env
 source env/bin/activate
 ```
 
-2. Install the packge either from source or from pypi
+2. Install the packge either from source or from PyPI
 
   * from PyPI
   
