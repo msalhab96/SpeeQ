@@ -261,6 +261,5 @@ def truncate_attention_mask(mask: Tensor, right_size: int, left_size: int) -> Te
 
     # setting the indices to True
     new_mask = new_mask.index_put((indices,), torch.tensor(True)).view(max_len, max_len)
-
     # merging the original tensor with the new one
-    return mask.unsqueeze(dim=1) & new_mask.unsqueeze(dim=0)
+    return mask.unsqueeze(dim=1) & new_mask.unsqueeze(dim=0) & mask.unsqueeze(dim=-1)

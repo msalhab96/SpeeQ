@@ -2477,7 +2477,7 @@ class TruncatedSelfAttention(MultiHeadAtt):
 
     def get_looking_ahead_mask(self, mask: Tensor) -> Tensor:
         truncated_mask = truncate_attention_mask(mask, self.right_size, self.left_size)
-        return truncated_mask & mask.unsqueeze(dim=-1)
+        return truncated_mask
 
     def _mask(self, att: Tensor, query_mask: Tensor, *args, **kwargs) -> Tensor:
         query_mask = query_mask.unsqueeze(dim=1)
