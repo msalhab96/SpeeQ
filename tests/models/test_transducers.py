@@ -972,7 +972,6 @@ class TestVGGTransformerTransducer(BaseTransducerTest):
 class TestTransformerTransducer(BaseTransducerTest):
     model = transducers.TransformerTransducer
 
-    # @pytest.mark.filterwarnings(IGNORE_USERWARNING)
     @pytest.mark.parametrize(
         (
             "model_args",
