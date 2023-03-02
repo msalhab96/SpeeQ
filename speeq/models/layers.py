@@ -2660,3 +2660,63 @@ class VGGTransformerPreNet(nn.Module):
         x = x.contiguous()
         x = x.view(*x.shape[:2], -1)
         return self.fc(x), lengths
+
+
+class TruncatedRelativeMHSA(TruncatedSelfAttention):
+    """Builds the truncated self attention with relative positional encoding
+    module proposed in https://arxiv.org/abs/2002.02562
+
+    Args:
+
+        d_model (int): The model dimension.
+
+        h (int): The number of attention heads.
+
+        left_size (int): The size of the left window that each time step is
+        allowed to look at.
+
+        right_size (int): The size of the right window that each time step is
+        allowed to look at.
+
+        masking_value (float): The attention masking value.
+    """
+
+    def __init__(
+        self,
+        d_model: int,
+        h: int,
+        left_size: int,
+        right_size: int,
+        masking_value: float = -1e15,
+    ) -> None:
+        super().__init__(
+            d_model=d_model,
+            h=h,
+            left_size=left_size,
+            right_size=right_size,
+            masking_value=masking_value,
+        )
+
+    def forward(
+        self,
+        x: Tensor,
+        mask: Union[Tensor, None],
+    ) -> Tensor:
+        """Applies truncated masked rekative multi-head self attention to the input.
+
+        Args:
+
+            x (Tensor): The input tensor of shape [B, M, d].
+
+            mask (Union[Tensor, None]): The mask tensor of the input of shape
+            [B, M] where True indicates that the corresponding input position
+            contains data not padding and therefore should not be masked.
+            If None, the function will act as a normal multi-head self attention.
+
+        Returns:
+
+            Tensor: The attention result tensor of shape [B, M, d].
+
+        """
+        x = add_pos_enc(x)
+        return super().forward(x=x, mask=mask)
