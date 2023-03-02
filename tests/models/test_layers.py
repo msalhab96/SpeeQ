@@ -1928,3 +1928,93 @@ class TestVGGTransformerPreNet:
         assert result.shape == expected_shape
         assert torch.all(lengths == expected_lengths)
         check_grad(result=result, model=model)
+
+
+class TestTruncatedRelativeMHSA:
+    @pytest.mark.parametrize(
+        (
+            "d_model",
+            "h",
+            "left_size",
+            "right_size",
+            "pad_lens",
+            "seq_len",
+            "expected_shape",
+        ),
+        (
+            (16, 4, 2, 3, [1, 0, 3], 6, (3, 6, 16)),
+            (16, 4, 0, 3, [1, 0, 3], 6, (3, 6, 16)),
+            (16, 4, 3, 0, [1, 0, 3], 6, (3, 6, 16)),
+        ),
+    )
+    def test_forward(
+        self,
+        batcher,
+        d_model,
+        h,
+        left_size,
+        right_size,
+        pad_lens,
+        seq_len,
+        expected_shape,
+    ):
+        batch_size = len(pad_lens)
+        input = batcher(batch_size, seq_len, d_model)
+        model = layers.TruncatedRelativeMHSA(
+            d_model=d_model,
+            h=h,
+            left_size=left_size,
+            right_size=right_size,
+        )
+        mask = get_mask(seq_len=seq_len, pad_lens=pad_lens)
+        result = model(input, mask)
+        assert result.shape == expected_shape
+        check_grad(result=result, model=model)
+
+
+class TestTransformerTransducerLayer:
+    @pytest.mark.parametrize(
+        (
+            "d_model",
+            "ff_size",
+            "h",
+            "left_size",
+            "right_size",
+            "p_dropout",
+            "pad_lens",
+            "seq_len",
+            "expected_shape",
+        ),
+        (
+            (16, 12, 4, 2, 3, 0.1, [1, 0, 3], 6, (3, 6, 16)),
+            (16, 12, 4, 0, 3, 0.1, [1, 0, 3], 6, (3, 6, 16)),
+            (16, 12, 4, 3, 0, 0.1, [1, 0, 3], 6, (3, 6, 16)),
+        ),
+    )
+    def test_forward(
+        self,
+        batcher,
+        d_model,
+        ff_size,
+        h,
+        left_size,
+        right_size,
+        p_dropout,
+        pad_lens,
+        seq_len,
+        expected_shape,
+    ):
+        batch_size = len(pad_lens)
+        input = batcher(batch_size, seq_len, d_model)
+        model = layers.TransformerTransducerLayer(
+            d_model=d_model,
+            ff_size=ff_size,
+            h=h,
+            left_size=left_size,
+            right_size=right_size,
+            p_dropout=p_dropout,
+        )
+        mask = get_mask(seq_len=seq_len, pad_lens=pad_lens)
+        result = model(input, mask)
+        assert result.shape == expected_shape
+        check_grad(result=result, model=model)
