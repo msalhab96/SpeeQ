@@ -2723,3 +2723,75 @@ class TruncatedRelativeMHSA(TruncatedSelfAttention):
         """
         x = add_pos_enc(x)
         return super().forward(x=x, mask=mask)
+
+
+class TransformerTransducerLayer(nn.Module):
+    """Implements a single encoder layer of the transformer transducer
+    with truncated relative self attention as described in https://arxiv.org/abs/2002.02562
+
+    Args:
+
+        d_model (int): The model dimensionality.
+
+        ff_size (int): The feed forward inner layer dimensionality.
+
+        h (int): The number of heads in the attention mechanism.
+
+        left_size (int): The size of the left window that each time step is
+        allowed to look at.
+
+        right_size (int): The size of the right window that each time step is
+        allowed to look at.
+
+        p_dropout (float): The dropout rate.
+
+        masking_value (float, optional): The value to use for masking padded
+        elements. Defaults to -1e15.
+    """
+
+    def __init__(
+        self,
+        d_model: int,
+        ff_size: int,
+        h: int,
+        left_size: int,
+        right_size: int,
+        p_dropout: float,
+        masking_value: int = -1e15,
+    ) -> None:
+        super().__init__(d_model, ff_size, h, masking_value)
+        self.mhsa = TruncatedRelativeMHSA(
+            d_model=d_model,
+            h=h,
+            left_size=left_size,
+            right_size=right_size,
+            masking_value=masking_value,
+        )
+        self.add_and_norm = AddAndNorm(d_model=d_model)
+        self.ff = FeedForwardModule(
+            d_model=d_model, ff_size=ff_size, p_dropout=p_dropout
+        )
+        self.dropout = nn.Dropout(p_dropout)
+        self.lnorm = nn.LayerNorm(normalized_shape=d_model)
+
+    def forward(self, x: Tensor, mask: Union[Tensor, None] = None) -> Tensor:
+        """Performs a forward pass of the transformer-transducer encoder layer.
+
+        Args:
+
+            x (Tensor): The input tensor of shape [B, M, d].
+
+            mask (Union[Tensor, None], optional): Boolean tensor of the input of shape
+            [B, M] where True indicates that the corresponding key position
+            contains data not padding and therefore should not be masked.
+            If None, the function will act as a normal multi-head attention. Defaults to None.
+
+        Returns:
+            Tensor: Result tensor of the same shape as x.
+        """
+        x = self.lnorm(x)
+        out = self.mhsa(x, mask)
+        out = self.add_and_norm(x, out)
+        out = out + self.ff(out)
+        out = self.dropout(out)
+        return out
