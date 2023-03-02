@@ -47,6 +47,8 @@ Layers:
 - TruncatedSelfAttention: Truncated self attention.
 - TransformerEncLayerWithAttTruncation: Transformer Encoder layer with truncated self attention.
 - VGGTransformerPreNet: VGG Transformer prenet.
+- TruncatedRelativeMHSA: Truncated relative multi-head self attention.
+- TransformerTransducerLayer: Transfirmer transducer layer with Truncated relative multi-head self attention.
 """
 from typing import List, Optional, Tuple, Union
 
