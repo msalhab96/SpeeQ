@@ -917,3 +917,69 @@ class VGGTransformerTransducerTemp(BaseTemplate):
     masking_value: int = -1e15
     _name = "vgg_transformer"
     _type = TRANSDUCER_TYPE
+
+
+@dataclass
+class TransformerTransducerTemp(BaseTemplate):
+    """Transformer-Transducer model template
+    https://arxiv.org/abs/2002.02562
+
+    Args:
+
+        in_features (int): The input feature size.
+
+        emb_dim (int): The embedding layer's size.
+
+        n_layers (int): The number of transformer encoder layers with truncated
+        self attention.
+
+        n_dec_layers (int): The number of layers in the decoder (predictor).
+
+        d_model (int): The model dimensionality.
+
+        ff_size (int): The feed forward inner layer dimensionality.
+
+        h (int): The number of heads in the attention mechanism.
+
+        joint_size (int): The joint layer feature size.
+
+        enc_left_size (int): The size of the left window that each time step is
+        allowed to look at in the encoder.
+
+        enc_right_size (int): The size of the right window that each time step is
+        allowed to look at in the encoder.
+
+        dec_left_size (int): The size of the left window that each time step is
+        allowed to look at in the decoder.
+
+        dec_right_size (int): The size of the right window that each time step is
+        allowed to look at in the decoder.
+
+        p_dropout (float): The dropout rate.
+
+        stride (int): The stride of the convolution layer in the prenet. Default 1.
+
+        kernel_size (int): The kernel size of the convolution layer in the prenet. Default 1.
+
+        masking_value (float, optional): The value to use for masking padded
+        elements. Defaults to -1e15.
+    """
+
+    in_features: int
+    emb_dim: int
+    n_layers: int
+    n_dec_layers: int
+    d_model: int
+    ff_size: int
+    h: int
+    joint_size: int
+    enc_left_size: int
+    enc_right_size: int
+    dec_left_size: int
+    dec_right_size: int
+    p_dropout: float
+    stride: int = 1
+    kernel_size: int = 1
+    masking_value: int = -1e15
+    _name = "transformer_transducer"
+    _type = TRANSDUCER_TYPE
