@@ -1475,7 +1475,7 @@ class TransformerTransducerEncoder(nn.Module):
             pad_len=x.shape[1] - lengths,
             data_len=lengths,
             kernel_size=self.pre_net.kernel_size[0],
-            stride=self.stride,
+            stride=self.pre_net.stride[0],
         )
         mask = get_mask_from_lens(lengths=lengths, max_len=out.shape[1])
         for layer in self.enc_layers:
