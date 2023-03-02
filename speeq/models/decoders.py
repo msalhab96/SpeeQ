@@ -627,8 +627,6 @@ class TransformerTransducerDecoder(nn.Module):
 
         vocab_size (int): The vocabulary size.
 
-        emb_dim (int): The embedding dimension.
-
         n_layers (int): The number of transformer encoder layers with truncated
         self attention and relative positional encoding.
 
@@ -653,7 +651,6 @@ class TransformerTransducerDecoder(nn.Module):
     def __init__(
         self,
         vocab_size: int,
-        emb_dim: int,
         n_layers: int,
         d_model: int,
         ff_size: int,
@@ -664,7 +661,7 @@ class TransformerTransducerDecoder(nn.Module):
         masking_value: int = -1e15,
     ) -> None:
         super().__init__()
-        self.emb = nn.Embedding(num_embeddings=vocab_size, embedding_dim=emb_dim)
+        self.emb = nn.Embedding(num_embeddings=vocab_size, embedding_dim=d_model)
         self.enc_layers = nn.ModuleList(
             [
                 TransformerTransducerLayer(
@@ -697,6 +694,7 @@ class TransformerTransducerDecoder(nn.Module):
         """
         lengths = mask.sum(dim=-1)
         out = self.emb(x)
+
         for layer in self.enc_layers:
             out = layer(out, mask)
         return out, lengths

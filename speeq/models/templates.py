@@ -929,8 +929,6 @@ class TransformerTransducerTemp(BaseTemplate):
 
         in_features (int): The input feature size.
 
-        emb_dim (int): The embedding layer's size.
-
         n_layers (int): The number of transformer encoder layers with truncated
         self attention.
 
@@ -967,7 +965,6 @@ class TransformerTransducerTemp(BaseTemplate):
     """
 
     in_features: int
-    emb_dim: int
     n_layers: int
     n_dec_layers: int
     d_model: int

@@ -432,8 +432,6 @@ class TransformerTransducer(nn.Module):
 
         n_classes (int): The number of classes/vocabulary.
 
-        emb_dim (int): The embedding layer's size.
-
         n_layers (int): The number of transformer encoder layers with truncated
         self attention.
 
@@ -473,7 +471,6 @@ class TransformerTransducer(nn.Module):
         self,
         in_features: int,
         n_classes: int,
-        emb_dim: int,
         n_layers: int,
         n_dec_layers: int,
         d_model: int,
@@ -505,7 +502,6 @@ class TransformerTransducer(nn.Module):
         )
         self.decoder = TransformerTransducerDecoder(
             vocab_size=n_classes,
-            emb_dim=emb_dim,
             n_layers=n_dec_layers,
             d_model=d_model,
             ff_size=ff_size,
