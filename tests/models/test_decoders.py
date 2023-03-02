@@ -389,3 +389,75 @@ class TestSpeechTransformerDecoder:
         check_grad(result=result, model=model)
         assert result.shape == expected_shape
         assert torch.allclose(result.sum(dim=-1), torch.ones_like(target).float())
+
+
+class TestTransformerTransducerDecoder:
+    @pytest.mark.parametrize(
+        (
+            "vocab_size",
+            "n_layers",
+            "d_model",
+            "ff_size",
+            "h",
+            "left_size",
+            "right_size",
+            "p_dropout",
+            "batch_size",
+            "seq_len",
+            "pad_lens",
+            "expected_shape",
+        ),
+        (
+            (7, 2, 16, 4, 2, 3, 5, 0.1, 3, 6, [0, 1, 0], (3, 6, 16)),
+            (
+                7,
+                2,
+                16,
+                4,
+                2,
+                3,
+                5,
+                0.1,
+                1,
+                6,
+                [
+                    0,
+                ],
+                (1, 6, 16),
+            ),
+            (7, 2, 16, 4, 2, 1, 1, 0.1, 3, 6, [0, 1, 0], (3, 6, 16)),
+        ),
+    )
+    def test_forward(
+        self,
+        int_batcher,
+        vocab_size,
+        n_layers,
+        d_model,
+        ff_size,
+        h,
+        left_size,
+        right_size,
+        p_dropout,
+        batch_size,
+        seq_len,
+        pad_lens,
+        expected_shape,
+    ):
+        input = int_batcher(batch_size, seq_len, vocab_size)
+        print(input.shape)
+        model = decoders.TransformerTransducerDecoder(
+            vocab_size=vocab_size,
+            n_layers=n_layers,
+            d_model=d_model,
+            ff_size=ff_size,
+            h=h,
+            left_size=left_size,
+            right_size=right_size,
+            p_dropout=p_dropout,
+        )
+        mask = get_mask(seq_len, pad_lens)
+        result, _ = model(input, mask)
+        print(result.shape)
+        check_grad(result=result, model=model)
+        assert result.shape == expected_shape

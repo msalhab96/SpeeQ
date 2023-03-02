@@ -22,6 +22,7 @@ from .transducers import (
     ConformerTransducer,
     ContextNet,
     RNNTransducer,
+    TransformerTransducer,
     VGGTransformerTransducer,
 )
 
@@ -52,6 +53,7 @@ TRANSDUCER_MODELS = {
     "conformer": ConformerTransducer,
     "context_net": ContextNet,
     "vgg_transformer": VGGTransformerTransducer,
+    "transformer_transducer": TransformerTransducer,
 }
 
 MODELS_BUILDER = {

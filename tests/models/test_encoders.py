@@ -1257,3 +1257,173 @@ class TestContextNetEncoder(BaseTest):
             expected_shape,
             expected_lens,
         )
+
+
+class TestVGGTransformerEncoder(BaseTest):
+    model = encoders.VGGTransformerEncoder
+    test_cases = (
+        (
+            {
+                "in_features": 8,
+                "n_layers": 2,
+                "n_vgg_blocks": 1,
+                "n_conv_layers_per_vgg_block": [
+                    2,
+                ],
+                "kernel_sizes_per_vgg_block": [[4, 8]],
+                "n_channels_per_vgg_block": [[8, 4]],
+                "vgg_pooling_kernel_size": [
+                    1,
+                ],
+                "d_model": 16,
+                "ff_size": 8,
+                "h": 2,
+                "left_size": 2,
+                "right_size": 2,
+            },
+            3,
+            10,
+            8,
+            [0, 6, 3],
+            (3, 10, 16),
+            torch.LongTensor([10, 4, 7]),
+        ),
+        (
+            {
+                "in_features": 8,
+                "n_layers": 2,
+                "n_vgg_blocks": 1,
+                "n_conv_layers_per_vgg_block": [
+                    2,
+                ],
+                "kernel_sizes_per_vgg_block": [[4, 8]],
+                "n_channels_per_vgg_block": [[8, 4]],
+                "vgg_pooling_kernel_size": [
+                    2,
+                ],
+                "d_model": 16,
+                "ff_size": 8,
+                "h": 2,
+                "left_size": 2,
+                "right_size": 2,
+            },
+            3,
+            10,
+            8,
+            [0, 6, 3],
+            (3, 5, 16),
+            torch.LongTensor([5, 2, 3]),
+        ),
+    )
+
+    @encoder_paramterizer(test_cases=test_cases)
+    def test_forward(
+        self,
+        batcher,
+        model_args,
+        batch_size,
+        seq_len,
+        feat_size,
+        pad_lens,
+        expected_shape,
+        expected_lens,
+    ):
+        self.check(
+            batcher,
+            model_args,
+            batch_size,
+            seq_len,
+            feat_size,
+            pad_lens,
+            expected_shape,
+            expected_lens,
+        )
+
+
+class TestTransformerTransducerEncoder(BaseTest):
+    model = encoders.TransformerTransducerEncoder
+    test_cases = (
+        (
+            {
+                "in_features": 8,
+                "n_layers": 2,
+                "d_model": 16,
+                "ff_size": 8,
+                "h": 2,
+                "left_size": 2,
+                "right_size": 2,
+                "p_dropout": 0.05,
+                "stride": 1,
+                "kernel_size": 1,
+            },
+            3,
+            10,
+            8,
+            [0, 6, 3],
+            (3, 10, 16),
+            torch.LongTensor([10, 4, 7]),
+        ),
+        (
+            {
+                "in_features": 8,
+                "n_layers": 2,
+                "d_model": 16,
+                "ff_size": 8,
+                "h": 2,
+                "left_size": 2,
+                "right_size": 2,
+                "p_dropout": 0.05,
+                "stride": 2,
+                "kernel_size": 1,
+            },
+            3,
+            10,
+            8,
+            [0, 6, 3],
+            (3, 5, 16),
+            torch.LongTensor([5, 2, 4]),
+        ),
+        (
+            {
+                "in_features": 8,
+                "n_layers": 2,
+                "d_model": 16,
+                "ff_size": 8,
+                "h": 2,
+                "left_size": 2,
+                "right_size": 2,
+                "p_dropout": 0.05,
+                "stride": 2,
+                "kernel_size": 2,
+            },
+            3,
+            10,
+            8,
+            [0, 6, 3],
+            (3, 5, 16),
+            torch.LongTensor([5, 2, 4]),
+        ),
+    )
+
+    @encoder_paramterizer(test_cases=test_cases)
+    def test_forward(
+        self,
+        batcher,
+        model_args,
+        batch_size,
+        seq_len,
+        feat_size,
+        pad_lens,
+        expected_shape,
+        expected_lens,
+    ):
+        self.check(
+            batcher,
+            model_args,
+            batch_size,
+            seq_len,
+            feat_size,
+            pad_lens,
+            expected_shape,
+            expected_lens,
+        )

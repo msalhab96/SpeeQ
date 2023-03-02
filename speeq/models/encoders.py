@@ -13,6 +13,8 @@ The available encoders are:
 - RNNEncoder: The encoder implementation of a general RNN model.
 - PyramidRNNEncoder: The encoder implementation of the Pyramid RNN model.
 - ContextNetEncoder: The encoder implementation of the ContextNet model.
+- VGGTransformerEncoder: The encoder implementation of the VGG-Transformer.
+- TransformerTransducerEncoder: The encoder implementation of the transformer transducer with relative truncated multi-head self-attention.
 
 Each encoder takes a speech input of shape [B, M, d], and the lengths if
 shape [B], where B is the batch size, M is the length of
@@ -39,6 +41,7 @@ from .layers import (
     SqueezeformerBlock,
     TransformerEncLayer,
     TransformerEncLayerWithAttTruncation,
+    TransformerTransducerLayer,
     VGGTransformerPreNet,
 )
 
@@ -1375,6 +1378,107 @@ class VGGTransformerEncoder(nn.Module):
         """
         lengths = mask.sum(dim=-1)
         out, lengths = self.pre_net(x, lengths)
+        mask = get_mask_from_lens(lengths=lengths, max_len=out.shape[1])
+        for layer in self.enc_layers:
+            out = layer(out, mask)
+        return out, lengths
+
+
+class TransformerTransducerEncoder(nn.Module):
+    """Implements the Transformer-Transducer encoder with relative truncated
+    multi-head self attention as described in https://arxiv.org/abs/2002.02562
+
+    Args:
+
+        in_features (int): The input feature size.
+
+        n_layers (int): The number of transformer encoder layers with truncated
+        self attention and relative positional encoding.
+
+        d_model (int): The model dimensionality.
+
+        ff_size (int): The feed forward inner layer dimensionality.
+
+        h (int): The number of heads in the attention mechanism.
+
+        left_size (int): The size of the left window that each time step is
+        allowed to look at.
+
+        right_size (int): The size of the right window that each time step is
+        allowed to look at.
+
+        p_dropout (float): The dropout rate.
+
+        stride (int): The stride of the convolution layer. Default 1.
+
+        kernel_size (int): The kernel size of the convolution layer. Default 1.
+
+        masking_value (float, optional): The value to use for masking padded
+        elements. Defaults to -1e15.
+    """
+
+    def __init__(
+        self,
+        in_features: int,
+        n_layers: int,
+        d_model: int,
+        ff_size: int,
+        h: int,
+        left_size: int,
+        right_size: int,
+        p_dropout: float,
+        stride: int = 1,
+        kernel_size: int = 1,
+        masking_value: int = -1e15,
+    ) -> None:
+        super().__init__()
+        self.pre_net = nn.Conv1d(
+            in_channels=in_features,
+            out_channels=d_model,
+            kernel_size=kernel_size,
+            stride=stride,
+        )
+        self.enc_layers = nn.ModuleList(
+            [
+                TransformerTransducerLayer(
+                    d_model=d_model,
+                    ff_size=ff_size,
+                    h=h,
+                    left_size=left_size,
+                    right_size=right_size,
+                    p_dropout=p_dropout,
+                    masking_value=masking_value,
+                )
+                for _ in range(n_layers)
+            ]
+        )
+
+    def forward(self, x: Tensor, mask: Tensor) -> Tuple[Tensor, Tensor]:
+        """Passes the input `x` through the encoder layers.
+
+        Args:
+
+            x (Tensor): The input speech tensor of shape [B, M, d]
+
+            mask (Tensor): The input boolean mask of shape [B, M], where it's True
+            if there is no padding.
+
+        Returns:
+
+            Tuple[Tensor, Tensor]: A tuple where the first element is the encoded speech of shape
+            [B, M, F] and the second element is the lengths of shape [B].
+        """
+        lengths = mask.sum(dim=-1)
+        out = x.transpose(-1, -2)
+        out = self.pre_net(out)
+        out = out.transpose(-1, -2)
+        lengths = calc_data_len(
+            result_len=out.shape[1],
+            pad_len=x.shape[1] - lengths,
+            data_len=lengths,
+            kernel_size=self.pre_net.kernel_size[0],
+            stride=self.pre_net.stride[0],
+        )
         mask = get_mask_from_lens(lengths=lengths, max_len=out.shape[1])
         for layer in self.enc_layers:
             out = layer(out, mask)
