@@ -2759,7 +2759,7 @@ class TransformerTransducerLayer(nn.Module):
         p_dropout: float,
         masking_value: int = -1e15,
     ) -> None:
-        super().__init__(d_model, ff_size, h, masking_value)
+        super().__init__()
         self.mhsa = TruncatedRelativeMHSA(
             d_model=d_model,
             h=h,
