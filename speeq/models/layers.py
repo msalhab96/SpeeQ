@@ -249,11 +249,12 @@ class FeedForwardModule(nn.Module):
         ff_size (int): The dimensionality of the inner layer.
     """
 
-    def __init__(self, d_model: int, ff_size: int) -> None:
+    def __init__(self, d_model: int, ff_size: int, p_dropout: float = 0.0) -> None:
         super().__init__()
         self.fc1 = nn.Linear(in_features=d_model, out_features=ff_size)
         self.relu = nn.ReLU()
         self.fc2 = nn.Linear(in_features=ff_size, out_features=d_model)
+        self.dropout = nn.Dropout(p_dropout)
 
     def forward(self, x: Tensor) -> Tensor:
         """Passes the input to the layer
@@ -267,7 +268,9 @@ class FeedForwardModule(nn.Module):
         """
         out = self.fc1(x)
         out = self.relu(out)
+        out = self.dropout(out)
         out = self.fc2(out)
+        out = self.dropout(out)
         return out
 
 
