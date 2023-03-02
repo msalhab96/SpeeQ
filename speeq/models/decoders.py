@@ -6,7 +6,7 @@ Classes:
 - LocationAwareAttDecoder: Implements a RNN decoder with location aware attention mechanism.
 - TransducerRNNDecoder: Implements a simple RNN decoder with an embedding layer and a single RNN layer.
 - TransformerDecoder: Implements a transformer decoder.
-
+- TransformerTransducerDecoder: Implements a Transformer-Transducer decoder.
 """
 from typing import Tuple, Union
 

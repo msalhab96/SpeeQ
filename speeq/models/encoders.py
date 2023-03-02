@@ -13,6 +13,8 @@ The available encoders are:
 - RNNEncoder: The encoder implementation of a general RNN model.
 - PyramidRNNEncoder: The encoder implementation of the Pyramid RNN model.
 - ContextNetEncoder: The encoder implementation of the ContextNet model.
+- VGGTransformerEncoder: The encoder implementation of the VGG-Transformer.
+- TransformerTransducerEncoder: The encoder implementation of the transformer transducer with relative truncated multi-head self-attention.
 
 Each encoder takes a speech input of shape [B, M, d], and the lengths if
 shape [B], where B is the batch size, M is the length of
