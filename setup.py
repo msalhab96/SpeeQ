@@ -15,4 +15,5 @@ setup(
     license="LICENSE",
     packages=["speeq"],
     setup_requires=["wheel"],
+    python_requires=">=3.7",
 )
