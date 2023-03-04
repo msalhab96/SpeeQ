@@ -381,6 +381,7 @@ class TestConv1DLayers:
             "lengths",
             "expected_len",
             "expected_shape",
+            "activation",
         ),
         (
             (
@@ -395,6 +396,7 @@ class TestConv1DLayers:
                 torch.LongTensor([10, 8, 5]),
                 torch.LongTensor([7, 7, 5]),
                 (3, 7, 16),
+                torch.nn.ReLU(),
             ),
             (
                 12,
@@ -408,6 +410,35 @@ class TestConv1DLayers:
                 torch.LongTensor([10, 8, 5]),
                 torch.LongTensor([4, 4, 4]),
                 (3, 4, 16),
+                torch.nn.ReLU(),
+            ),
+            (
+                12,
+                16,
+                2,
+                1,
+                3,
+                0.0,
+                3,
+                10,
+                torch.LongTensor([10, 8, 5]),
+                torch.LongTensor([7, 7, 5]),
+                (3, 7, 16),
+                None,
+            ),
+            (
+                12,
+                16,
+                3,
+                1,
+                3,
+                0.0,
+                3,
+                10,
+                torch.LongTensor([10, 8, 5]),
+                torch.LongTensor([4, 4, 4]),
+                (3, 4, 16),
+                None,
             ),
             (
                 12,
@@ -421,6 +452,7 @@ class TestConv1DLayers:
                 torch.LongTensor([10, 8, 5]),
                 torch.LongTensor([7, 7, 5]),
                 (3, 7, 16),
+                None,
             ),
             (
                 12,
@@ -434,6 +466,7 @@ class TestConv1DLayers:
                 torch.LongTensor([10, 8, 5]),
                 torch.LongTensor([7, 7, 5]),
                 (3, 7, 16),
+                None,
             ),
             (
                 12,
@@ -447,6 +480,7 @@ class TestConv1DLayers:
                 torch.LongTensor([10, 8, 5]),
                 torch.LongTensor([7, 7, 5]),
                 (3, 7, 16),
+                None,
             ),
             (
                 12,
@@ -460,6 +494,7 @@ class TestConv1DLayers:
                 torch.LongTensor([10, 8, 5]),
                 torch.LongTensor([5, 4, 3]),
                 (3, 5, 16),
+                None,
             ),
         ),
     )
@@ -477,6 +512,7 @@ class TestConv1DLayers:
         lengths,
         expected_len,
         expected_shape,
+        activation,
     ):
         """Tests the returned shape and the gradients of the model's forward"""
         batch = batcher(batch_size, seq_len, in_size)
@@ -487,6 +523,7 @@ class TestConv1DLayers:
             stride=stride,
             n_layers=n_layers,
             p_dropout=p_dropout,
+            activation=activation,
         )
         result, lengths = model(batch, lengths)
         print(lengths.dtype)
