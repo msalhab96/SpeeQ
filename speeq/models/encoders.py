@@ -185,6 +185,7 @@ class DeepSpeechV2Encoder(nn.Module):
             stride=stride,
             n_layers=n_conv,
             p_dropout=p_dropout,
+            activation=CReLu(max_val=max_clip_value),
         )
         from .registry import PACKED_RNN_REGISTRY
 

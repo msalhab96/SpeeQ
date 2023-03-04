@@ -622,6 +622,10 @@ class Conv1DLayers(nn.Module):
         groups (Union[List[int], int]): The groups size of the conv layers, if
         a list is passed it has to be of length equal to n_layers. Default 1.
 
+        activation (Module, optional): An optional instance of an activation
+        function would be executed on the output of each activation convolution
+        layer. Default None.
+
     """
 
     def __init__(
@@ -633,6 +637,7 @@ class Conv1DLayers(nn.Module):
         n_layers: int,
         p_dropout: float,
         groups: Union[List[int], int] = 1,
+        activation: Optional[nn.Module] = None,
     ) -> None:
         super().__init__()
         self.layers = nn.ModuleList()
@@ -659,15 +664,29 @@ class Conv1DLayers(nn.Module):
             if isinstance(groups, list):
                 _groups = groups[i]
 
-            self.layers.append(
-                nn.Conv1d(
-                    in_channels=in_channels,
-                    out_channels=out_channels,
-                    kernel_size=_kernel_size,
-                    stride=_stride,
-                    groups=_groups,
+            if activation is not None:
+                self.layers.append(
+                    nn.Sequential(
+                        nn.Conv1d(
+                            in_channels=in_channels,
+                            out_channels=out_channels,
+                            kernel_size=_kernel_size,
+                            stride=_stride,
+                            groups=_groups,
+                        ),
+                        activation,
+                    )
                 )
-            )
+            else:
+                self.layers.append(
+                    nn.Conv1d(
+                        in_channels=in_channels,
+                        out_channels=out_channels,
+                        kernel_size=_kernel_size,
+                        stride=_stride,
+                        groups=_groups,
+                    )
+                )
         self.dropout = nn.Dropout(p_dropout)
 
     def forward(self, x: Tensor, data_len: Tensor) -> Tuple[Tensor, Tensor]:
