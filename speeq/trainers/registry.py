@@ -150,8 +150,11 @@ def _get_asr_trainer_args(
         **trainer_config.criterion_args
     )
     if os.path.exists(model_config.model_path):
+        ignore = trainer_config.ignore_optim_state
         *_, history = set_state_dict(
-            model=model, optimizer=optimizer, state_path=model_config.model_path
+            model=model,
+            optimizer=optimizer if ignore is False else None,
+            state_path=model_config.model_path,
         )
     else:
         history = {}

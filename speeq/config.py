@@ -40,6 +40,10 @@ class TrainerConfig:
 
         optim_args (dict): The optimizer arguments.
 
+        ignore_optim_state (bool): If True, the state of the optimizer that is
+        loaded when a pre-trained checkpoint is passed will be ignored. otherwise,
+        the optimizer/scheduler that is passed will be used. Default False.
+
         scheduler_template (Union[IScheduler, None]): The scheduler template to be used.
         Default None.
 
@@ -70,6 +74,7 @@ class TrainerConfig:
     criterion: str
     optimizer: str
     optim_args: dict
+    ignore_optim_state = False
     scheduler_template: Union[ITemplate, None] = None
     dist_config: Union[object, None] = None
     device: str = "cuda"
