@@ -3,7 +3,7 @@ import os
 import platform
 from csv import DictReader
 from pathlib import Path
-from typing import List, Union
+from typing import List, Optional, Union
 
 import torch
 from torch import Tensor
@@ -97,12 +97,15 @@ def load_state_dict(state_path: Union[str, Path]) -> tuple:
     return model, optimizer, steps, history
 
 
-def set_state_dict(model, optimizer, state_path):
+def set_state_dict(
+    model: Module, state_path: Union[Path, str], optimizer: Optional[Optimizer] = None
+):
     model_state, optimizer_state, steps, history = load_state_dict(
         state_path=state_path
     )
     model.load_state_dict(model_state)
-    optimizer.load_state_dict(optimizer_state)
+    if optimizer is not None:
+        optimizer.load_state_dict(optimizer_state)
     return steps, history
 
 
