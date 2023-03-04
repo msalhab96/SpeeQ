@@ -679,12 +679,14 @@ class Conv1DLayers(nn.Module):
                 )
             else:
                 self.layers.append(
-                    nn.Conv1d(
-                        in_channels=in_channels,
-                        out_channels=out_channels,
-                        kernel_size=_kernel_size,
-                        stride=_stride,
-                        groups=_groups,
+                    nn.Sequential(
+                        nn.Conv1d(
+                            in_channels=in_channels,
+                            out_channels=out_channels,
+                            kernel_size=_kernel_size,
+                            stride=_stride,
+                            groups=_groups,
+                        )
                     )
                 )
         self.dropout = nn.Dropout(p_dropout)
@@ -717,8 +719,8 @@ class Conv1DLayers(nn.Module):
                 result_len=result_len,
                 pad_len=pad_len,
                 data_len=data_len,
-                kernel_size=layer.kernel_size[0],
-                stride=layer.stride[0],
+                kernel_size=layer[0].kernel_size[0],
+                stride=layer[0].stride[0],
             )
             pad_len = result_len - data_len
         out = out.transpose(1, 2)
