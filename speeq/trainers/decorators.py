@@ -1,4 +1,5 @@
 from functools import wraps
+import os
 from typing import Callable
 
 from speeq.utils.utils import get_key_tag, save_state_dict
@@ -40,6 +41,8 @@ def export_ckpt(key: str, category: str) -> Callable:
             if trainer.is_master:
                 loss = trainer.history[tag][-1]
                 if loss < trainer.min_loss:
+                    if os.path.exists(trainer.outdir) is False:
+                        os.mkdir(trainer.outdir)
                     trainer.min_loss = loss
                     save_state_dict(
                         model_name="checkpoint",
