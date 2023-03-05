@@ -59,6 +59,9 @@ class TrainerConfig:
         criterion_args (dict): The criterion arguments if there is any.
         Default {}.
 
+        grad_acc_steps (int): The number of steps to accumulate gradients
+        over. Default 1.
+
         grad_clip_thresh (Union[None, float]): max norm of the gradients.
         Default None.
 
@@ -82,6 +85,7 @@ class TrainerConfig:
     n_logs: int = 5
     clear_screen: bool = False
     criterion_args: dict = field(default_factory=dict)
+    grad_acc_steps: int = 1
     grad_clip_thresh: Union[None, float] = None
     grad_clip_norm_type: float = 2.0
 
