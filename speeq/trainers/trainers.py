@@ -118,14 +118,14 @@ class BaseTrainer(ITrainer):
         Args:
             loss (Tensor): The loss tensor.
         """
+        loss = loss / self.grad_acc_steps
+        loss.backward()
         if self.grad_clip_thresh is not None:
             torch.nn.utils.clip_grad_norm_(
                 self.model,
                 max_norm=self.grad_clip_thresh,
                 norm_type=self.grad_clip_norm_type,
             )
-        loss = loss / self.grad_acc_steps
-        loss.backward()
         if self.counter % self.grad_acc_steps == 0:
             self.optimizer.step()
             self.optimizer.zero_grad()
@@ -243,6 +243,9 @@ class BaseDistTrainer(BaseTrainer):
 
         dist_backend (str): The backend used for DDP.
 
+        grad_acc_steps (int): The number of steps to accumulate gradients
+        over. Default 1.
+
         grad_clip_thresh (Union[None, float]): The maximum norm of the gradients.
         Default None.
 
@@ -267,6 +270,7 @@ class BaseDistTrainer(BaseTrainer):
         dist_address: str,
         dist_port: int,
         dist_backend: str,
+        grad_acc_steps: int = 1,
         grad_clip_thresh: Union[None, float] = None,
         grad_clip_norm_type: float = 2.0,
         history={},
@@ -282,6 +286,7 @@ class BaseDistTrainer(BaseTrainer):
             log_steps_frequency=log_steps_frequency,
             logger=logger,
             outdir=outdir,
+            grad_acc_steps=grad_acc_steps,
             grad_clip_thresh=grad_clip_thresh,
             grad_clip_norm_type=grad_clip_norm_type,
             history=history,
@@ -316,6 +321,27 @@ class BaseDistTrainer(BaseTrainer):
         total = torch.tensor([total_loss / counter]).cuda(self.rank)
         all_reduce(total, op=ReduceOp.SUM)
         return total / self.world_size
+
+    def backward_pass(self, loss: Tensor) -> None:
+        """This method performs a backward pass on the model parameters to update
+        them based on the provided loss tensor.
+
+        Args:
+            loss (Tensor): The loss tensor.
+        """
+        loss = loss / self.grad_acc_steps
+        loss.backward()
+        if self.grad_clip_thresh is not None:
+            torch.nn.utils.clip_grad_norm_(
+                self.model,
+                max_norm=self.grad_clip_thresh,
+                norm_type=self.grad_clip_norm_type,
+            )
+        if self.counter % self.grad_acc_steps == 0:
+            for param in self.model.parameters():
+                param.grad.data /= self.world_size
+            self.optimizer.step()
+            self.optimizer.zero_grad()
 
     @step_log(key=HistoryKeys.train_loss.value, category=LogCategories.epochs.value)
     def train(self) -> float:
@@ -393,6 +419,9 @@ class CTCTrainer(BaseTrainer):
 
         outdir (Union[str, Path]):  The directory to save checkpoints.
 
+        grad_acc_steps (int): The number of steps to accumulate gradients
+        over. Default 1.
+
         grad_clip_thresh (Union[None, float]): The maximum norm of the gradients.
         Default None.
 
@@ -413,6 +442,7 @@ class CTCTrainer(BaseTrainer):
         device: str,
         logger: ILogger,
         outdir: Union[str, Path],
+        grad_acc_steps: int = 1,
         grad_clip_thresh: Union[None, float] = None,
         grad_clip_norm_type: float = 2.0,
         history: dict = {},
@@ -428,6 +458,7 @@ class CTCTrainer(BaseTrainer):
             log_steps_frequency=log_steps_frequency,
             logger=logger,
             outdir=outdir,
+            grad_acc_steps=grad_acc_steps,
             grad_clip_thresh=grad_clip_thresh,
             grad_clip_norm_type=grad_clip_norm_type,
             history=history,
@@ -478,6 +509,9 @@ class DistCTCTrainer(BaseDistTrainer, CTCTrainer):
 
         dist_backend (str): The backend used for DDP.
 
+        grad_acc_steps (int): The number of steps to accumulate gradients
+        over. Default 1.
+
         grad_clip_thresh (Union[None, float]): The maximum norm of the gradients.
         Default None.
 
@@ -502,6 +536,7 @@ class DistCTCTrainer(BaseDistTrainer, CTCTrainer):
         dist_address: int,
         dist_port: int,
         dist_backend: str,
+        grad_acc_steps: int = 1,
         grad_clip_thresh: Union[None, float] = None,
         grad_clip_norm_type: float = 2.0,
         history: dict = {},
@@ -518,6 +553,7 @@ class DistCTCTrainer(BaseDistTrainer, CTCTrainer):
             device=f"cuda:{rank}",
             logger=logger,
             outdir=outdir,
+            grad_acc_steps=grad_acc_steps,
             grad_clip_thresh=grad_clip_thresh,
             grad_clip_norm_type=grad_clip_norm_type,
             history=history,
@@ -538,6 +574,7 @@ class DistCTCTrainer(BaseDistTrainer, CTCTrainer):
             dist_address=dist_address,
             dist_port=dist_port,
             dist_backend=dist_backend,
+            grad_acc_steps=grad_acc_steps,
             grad_clip_thresh=grad_clip_thresh,
             grad_clip_norm_type=grad_clip_norm_type,
             history=history,
@@ -568,6 +605,9 @@ class Seq2SeqTrainer(BaseTrainer):
 
         outdir (Union[str, Path]):  The directory to save checkpoints.
 
+        grad_acc_steps (int): The number of steps to accumulate gradients
+        over. Default 1.
+
         grad_clip_thresh (Union[None, float]): The maximum norm of the gradients.
         Default None.
 
@@ -588,6 +628,7 @@ class Seq2SeqTrainer(BaseTrainer):
         device: str,
         logger: ILogger,
         outdir: Union[str, Path],
+        grad_acc_steps: int = 1,
         grad_clip_thresh: Union[None, float] = None,
         grad_clip_norm_type: float = 2.0,
         history: dict = {},
@@ -603,6 +644,7 @@ class Seq2SeqTrainer(BaseTrainer):
             log_steps_frequency=log_steps_frequency,
             logger=logger,
             outdir=outdir,
+            grad_acc_steps=grad_acc_steps,
             grad_clip_thresh=grad_clip_thresh,
             grad_clip_norm_type=grad_clip_norm_type,
             history=history,
@@ -652,6 +694,9 @@ class DistSeq2SeqTrainer(BaseDistTrainer, Seq2SeqTrainer):
 
         dist_backend (str): The backend used for DDP.
 
+        grad_acc_steps (int): The number of steps to accumulate gradients
+        over. Default 1.
+
         grad_clip_thresh (Union[None, float]): The maximum norm of the gradients.
         Default None.
 
@@ -676,6 +721,7 @@ class DistSeq2SeqTrainer(BaseDistTrainer, Seq2SeqTrainer):
         dist_address: int,
         dist_port: int,
         dist_backend: str,
+        grad_acc_steps: int = 1,
         grad_clip_thresh: Union[None, float] = None,
         grad_clip_norm_type: float = 2.0,
         history: dict = {},
@@ -692,6 +738,7 @@ class DistSeq2SeqTrainer(BaseDistTrainer, Seq2SeqTrainer):
             device=f"cuda:{rank}",
             logger=logger,
             outdir=outdir,
+            grad_acc_steps=grad_acc_steps,
             grad_clip_thresh=grad_clip_thresh,
             grad_clip_norm_type=grad_clip_norm_type,
             history=history,
@@ -712,6 +759,7 @@ class DistSeq2SeqTrainer(BaseDistTrainer, Seq2SeqTrainer):
             dist_address=dist_address,
             dist_port=dist_port,
             dist_backend=dist_backend,
+            grad_acc_steps=grad_acc_steps,
             grad_clip_thresh=grad_clip_thresh,
             grad_clip_norm_type=grad_clip_norm_type,
             history=history,
@@ -742,6 +790,9 @@ class TransducerTrainer(BaseTrainer):
 
         outdir (Union[str, Path]):  The directory to save checkpoints.
 
+        grad_acc_steps (int): The number of steps to accumulate gradients
+        over. Default 1.
+
         grad_clip_thresh (Union[None, float]): The maximum norm of the gradients.
         Default None.
 
@@ -762,6 +813,7 @@ class TransducerTrainer(BaseTrainer):
         device: str,
         logger: ILogger,
         outdir: Union[str, Path],
+        grad_acc_steps: int = 1,
         grad_clip_thresh: Union[None, float] = None,
         grad_clip_norm_type: float = 2.0,
         history: dict = {},
@@ -777,6 +829,7 @@ class TransducerTrainer(BaseTrainer):
             log_steps_frequency=log_steps_frequency,
             logger=logger,
             outdir=outdir,
+            grad_acc_steps=grad_acc_steps,
             grad_clip_thresh=grad_clip_thresh,
             grad_clip_norm_type=grad_clip_norm_type,
             history=history,
@@ -838,6 +891,9 @@ class DistTransducerTrainer(BaseDistTrainer, TransducerTrainer):
 
         dist_backend (str): The backend used for DDP.
 
+        grad_acc_steps (int): The number of steps to accumulate gradients
+        over. Default 1.
+
         grad_clip_thresh (Union[None, float]): The maximum norm of the gradients.
         Default None.
 
@@ -862,6 +918,7 @@ class DistTransducerTrainer(BaseDistTrainer, TransducerTrainer):
         dist_address: int,
         dist_port: int,
         dist_backend: str,
+        grad_acc_steps: int = 1,
         grad_clip_thresh: Union[None, float] = None,
         grad_clip_norm_type: float = 2.0,
         history: dict = {},
@@ -878,6 +935,7 @@ class DistTransducerTrainer(BaseDistTrainer, TransducerTrainer):
             device=f"cuda:{rank}",
             logger=logger,
             outdir=outdir,
+            grad_acc_steps=grad_acc_steps,
             grad_clip_thresh=grad_clip_thresh,
             grad_clip_norm_type=grad_clip_norm_type,
             history=history,
@@ -898,6 +956,7 @@ class DistTransducerTrainer(BaseDistTrainer, TransducerTrainer):
             dist_address=dist_address,
             dist_port=dist_port,
             dist_backend=dist_backend,
+            grad_acc_steps=grad_acc_steps,
             grad_clip_thresh=grad_clip_thresh,
             grad_clip_norm_type=grad_clip_norm_type,
             history=history,
