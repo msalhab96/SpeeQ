@@ -103,7 +103,8 @@ class BaseTrainer(ITrainer):
         self.grad_clip_norm_type = grad_clip_norm_type
         self.history = history
         self.counter = 1
-        self.min_loss = inf
+        if HistoryKeys.min_loss.value not in self.history:
+            self.history[HistoryKeys.min_loss.value] = inf
 
     def backward_pass(self, loss: Tensor) -> None:
         """This method performs a backward pass on the model parameters to update

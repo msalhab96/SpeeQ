@@ -45,6 +45,7 @@ class StateKeys(Enum):
 class HistoryKeys(Enum):
     train_loss = "train_loss"
     test_loss = "test_loss"
+    min_loss = "min_loss"
 
 
 class LogCategories(Enum):
