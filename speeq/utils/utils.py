@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import List, Optional, Union
 
 import torch
-from torch import Tensor
+from torch import Tensor, nn
 from torch.nn import Module
 from torch.optim import Optimizer
 
@@ -266,3 +266,21 @@ def truncate_attention_mask(mask: Tensor, right_size: int, left_size: int) -> Te
     new_mask = new_mask.index_put((indices,), torch.tensor(True)).view(max_len, max_len)
     # merging the original tensor with the new one
     return mask.unsqueeze(dim=1) & new_mask.unsqueeze(dim=0) & mask.unsqueeze(dim=-1)
+
+
+def has_bnorm(model: Module) -> bool:
+    """Checks if a model contains a batch normalization layer.
+
+    Args:
+        model (Module): The model to check.
+
+    Returns:
+        bool: A boolean value indicating whether the provided model contains
+        batch normalization or not.
+    """
+    for layer in model.children():
+        if isinstance(layer, (nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d)):
+            return True
+        if has_bnorm(layer):
+            return True
+    return False
