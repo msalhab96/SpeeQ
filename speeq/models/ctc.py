@@ -36,13 +36,11 @@ class CTCModel(nn.Module):
 
     def __new__(cls, *args, **kwargs):
         if cls is CTCModel:
-            raise NotImplementedError(
-                f"Cannot create object of type `{cls.__name__}`")
+            raise NotImplementedError(f"Cannot create object of type `{cls.__name__}`")
         return object.__new__(cls)
-    
+
     def __init__(self, pred_in_size: int, n_classes: int) -> None:
         super().__init__()
-        self.has_bnorm = False
         self.pred_net = PredModule(
             in_features=pred_in_size,
             n_classes=n_classes,
@@ -172,7 +170,6 @@ class BERT(nn.Module):
             in_features=d_model, n_classes=n_classes, activation=nn.LogSoftmax(dim=-1)
         )
         self.dropout = nn.Dropout(p_dropout)
-        self.has_bnorm = False
 
     def embed(self, x: Tensor, mask: Tensor):
         max_len = mask.sum(dim=-1).max().item()
@@ -246,7 +243,6 @@ class DeepSpeechV2(CTCModel):
         p_dropout: float,
     ) -> None:
         super().__init__(pred_in_size=hidden_size, n_classes=n_classes)
-        self.has_bnorm = True
         self.encoder = DeepSpeechV2Encoder(
             n_conv=n_conv,
             kernel_size=kernel_size,
@@ -324,7 +320,6 @@ class Conformer(CTCModel):
             res_scaling=res_scaling,
             p_dropout=p_dropout,
         )
-        self.has_bnorm = True
 
 
 class Jasper(CTCModel):
@@ -375,7 +370,6 @@ class Jasper(CTCModel):
         # TODO: Add normalization options
         # TODO: Add residual connections options
         # TODO: passing dropout list
-        self.has_bnorm = True
         self.encoder = JasperEncoder(
             in_features=in_features,
             num_blocks=num_blocks,
@@ -618,4 +612,3 @@ class Squeezeformer(CTCModel):
             ss_groups=ss_groups,
             masking_value=masking_value,
         )
-        self.has_bnorm = True
