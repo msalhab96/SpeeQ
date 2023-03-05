@@ -77,7 +77,6 @@ template, you can easily do the below.
     # define the template
     template = templates.CTCModelBuilderTemp(
         encoder=encoder,
-        has_bnorm=False,
         feat_size=feat_size
     )
 
