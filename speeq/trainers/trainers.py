@@ -608,12 +608,6 @@ class Seq2SeqTrainer(BaseTrainer):
         [speech, speech_mask, text, text_mask] = batch
         preds = self.model(speech, speech_mask, text, text_mask)
         loss = self.criterion(preds, text, text_mask)
-        import random
-
-        if random.random() > 0.98:
-            print(torch.argmax(preds[0, :, :], dim=-1))
-            print(text[0])
-            print("-" * 10)
         return loss
 
 
