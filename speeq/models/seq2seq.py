@@ -15,7 +15,11 @@ from torch import Tensor, nn
 from speeq.constants import ENC_OUT_KEY, HIDDEN_STATE_KEY
 from speeq.utils.utils import get_mask_from_lens
 
-from .decoders import GlobAttRNNDecoder, LocationAwareAttDecoder, SpeechTransformerDecoder
+from .decoders import (
+    GlobAttRNNDecoder,
+    LocationAwareAttDecoder,
+    SpeechTransformerDecoder,
+)
 from .encoders import PyramidRNNEncoder, RNNEncoder, SpeechTransformerEncoder
 
 
@@ -63,7 +67,6 @@ class BasicAttSeq2SeqRNN(nn.Module):
         rnn_type: str = "rnn",
     ) -> None:
         super().__init__()
-        self.has_bnorm = False
         self.encoder = RNNEncoder(
             in_features=in_features,
             hidden_size=hidden_size,
@@ -343,7 +346,6 @@ class SpeechTransformer(nn.Module):
         masking_value: int = -1e15,
     ) -> None:
         super().__init__()
-        self.has_bnorm = False
         self.encoder = SpeechTransformerEncoder(
             in_features=in_features,
             n_conv_layers=n_conv_layers,
