@@ -37,7 +37,7 @@ from speeq.config import ASRDataConfig, ModelConfig, TrainerConfig
 from speeq.constants import HistoryKeys, LogCategories
 from speeq.interfaces import IDataLoader, IScheduler, ITrainer
 from speeq.utils.loggers import ILogger
-from speeq.utils.utils import get_key_tag
+from speeq.utils.utils import get_key_tag, has_bnorm
 
 from .decorators import export_ckpt, step_log
 
@@ -285,7 +285,7 @@ class BaseDistTrainer(BaseTrainer):
         self.dist_address = dist_address
         self.dist_backend = dist_backend
         self.init_dist()
-        self.has_bnorm = self.model.has_bnorm
+        self.has_bnorm = has_bnorm(self.model)
         self.model.to(f"cuda:{rank}")
         self.model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(self.model)
         self.model = DistributedDataParallel(self.model, device_ids=[self.rank])
