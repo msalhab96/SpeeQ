@@ -234,6 +234,7 @@ class ConformerTransducer(RNNTransducer):
             res_scaling=res_scaling,
             p_dropout=p_dropout,
         )
+        self.has_bnorm = True
 
 
 class ContextNet(_BaseTransducer):
