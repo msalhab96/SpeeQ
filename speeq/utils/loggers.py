@@ -35,7 +35,11 @@ class TBLogger(ILogger):
         self.writer.add_scalar(tag, value, global_step=counter)
 
     def log(self, history: dict):
-        logs = {key: value[-self.n_logs :] for key, value in history.items()}
+        logs = {
+            key: value[-self.n_logs :]
+            for key, value in history.items()
+            if isinstance(value, list)
+        }
         if self.clear_screen is True:
             clear()  # cleaning the screen up
         print(logs)
