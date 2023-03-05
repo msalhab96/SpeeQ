@@ -66,6 +66,9 @@ class BaseTrainer(ITrainer):
 
         outdir (Union[str, Path]):  The directory to save checkpoints.
 
+        grad_acc_steps (int): The number of steps to accumulate gradients
+        over. Default 1.
+
         grad_clip_thresh (Union[None, float]): The maximum norm of the gradients.
         Default None.
 
@@ -85,6 +88,7 @@ class BaseTrainer(ITrainer):
         log_steps_frequency: int,
         logger: ILogger,
         outdir: Union[str, Path],
+        grad_acc_steps: int = 1,
         grad_clip_thresh: Union[None, float] = None,
         grad_clip_norm_type: float = 2.0,
         history: dict = {},
@@ -103,6 +107,7 @@ class BaseTrainer(ITrainer):
         self.grad_clip_norm_type = grad_clip_norm_type
         self.history = history
         self.counter = 1
+        self.grad_acc_steps = grad_acc_steps
         if HistoryKeys.min_loss.value not in self.history:
             self.history[HistoryKeys.min_loss.value] = inf
 
@@ -119,9 +124,11 @@ class BaseTrainer(ITrainer):
                 max_norm=self.grad_clip_thresh,
                 norm_type=self.grad_clip_norm_type,
             )
+        loss = loss / self.grad_acc_steps
         loss.backward()
-        self.optimizer.step()
-        self.optimizer.zero_grad()
+        if self.counter % self.grad_acc_steps == 0:
+            self.optimizer.step()
+            self.optimizer.zero_grad()
 
     def fit(self):
         """Fits the model on the training data."""
