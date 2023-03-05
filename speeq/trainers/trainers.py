@@ -122,7 +122,7 @@ class BaseTrainer(ITrainer):
         loss.backward()
         if self.grad_clip_thresh is not None:
             torch.nn.utils.clip_grad_norm_(
-                self.model,
+                self.model.parameters(),
                 max_norm=self.grad_clip_thresh,
                 norm_type=self.grad_clip_norm_type,
             )
@@ -333,7 +333,7 @@ class BaseDistTrainer(BaseTrainer):
         loss.backward()
         if self.grad_clip_thresh is not None:
             torch.nn.utils.clip_grad_norm_(
-                self.model,
+                self.model.parameters(),
                 max_norm=self.grad_clip_thresh,
                 norm_type=self.grad_clip_norm_type,
             )
