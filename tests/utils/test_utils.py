@@ -323,3 +323,72 @@ def test_truncate_attention_mask(mask, right_size, left_size, expected):
         mask=mask, left_size=left_size, right_size=right_size
     )
     assert torch.all(result == expected)
+
+
+def test_has_bnorm_with_linear():
+    model = torch.nn.Linear(5, 10)
+    assert utils.has_bnorm(model) == False
+
+
+def test_has_bnorm_with_negative_combined_layers():
+    class ModelA(torch.nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.fc = torch.nn.Linear(1, 2)
+            self.seq = torch.nn.Sequential(
+                torch.nn.Linear(2, 1),
+                torch.nn.Linear(2, 2),
+            )
+
+    class ModelB(torch.nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.fc = torch.nn.Linear(1, 2)
+            self.seq = torch.nn.Sequential(
+                torch.nn.Linear(2, 1),
+                torch.nn.Linear(2, 2),
+            )
+            self.rnn = torch.nn.RNN(2, 2)
+
+    class ModelC(torch.nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.a = ModelA()
+            self.b = ModelB()
+
+    assert utils.has_bnorm(ModelA()) == False
+    assert utils.has_bnorm(ModelB()) == False
+    assert utils.has_bnorm(ModelC()) == False
+
+
+def test_has_bnorm_with_positive_combined_layers():
+    class ModelA(torch.nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.fc = torch.nn.Linear(1, 2)
+            self.seq = torch.nn.Sequential(
+                torch.nn.Linear(2, 1),
+                torch.nn.Linear(2, 2),
+                torch.nn.BatchNorm1d(2),
+            )
+
+    class ModelB(torch.nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.fc = torch.nn.Linear(1, 2)
+            self.seq = torch.nn.Sequential(
+                torch.nn.Linear(2, 1),
+                torch.nn.Linear(2, 2),
+                torch.nn.BatchNorm2d(2),
+            )
+            self.rnn = torch.nn.RNN(2, 2)
+
+    class ModelC(torch.nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.a = ModelA()
+            self.b = ModelB()
+
+    assert utils.has_bnorm(ModelA())
+    assert utils.has_bnorm(ModelB())
+    assert utils.has_bnorm(ModelC())
