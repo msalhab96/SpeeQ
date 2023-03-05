@@ -35,7 +35,6 @@ from .encoders import (
 class _BaseTransducer(nn.Module):
     def __init__(self, feat_size: int, n_classes: int) -> None:
         super().__init__()
-        self.has_bnorm = False
         self.join_net = nn.Linear(in_features=feat_size, out_features=n_classes)
 
     def forward(
@@ -234,7 +233,6 @@ class ConformerTransducer(RNNTransducer):
             res_scaling=res_scaling,
             p_dropout=p_dropout,
         )
-        self.has_bnorm = True
 
 
 class ContextNet(_BaseTransducer):
@@ -289,7 +287,6 @@ class ContextNet(_BaseTransducer):
             out_channels[-1] if isinstance(out_channels, list) else out_channels,
             n_classes,
         )
-        self.has_bnorm = True
         self.encoder = ContextNetEncoder(
             in_features=in_features,
             n_layers=n_layers,
