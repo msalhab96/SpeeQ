@@ -176,6 +176,7 @@ def _get_asr_trainer_args(
         "logger": logger,
         "outdir": trainer_config.outdir,
         "history": history,
+        "grad_acc_steps": trainer_config.grad_acc_steps,
     }
     if world_size == 1:
         args["device"] = trainer_config.device
