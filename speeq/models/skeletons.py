@@ -22,9 +22,6 @@ class CTCSkeleton(CTCModel):
         the forward of the encoder returns a tuple of the encoded speech
         tensor and a length tensor for the encoded speech.
 
-        has_bnorm (bool): A flag indicates whether the encoder or the decoder
-        has batch normalization.
-
         pred_net (Union[Module, None]): The prediction network. if provided
         the forward of the prediction network expected to have log softmax
         as an activation function, and the predictions of shape [B, T, C]
@@ -41,7 +38,6 @@ class CTCSkeleton(CTCModel):
     def __init__(
         self,
         encoder: Module,
-        has_bnorm: bool,
         pred_net: Union[Module, None] = None,
         feat_size: Union[int, None] = None,
         n_classes: Union[int, None] = None,
@@ -55,7 +51,6 @@ class CTCSkeleton(CTCModel):
         if n_classes is not None:
             args[1] = n_classes
         super().__init__(*args)
-        self.has_bnorm = has_bnorm
         self.encoder = encoder
         if pred_net is not None:
             self.pred_net = pred_net
@@ -72,9 +67,6 @@ class TransducerSkeleton(_BaseTransducer):
         decoder (Module): The text decoder such that
         the forward method of the decoder returns a tuple of the encoded
         text tensor and a length tensor for the encoded text.
-
-        has_bnorm (bool): A flag indicates whether the encoder, the decoder, or
-        the join network has batch normalization.
 
         join_net (Union[Module, None]): The join network. if provided
         the forward of the join network expected to have no activation
@@ -94,7 +86,6 @@ class TransducerSkeleton(_BaseTransducer):
         self,
         encoder: Module,
         decoder: Module,
-        has_bnorm: bool,
         join_net: Union[Module, None] = None,
         feat_size: Union[int, None] = None,
         n_classes: Union[int, None] = None,
@@ -108,7 +99,6 @@ class TransducerSkeleton(_BaseTransducer):
         if n_classes is not None:
             args[1] = n_classes
         super().__init__(*args)
-        self.has_bnorm = has_bnorm
         self.encoder = encoder
         self.decoder = decoder
         if join_net is not None:
@@ -129,18 +119,12 @@ class Seq2SeqSkeleton(Module):
         last encoder's hidden state (if there is any), the encoder mask,
         the decoder input, and the decoder mask and returns the prediction
         tensor.
-
-        has_bnorm (bool): A flag indicates whether the encoder, the decoder
-        has batch normalization.
     """
 
-    def __init__(
-        self, encoder: Module, decoder: Module, has_bnorm: bool, *args, **kwargs
-    ) -> None:
+    def __init__(self, encoder: Module, decoder: Module, *args, **kwargs) -> None:
         super().__init__()
         self.encoder = encoder
         self.decoder = decoder
-        self.has_bnorm = has_bnorm
 
     def _process_encoder_out(self, out: tuple) -> dict:
         if len(out) == 2:
