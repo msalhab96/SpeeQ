@@ -185,5 +185,8 @@ class TransducerPredictor(_ASRBasePredictor):
                 state[SPEECH_IDX_KEY] += 1
                 state[HIDDEN_STATE_KEY] = state[PREV_HIDDEN_STATE_KEY]
                 state[PREDS_KEY] = state[PREDS_KEY][:, :-1]
+            if last_pred == self.eos:
+                state[PREDS_KEY] = state[PREDS_KEY][:, :-1]
+                break
         results = state[PREDS_KEY][0, :].tolist()
         return "".join(self.tokenizer.ids2tokens(results[1:]))
