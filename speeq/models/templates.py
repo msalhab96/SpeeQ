@@ -757,8 +757,6 @@ class CTCModelBuilderTemp(BaseTemplate):
         the forward of the encoder returns a tuple of the encoded speech
         tensor and a length tensor of the encoded speech.
 
-        has_bnorm (bool): A flag indicates whether the encoder or the decoder
-        has batch normalization.
 
         pred_net (Union[Module, None]): The prediction network. if provided
         the forward of the prediction network expected to have log softmax
@@ -771,7 +769,6 @@ class CTCModelBuilderTemp(BaseTemplate):
     """
 
     encoder: Module
-    has_bnorm: bool
     pred_net: Union[Module, None] = None
     feat_size: Union[int, None] = None
     _name = CTC_TYPE
@@ -791,9 +788,6 @@ class TransducerBuilderTemp(BaseTemplate):
         the forward method of the decoder returns a tuple of the encoded
         text tensor and a length tensor for the encoded text.
 
-        has_bnorm (bool): A flag indicates whether the encoder, the decoder, or
-        the join network has batch normalization.
-
         join_net (Union[Module, None]): The join network. if provided
         the forward of the join network expected to have no activation
         function, and the results of shape [B, Ts, Tt, C], where B the
@@ -807,7 +801,6 @@ class TransducerBuilderTemp(BaseTemplate):
 
     encoder: Module
     decoder: Module
-    has_bnorm: bool
     join_net: Union[Module, None] = None
     feat_size: Union[None, int] = None
     _name = TRANSDUCER_TYPE
@@ -829,14 +822,10 @@ class Seq2SeqBuilderTemp(BaseTemplate):
         last encoder's hidden state (if there is any), the encoder mask,
         the decoder input, and the decoder mask and returns the prediction
         tensor.
-
-        has_bnorm (bool): A flag indicates whether the encoder, the decoder
-        has batch normalization.
     """
 
     encoder: Module
     decoder: Module
-    has_bnorm: bool
     _name = SEQ2SEQ_TYPE
     _type = MODEL_BUILDER_TYPE
 
