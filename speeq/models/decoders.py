@@ -425,10 +425,13 @@ class TransducerRNNDecoder(nn.Module):
 
     def predict(self, state: dict) -> dict:
         h = state[HIDDEN_STATE_KEY]
+        if not isinstance(h, list):
+            h = [h] * len(self.layers)
         last_pred = state[PREDS_KEY][:, -1:]
         lens = torch.ones(last_pred.shape[0], dtype=torch.long)
         out = self.emb(last_pred)
-        out, h, _ = self.rnn(out, lens, h)
+        for i, rnn in enumerate(self.layers):
+            out, h[i], _ = rnn(out, lens, h[i])
         state[HIDDEN_STATE_KEY] = h
         state[DECODER_OUT_KEY] = out
         return state
