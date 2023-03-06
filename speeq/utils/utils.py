@@ -20,8 +20,8 @@ def clear():
         os.system("clear")
 
 
-def get_text_list(data: List[dict]) -> List[str]:
-    return [item[FileKeys.text_key.value] for item in data]
+def get_text_list(data: List[dict], key=FileKeys.text_key.value) -> List[str]:
+    return [item[key] for item in data]
 
 
 def load_json(file_path, encoding="utf-8"):
