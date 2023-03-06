@@ -137,7 +137,7 @@ def _get_asr_trainer_args(
         clear_screen=trainer_config.clear_screen,
     )
     data = load_csv(data_config.training_path, sep=data_config.sep)
-    data = get_text_list(data=data)
+    data = get_text_list(data=data, key=data_config.text_key)
     tokenizer = get_tokenizer(data_config=data_config, data=data)
     model = get_model(model_config=model_config, n_classes=tokenizer.vocab_size)
     if world_size == 1:
