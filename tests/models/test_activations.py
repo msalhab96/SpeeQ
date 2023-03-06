@@ -30,8 +30,6 @@ class TestSigmax:
         act = activations.Sigmax(dim=dim)
         inp = torch.ones(*inp_shape)
         result = act(inp)
-        print(result.sum(dim=dim))
-        print(result.shape, inp_shape[dim], result.sum(dim=dim).shape)
         if len(inp_shape) == 1:
             expected = 1
         else:
@@ -113,5 +111,4 @@ class TestCReLu:
         """tests the correctness of the values."""
         act = activations.CReLu(max_val)
         result = act(inputs)
-        print(result)
         assert torch.allclose(result, expected, rtol=1e-15, atol=1e-15)

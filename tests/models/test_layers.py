@@ -308,8 +308,6 @@ class TestMaskedMultiHeadAtt:
         """Test the functionality of .get_looking_ahead_mask function"""
         model = layers.MaskedMultiHeadAtt(d_model=d_model, h=h)
         result = model.get_looking_ahead_mask(key_mask)
-        print(result)
-        print(expected)
         assert torch.all(result == expected).item()
 
 
@@ -526,7 +524,6 @@ class TestConv1DLayers:
             activation=activation,
         )
         result, lengths = model(batch, lengths)
-        print(lengths.dtype)
         assert lengths.dtype in [torch.int32, torch.int64, torch.long]
         assert result.shape == expected_shape
         assert torch.all(lengths == expected_len).item()

@@ -187,8 +187,6 @@ def speech_text_loader(speech_text_dataset):
         dataset = speech_text_dataset(use_mel_spec=use_mel_spec)
         speech_padder = DynamicPadder(dim=-2 if use_mel_spec else -1, pad_val=0)
         text_padder = DynamicPadder(dim=-1, pad_val=0)
-        print("*" * 10)
-        print(len(dataset), batch_size)
         return SpeechTextLoader(
             dataset=dataset,
             batch_size=batch_size,

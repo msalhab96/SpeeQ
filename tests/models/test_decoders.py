@@ -445,7 +445,6 @@ class TestTransformerTransducerDecoder:
         expected_shape,
     ):
         input = int_batcher(batch_size, seq_len, vocab_size)
-        print(input.shape)
         model = decoders.TransformerTransducerDecoder(
             vocab_size=vocab_size,
             n_layers=n_layers,
@@ -458,6 +457,5 @@ class TestTransformerTransducerDecoder:
         )
         mask = get_mask(seq_len, pad_lens)
         result, _ = model(input, mask)
-        print(result.shape)
         check_grad(result=result, model=model)
         assert result.shape == expected_shape
