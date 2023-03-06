@@ -105,6 +105,8 @@ def get_asr_datasets(
         sep=data_config.sep,
         add_eos=data_config.add_eos_token,
         add_sos=data_config.add_sos_token,
+        text_key=data_config.text_key,
+        speech_key=data_config.speech_key,
         sort_key=data_config.sort_key,
         reverse=data_config.reverse,
     )
@@ -116,6 +118,8 @@ def get_asr_datasets(
         sep=data_config.sep,
         add_eos=data_config.add_eos_token,
         add_sos=data_config.add_sos_token,
+        text_key=data_config.text_key,
+        speech_key=data_config.speech_key,
         sort_key=data_config.sort_key,
         reverse=data_config.reverse,
     )

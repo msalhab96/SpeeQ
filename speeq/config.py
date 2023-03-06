@@ -13,6 +13,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Union
 
+from speeq.constants import FileKeys
+
 from .interfaces import IProcessor, ITemplate
 
 
@@ -112,6 +114,12 @@ class ASRDataConfig:
 
         type (str): the file and the dataset type. Default 'csv'.
 
+        text_key (Optional[str]): The name of the column that holds the text
+        data. Default 'text'.
+
+        speech_key (Optional[str]): The name of the column that holds the audio
+        file path. Default 'file_path'
+
         padding_type (str): The padding to use static or dynamic.
         Default 'dynamic'.
 
@@ -150,6 +158,8 @@ class ASRDataConfig:
     tokenizer_type: str = "char_tokenizer"
     sep: str = ","
     type: str = "csv"
+    text_key: str = FileKeys.text_key.value
+    speech_key: str = FileKeys.speech_key.value
     padding_type: str = "dynamic"
     text_pad_max_len: int = -1
     speech_pad_max_len: int = -1
