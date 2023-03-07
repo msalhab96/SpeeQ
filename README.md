@@ -1,8 +1,10 @@
+<h1 align="center">
 
 [![Documentation Status](https://readthedocs.org/projects/speeq/badge/?version=latest)](https://speeq.readthedocs.io/en/latest/?badge=latest)
 [![CI](https://github.com/msalhab96/SpeeQ/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/msalhab96/SpeeQ/actions/workflows/ci.yml)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
+ </h1>
 
 # SpeeQ
 "SpeeQ", pronounced as "speekiu", is a Python-based speech recognition framework that allows developers and researchers to experiment and train various speech recognition models. It offers pre-implemented model architectures that can be trained with just a few lines of code, making it a suitable option for quick prototyping and testing of speech recognition models.
