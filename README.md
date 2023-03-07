@@ -3,6 +3,8 @@
 [![Documentation Status](https://readthedocs.org/projects/speeq/badge/?version=latest)](https://speeq.readthedocs.io/en/latest/?badge=latest)
 [![CI](https://github.com/msalhab96/SpeeQ/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/msalhab96/SpeeQ/actions/workflows/ci.yml)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 
  </div>
 
