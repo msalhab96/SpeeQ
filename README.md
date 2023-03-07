@@ -63,3 +63,22 @@ source env/bin/activate
 | LAS | [Listen, Attend and Spell](https://arxiv.org/abs/1508.01211) | Seq2Seq (encoder/decoder) |
 | RNNWithLocationAwareAtt | [Attention-Based Models for Speech Recognition](https://arxiv.org/abs/1506.07503) | Seq2Seq (encoder/decoder) |
 | SpeechTransformer | [Speech-Transformer: A No-Recurrence Sequence-to-Sequence Model for Speech Recognition](https://ieeexplore.ieee.org/document/8462506) | Seq2Seq (encoder/decoder) |
+
+
+# Contributiuon
+Your contributions are highly valued and appreciated! Our aim is to create an open and transparent environment that facilitates easy and straightforward contributions to this project. This can include reporting any issues or bugs you encounter, engaging in discussions regarding the current codebase, submitting fixes, proposing new features, or even becoming a maintainer yourself. We believe that your input is crucial to the continued growth and success of this framework. To start contributing to the framework, please consult the (guidelines)[https://speeq.readthedocs.io/en/latest/files/contribution.html] for contributions.
+
+# License & Citation
+The framework is licensed under MIT. Therefore, if you use the framework, please consider citing it using the following bitex.
+
+```
+@software{Salhab_SpeeQ_A_framework_2023,
+author = {Salhab, Mahmoud},
+license = {MIT},
+month = {3},
+title = {{SpeeQ: A framework for automatic speech recognition}},
+url = {https://github.com/msalhab96/SpeeQ},
+version = {0.0.1},
+year = {2023}
+}
+```
