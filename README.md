@@ -66,7 +66,7 @@ source env/bin/activate
 
 
 # Contributiuon
-Your contributions are highly valued and appreciated! Our aim is to create an open and transparent environment that facilitates easy and straightforward contributions to this project. This can include reporting any issues or bugs you encounter, engaging in discussions regarding the current codebase, submitting fixes, proposing new features, or even becoming a maintainer yourself. We believe that your input is crucial to the continued growth and success of this framework. To start contributing to the framework, please consult the (guidelines)[https://speeq.readthedocs.io/en/latest/files/contribution.html] for contributions.
+Your contributions are highly valued and appreciated! Our aim is to create an open and transparent environment that facilitates easy and straightforward contributions to this project. This can include reporting any issues or bugs you encounter, engaging in discussions regarding the current codebase, submitting fixes, proposing new features, or even becoming a maintainer yourself. We believe that your input is crucial to the continued growth and success of this framework. To start contributing to the framework, please consult the [guidelines](https://speeq.readthedocs.io/en/latest/files/contribution.html) for contributions.
 
 # License & Citation
 The framework is licensed under MIT. Therefore, if you use the framework, please consider citing it using the following bitex.
