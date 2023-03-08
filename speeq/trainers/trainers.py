@@ -975,7 +975,7 @@ def _run_trainer(
         # This can be replaced if we pass the rank to the
         # factories depend on the master node
         time.sleep(5)
-    from .registry import get_asr_trainer
+    from speeq.trainers.registry import get_asr_trainer
 
     trainer = get_asr_trainer(
         rank=rank,
