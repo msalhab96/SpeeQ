@@ -26,7 +26,7 @@ python3 -m venv env
 source env/bin/activate
 ```
 
-2. Install the packge either from source
+2. Install the packge from source
 
     ```bash
     git clone https://github.com/msalhab96/SpeeQ.git
