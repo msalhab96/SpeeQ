@@ -26,21 +26,13 @@ python3 -m venv env
 source env/bin/activate
 ```
 
-2. Install the packge either from source or from PyPI
-
-  * from PyPI
-
-    ```bash
-    pip install speeq
-    ```
-
-
-  * from source
+2. Install the packge either from source
 
     ```bash
     git clone https://github.com/msalhab96/SpeeQ.git
     cd SpeeQ
-    pip install .
+    pip install -r requirements.txt
+    pip install -e .
     ```
 
 # Implemented Models/Papers
