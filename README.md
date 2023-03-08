@@ -74,6 +74,7 @@ The framework is licensed under MIT. Therefore, if you use the framework, please
 ```
 @software{Salhab_SpeeQ_A_framework_2023,
 author = {Salhab, Mahmoud},
+doi = {10.5281/zenodo.7708780},
 license = {MIT},
 month = {3},
 title = {{SpeeQ: A framework for automatic speech recognition}},
