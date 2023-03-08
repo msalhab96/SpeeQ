@@ -11,3 +11,4 @@ version: "0.0.1"
 url: "https://github.com/msalhab96/SpeeQ"
 keywords:
   - Speech Recognition
+doi: 10.5281/zenodo.7708780
