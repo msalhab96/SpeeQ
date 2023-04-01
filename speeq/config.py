@@ -101,7 +101,10 @@ class ASRDataConfig:
 
         testing_path (Union[str, Path]): The testing data path.
 
-        speech_processor (IProcessor): The speech processor, where the `run` method
+        train_speech_processor (IProcessor): The training data speech processor, where the `run` method
+        returns the speech data with shape [B] or [1, M], or [..., M, F].
+
+        test_speech_processor (IProcessor): The testing data speech processor, where the `run` method
         returns the speech data with shape [B] or [1, M], or [..., M, F].
 
         text_processor (IProcessor): The text processor.
@@ -152,7 +155,8 @@ class ASRDataConfig:
 
     training_path: Union[str, Path]
     testing_path: Union[str, Path]
-    speech_processor: IProcessor
+    train_speech_processor: IProcessor
+    test_speech_processor: IProcessor
     text_processor: IProcessor
     tokenizer_path: Union[str, Path]
     tokenizer_type: str = "char_tokenizer"
