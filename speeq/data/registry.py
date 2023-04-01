@@ -100,7 +100,7 @@ def get_asr_datasets(
     train_dataset = SpeechTextDataset(
         data_path=data_config.training_path,
         tokenizer=tokenizer,
-        speech_processor=data_config.speech_processor,
+        speech_processor=data_config.train_speech_processor,
         text_processor=data_config.text_processor,
         sep=data_config.sep,
         add_eos=data_config.add_eos_token,
@@ -113,7 +113,7 @@ def get_asr_datasets(
     test_dataset = SpeechTextDataset(
         data_path=data_config.testing_path,
         tokenizer=tokenizer,
-        speech_processor=data_config.speech_processor,
+        speech_processor=data_config.test_speech_processor,
         text_processor=data_config.text_processor,
         sep=data_config.sep,
         add_eos=data_config.add_eos_token,
