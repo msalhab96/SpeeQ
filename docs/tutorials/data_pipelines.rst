@@ -99,11 +99,17 @@ example of how to create a speech processor in both scenarios:
     freq_domain_aug = StochasticProcessor([
         FrequencyMasking(n=5, max_length=10, ratio=0.2)
     ])
+    # speech processor for training data
     speech_processor_with_rand_aug = SpeechProcessor(
         audio_processor=speech_file_processor,
         audio_augmenter=time_domain_aug,
         spec_processor=spec_processor,
         spec_augmenter=freq_domain_aug
+    )
+    # creating speech processor for testing data
+    test_speech_processor = SpeechProcessor(
+        audio_processor=speech_file_processor,
+        spec_processor=spec_processor,
     )
 
     """The speech_processor_with_rand_aug will perform the following steps in a
@@ -129,7 +135,8 @@ ASRDataConfig object:
     data_cfg = ASRDataConfig(
         training_path='path/to/train.csv',
         testing_path='path/to/test.csv',
-        speech_processor=speech_processor,
+        train_speech_processor=train_speech_processor,
+        test_speech_processor=test_speech_processor,
         text_processor=text_processor,
         tokenizer_path='outdir/tokenizer.json',
         tokenizer_type='char_tokenizer',
